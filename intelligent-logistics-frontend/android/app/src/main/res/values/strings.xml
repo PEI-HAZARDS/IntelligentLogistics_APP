@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Intelligent Logistics</string>
+    <string name="title_activity_main">Intelligent Logistics</string>
+    <string name="package_name">pt.ilogistics</string>
+    <string name="custom_url_scheme">pt.ilogistics</string>
+</resources>
