@@ -1,0 +1,34 @@
+.header-root {
+  background: #16386a;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-left { display: flex; flex-direction: column; }
+
+.header-title { font-size: 18px; font-weight: 700; line-height: 1; }
+
+.header-subtitle { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-user { font-size: 13px; }
+
+.header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: rgba(255,255,255,0.03);
+}
