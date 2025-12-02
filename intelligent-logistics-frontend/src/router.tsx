@@ -2,8 +2,10 @@ import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Login from './Login';
 
-const GateLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorQuick'));
+const GateQuickLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorQuick'));
+const GateDetailLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorDetail'));
 const Dashboard = React.lazy(() => import('./app/gate-operator/components/Dashboard'));
+const ArrivalsList = React.lazy(() => import('./app/gate-operator/routes/ArrivalsList'));
 const ArrivalCard = React.lazy(() => import('./app/gate-operator/components/ArrivalCard'));
 
 const router = createBrowserRouter([
@@ -11,10 +13,16 @@ const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   {
     path: '/gate',
-    element: <GateLayout />,
+    element: <GateQuickLayout />,
     children: [
       { index: true, element: <Dashboard /> },
-      /* { path: 'arrival/:id', element: <ArrivalCard /> }, */
+    ],
+  },
+  {
+    path: '/gate/arrivals',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <ArrivalsList /> },
     ],
   },
 ]);

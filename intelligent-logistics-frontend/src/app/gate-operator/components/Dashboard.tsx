@@ -1,5 +1,7 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import HLSPlayer from "./HLSPlayer";
+import { getStreamUrl } from "../../../config/streams";
 
 type Detection = {
   id: string;
@@ -79,15 +81,17 @@ const mockArrivals: Arrival[] = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   return (
     <div className="operator-dashboard">
       {/* Coluna Esquerda - Câmera e Deteções */}
       <div className="left-panel">
         <div className="camera-section">
-          <img
-            src="/api/placeholder/800/450"
-            alt="Vista da câmera"
-            className="camera-feed"
+          <HLSPlayer
+            streamUrl={getStreamUrl("gate01", "high")}
+            quality="high"
+            autoPlay={true}
           />
         </div>
 
@@ -113,14 +117,13 @@ export default function Dashboard() {
             <span className="time-label">Hora:</span>
             <span className="time-value">22:12</span>
           </div>
-          <div className="notification-icon">
-            <span className="badge">1</span>
-          </div>
         </div>
 
         <h2 className="panel-title">Próximas Chegadas</h2>
 
-        <button className="view-toggle-btn">Visão Geral</button>
+        <button className="view-toggle-btn" onClick={() => navigate('/gate/arrivals')}>
+          Visão Geral
+        </button>
 
         <div className="arrivals-list">
           {mockArrivals.map((arrival) => (

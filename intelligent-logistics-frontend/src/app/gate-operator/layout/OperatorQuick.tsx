@@ -9,7 +9,7 @@ export default function OperatorQuick() {
       <header className="operator-header">
         <div className="header-left">
           <div className="logo-section">
-            <div className="logo-icon"></div>
+            <img src="/logo.png" alt="Porto de Aveiro" className="logo-icon" />
             <span className="logo-text">Porto de Aveiro</span>
           </div>
           <span className="header-subtitle">
