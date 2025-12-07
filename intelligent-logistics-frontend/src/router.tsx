@@ -1,12 +1,12 @@
 import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import Login from './Login';
+import Login from '@/pages/Login/Login';
 
-const GateQuickLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorQuick'));
-const GateDetailLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorDetail'));
-const Dashboard = React.lazy(() => import('./app/gate-operator/components/Dashboard'));
-const ArrivalsList = React.lazy(() => import('./app/gate-operator/routes/ArrivalsList'));
-const ArrivalCard = React.lazy(() => import('./app/gate-operator/components/ArrivalCard'));
+const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorQuick'));
+const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
+const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
+const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
+const ArrivalCard = React.lazy(() => import('@/components/gate-operator/ArrivalCard'));
 
 const router = createBrowserRouter([
   { path: '/', element: <Login /> },

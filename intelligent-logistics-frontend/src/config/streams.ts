@@ -1,6 +1,7 @@
+const DEFAULT_STREAM_BASE_URL = "http://10.255.32.35:8080";
 // Configuração das streams HLS
 export const STREAM_CONFIG = {
-  baseUrl: "http://10.255.32.35:8080",
+  baseUrl: DEFAULT_STREAM_BASE_URL,
   gates: {
     gate01: {
       low: "/hls/low/gate01/index.m3u8",
