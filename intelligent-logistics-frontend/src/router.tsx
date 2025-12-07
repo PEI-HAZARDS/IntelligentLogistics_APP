@@ -1,25 +1,36 @@
 import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-/* import { AuthProvider } from './features/auth/AuthProvider';
-import Login from './features/auth/Login'; */
+import Login from '@/pages/Login/Login';
 
-const DriverLayout = React.lazy(() => import('./app/driver/layout/DriverLayout'));
-const GateLayout = React.lazy(() => import('./app/gate-operator/layout/GateOperatorLayout'));
-const ManagerLayout = React.lazy(() => import('./app/logistics-manager/layout/ManagerLayout'));
+const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorQuick'));
+const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
+const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
+const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
+const ArrivalCard = React.lazy(() => import('@/components/gate-operator/ArrivalCard'));
 
 const router = createBrowserRouter([
   { path: '/', element: <Login /> },
-  { path: '/driver/*', element: <DriverLayout /> },
-  { path: '/gate/*', element: <GateLayout /> },
-  { path: '/manager/*', element: <ManagerLayout /> },
+  { path: '/login', element: <Login /> },
+  {
+    path: '/gate',
+    element: <GateQuickLayout />,
+    children: [
+      { index: true, element: <Dashboard /> },
+    ],
+  },
+  {
+    path: '/gate/arrivals',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <ArrivalsList /> },
+    ],
+  },
 ]);
 
 export default function AppRouter() {
   return (
-    <AuthProvider>
-      <Suspense fallback={<div>Loading...</div>}>
-        <RouterProvider router={router} />
-      </Suspense>
-    </AuthProvider>
+    <Suspense fallback={<div>Carregando...</div>}>
+      <RouterProvider router={router} />
+    </Suspense>
   );
 }
