@@ -9,7 +9,7 @@ const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'
 const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
 
 // Componentes do Motorista
-const DriverHome = React.lazy(() => import('@/pages/driver/DriverHome'));
+const DriverLayout = React.lazy(() => import('@/components/layout/driver/DriverLayout'));
 
 // Componentes do Gestor Logístico
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
@@ -46,7 +46,7 @@ const driverRoutes = [
   ...commonRoutes,
   {
     path: '/driver',
-    element: <DriverHome />
+    element: <DriverLayout />
   },
   // Redireciona qualquer rota desconhecida para /driver
   { path: '*', element: <Navigate to="/driver" replace /> }
