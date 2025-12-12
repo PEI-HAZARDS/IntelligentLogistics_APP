@@ -77,14 +77,14 @@ export default function Login() {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
         if (axiosError.response?.status === 401) {
-          setError("Credenciais inválidas. Verifique o email/carta e password.");
+          setError("Invalid credentials. Check your email/license and password.");
         } else if (axiosError.response?.status === 404) {
-          setError("Utilizador não encontrado.");
+          setError("User not found.");
         } else {
-          setError(axiosError.response?.data?.detail || "Erro ao fazer login. Tente novamente.");
+          setError(axiosError.response?.data?.detail || "Login failed. Please try again.");
         }
       } else {
-        setError("Erro de ligação. Verifique a sua ligação à rede.");
+        setError("Connection error. Please check your network.");
       }
     } finally {
       setIsLoading(false);
@@ -111,7 +111,7 @@ export default function Login() {
 
           {/* Subtítulo baseado no modo */}
           <p className="login-subtitle">
-            {isDriverMode ? "Área do Motorista" : mode === 'manager' ? "Gestor Logístico" : "Operador de Portaria"}
+            {isDriverMode ? "Driver Area" : mode === 'manager' ? "Logistics Manager" : "Gate Operator"}
           </p>
 
           {/* Mensagem de erro */}
@@ -143,11 +143,11 @@ export default function Login() {
               </div>
               <input
                 type="text"
-                placeholder={isDriverMode ? "Carta de Condução" : "Email"}
+                placeholder={isDriverMode ? "Driver's License" : "Email"}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="login-input"
-                aria-label={isDriverMode ? "Carta de Condução" : "Email"}
+                aria-label={isDriverMode ? "Driver's License" : "Email"}
                 required
                 disabled={isLoading}
               />
@@ -214,7 +214,7 @@ export default function Login() {
                   <svg className="spinner" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" />
                   </svg>
-                  A entrar...
+                  Logging in...
                 </span>
               ) : (
                 "LOGIN"
@@ -224,7 +224,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="login-footer">
-            © 2025 Sistema de Gestão Logística Portuária
+            © 2025 Port Logistics Management System
           </div>
         </div>
       </div>

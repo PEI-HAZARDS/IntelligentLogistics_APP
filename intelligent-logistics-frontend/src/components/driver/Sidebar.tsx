@@ -51,7 +51,7 @@ const Sidebar = ({ isOpen, onClose, driverName = 'Motorista' }: SidebarProps) =>
                 <div className="flex-1 py-4 px-3 space-y-1">
                     <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-[var(--bg-card-hover)]">
                         <Settings size={20} color="var(--icon-color)" />
-                        <span className="font-medium">Definições</span>
+                        <span className="font-medium">Settings</span>
                     </button>
                 </div>
 
@@ -62,7 +62,7 @@ const Sidebar = ({ isOpen, onClose, driverName = 'Motorista' }: SidebarProps) =>
                         className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                     >
                         <LogOut size={20} />
-                        <span className="font-medium">Terminar Sessão</span>
+                        <span className="font-medium">Log Out</span>
                     </button>
                 </div>
             </div>

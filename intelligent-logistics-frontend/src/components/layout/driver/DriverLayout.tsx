@@ -16,7 +16,7 @@ const DriverLayout = () => {
     // User info from localStorage
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
     const driversLicense = userInfo.drivers_license;
-    const driverName = userInfo.name || 'Motorista';
+    const driverName = userInfo.name || 'Driver';
 
     // Claim state
     const [pinCode, setPinCode] = useState('');
@@ -37,7 +37,7 @@ const DriverLayout = () => {
     // Handle PIN claim
     const handleClaimArrival = useCallback(async () => {
         if (!pinCode.trim() || !driversLicense) {
-            setError('Por favor, introduza o código PIN.');
+            setError('Please enter the PIN code.');
             return;
         }
 
@@ -51,7 +51,7 @@ const DriverLayout = () => {
             });
 
             setClaimResult(result);
-            setSuccessMessage('Chegada registada com sucesso!');
+            setSuccessMessage('Arrival registered successfully!');
             setPinCode('');
 
             // Auto-switch to internal navigation after claim
@@ -61,14 +61,14 @@ const DriverLayout = () => {
             if (err && typeof err === 'object' && 'response' in err) {
                 const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
                 if (axiosError.response?.status === 404) {
-                    setError('Código PIN não encontrado. Verifique o código.');
+                    setError('PIN code not found. Please check the code.');
                 } else if (axiosError.response?.status === 400) {
-                    setError(axiosError.response?.data?.detail || 'Código PIN inválido.');
+                    setError(axiosError.response?.data?.detail || 'Invalid PIN code.');
                 } else {
-                    setError('Erro ao registar chegada. Tente novamente.');
+                    setError('Failed to register arrival. Please try again.');
                 }
             } else {
-                setError('Erro de ligação. Verifique a sua ligação à rede.');
+                setError('Connection error. Please check your network.');
             }
         } finally {
             setIsClaiming(false);
@@ -83,12 +83,12 @@ const DriverLayout = () => {
         try {
             // TODO: Call API to confirm delivery / complete visit
             await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
-            setSuccessMessage('Entrega confirmada com sucesso!');
+            setSuccessMessage('Delivery confirmed successfully!');
             setClaimResult(null);
             setMode('claim');
         } catch (err) {
             console.error('Failed to confirm delivery:', err);
-            setError('Erro ao confirmar entrega. Tente novamente.');
+            setError('Failed to confirm delivery. Please try again.');
         } finally {
             setIsConfirming(false);
         }
@@ -114,12 +114,12 @@ const DriverLayout = () => {
                         <div className="claim-section">
                             <div className="claim-header">
                                 <QrCode size={20} />
-                                <h2>Registar Chegada</h2>
+                                <h2>Register Arrival</h2>
                             </div>
                             <div className="claim-form">
                                 <input
                                     type="text"
-                                    placeholder="Código PIN / ID da Chegada"
+                                    placeholder="PIN Code / Arrival ID"
                                     value={pinCode}
                                     onChange={(e) => setPinCode(e.target.value.toUpperCase())}
                                     className="pin-input"
@@ -134,12 +134,12 @@ const DriverLayout = () => {
                                     {isClaiming ? (
                                         <>
                                             <Loader2 size={18} className="animate-spin" />
-                                            A registar...
+                                            Registering...
                                         </>
                                     ) : (
                                         <>
                                             <CheckCircle size={18} />
-                                            Registar
+                                            Register
                                         </>
                                     )}
                                 </button>
@@ -149,41 +149,41 @@ const DriverLayout = () => {
                         {/* Info Card */}
                         {claimResult ? (
                             <div className="driver-card flex-1 flex flex-col gap-3">
-                                <h3 className="font-bold text-lg text-green-400">✓ Chegada Registada</h3>
+                                <h3 className="font-bold text-lg text-green-400">✓ Arrival Registered</h3>
                                 <div className="space-y-2">
                                     <div className="flex justify-between">
-                                        <span className="text-slate-400">Matrícula</span>
+                                        <span className="text-slate-400">License Plate</span>
                                         <span className="font-semibold">{claimResult.license_plate}</span>
                                     </div>
                                     {claimResult.dock_bay_number && (
                                         <div className="flex justify-between">
-                                            <span className="text-slate-400">Cais</span>
+                                            <span className="text-slate-400">Dock</span>
                                             <span className="font-bold text-blue-400 text-lg">{claimResult.dock_bay_number}</span>
                                         </div>
                                     )}
                                     {claimResult.dock_location && (
                                         <div className="flex justify-between">
-                                            <span className="text-slate-400">Localização</span>
+                                            <span className="text-slate-400">Location</span>
                                             <span>{claimResult.dock_location}</span>
                                         </div>
                                     )}
                                     {claimResult.cargo_description && (
                                         <div className="flex justify-between">
-                                            <span className="text-slate-400">Carga</span>
+                                            <span className="text-slate-400">Cargo</span>
                                             <span>{claimResult.cargo_description}</span>
                                         </div>
                                     )}
                                 </div>
                                 <p className="text-sm text-slate-400 mt-4">
-                                    Use as tabs abaixo para navegar até ao porto e depois ao cais.
+                                    Use the tabs below to navigate to the port and then to the dock.
                                 </p>
                             </div>
                         ) : (
                             <div className="driver-card flex-1 flex flex-col items-center justify-center text-center">
                                 <QrCode size={48} className="text-slate-500 mb-4" />
-                                <h3 className="font-bold text-lg mb-2">Bem-vindo, {driverName}</h3>
+                                <h3 className="font-bold text-lg mb-2">Welcome, {driverName}</h3>
                                 <p className="text-sm text-slate-400">
-                                    Introduza o código PIN fornecido para registar a sua chegada e receber as instruções de navegação.
+                                    Enter the PIN code provided to register your arrival and receive navigation instructions.
                                 </p>
                             </div>
                         )}
@@ -249,7 +249,7 @@ const DriverLayout = () => {
                     className={`nav-button ${mode === 'claim' ? 'active yellow' : ''}`}
                 >
                     <QrCode size={24} />
-                    <span>Registar</span>
+                    <span>Register</span>
                 </button>
 
                 <div className="nav-divider" />
@@ -259,7 +259,7 @@ const DriverLayout = () => {
                     className={`nav-button ${mode === 'external' ? 'active' : ''}`}
                 >
                     <Map size={24} />
-                    <span>Até ao Porto</span>
+                    <span>To Port</span>
                 </button>
 
                 <div className="nav-divider" />
@@ -269,7 +269,7 @@ const DriverLayout = () => {
                     className={`nav-button ${mode === 'internal' ? 'active green' : ''}`}
                 >
                     <Navigation size={24} />
-                    <span>Dentro do Porto</span>
+                    <span>Inside Port</span>
                 </button>
             </div>
         </div>

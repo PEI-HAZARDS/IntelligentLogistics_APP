@@ -1,367 +1,367 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Truck,
-    MapPin,
-    Clock,
-    Package,
-    CheckCircle,
-    AlertTriangle,
-    RefreshCw,
-    LogOut,
-    Navigation,
-    QrCode,
-    Loader2,
-    ChevronRight,
-    Calendar,
-    AlertCircle
+  Truck,
+  MapPin,
+  Clock,
+  Package,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  LogOut,
+  Navigation,
+  QrCode,
+  Loader2,
+  ChevronRight,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
 import { getMyActiveArrival, getMyTodayArrivals, claimArrival } from '@/services/drivers';
 import type { Appointment, ClaimAppointmentResponse } from '@/types/types';
 
-// Map status to Portuguese
-function mapStatusToPortuguese(status: string): string {
-    const statusMap: Record<string, string> = {
-        in_transit: 'Em trânsito',
-        delayed: 'Atrasado',
-        completed: 'Concluído',
-        canceled: 'Cancelado',
-    };
-    return statusMap[status] || status;
+// Map status to English
+function mapStatusToLabel(status: string): string {
+  const statusMap: Record<string, string> = {
+    in_transit: 'In Transit',
+    delayed: 'Delayed',
+    completed: 'Completed',
+    canceled: 'Canceled',
+  };
+  return statusMap[status] || status;
 }
 
 // Get status color class
 function getStatusClass(status: string): string {
-    switch (status) {
-        case 'completed':
-            return 'status-completed';
-        case 'delayed':
-            return 'status-delayed';
-        case 'canceled':
-            return 'status-canceled';
-        default:
-            return 'status-in-transit';
-    }
+  switch (status) {
+    case 'completed':
+      return 'status-completed';
+    case 'delayed':
+      return 'status-delayed';
+    case 'canceled':
+      return 'status-canceled';
+    default:
+      return 'status-in-transit';
+  }
 }
 
 export default function DriverHome() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    // User info from localStorage
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    const driversLicense = userInfo.drivers_license;
-    const driverName = userInfo.name || 'Motorista';
+  // User info from localStorage
+  const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+  const driversLicense = userInfo.drivers_license;
+  const driverName = userInfo.name || 'Driver';
 
-    // State
-    const [activeArrival, setActiveArrival] = useState<Appointment | null>(null);
-    const [todayArrivals, setTodayArrivals] = useState<Appointment[]>([]);
-    const [claimResult, setClaimResult] = useState<ClaimAppointmentResponse | null>(null);
-    const [pinCode, setPinCode] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-    const [isClaiming, setIsClaiming] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // State
+  const [activeArrival, setActiveArrival] = useState<Appointment | null>(null);
+  const [todayArrivals, setTodayArrivals] = useState<Appointment[]>([]);
+  const [claimResult, setClaimResult] = useState<ClaimAppointmentResponse | null>(null);
+  const [pinCode, setPinCode] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // Fetch data
-    const fetchData = useCallback(async () => {
-        if (!driversLicense) {
-            setError('Sessão expirada. Por favor, faça login novamente.');
-            setIsLoading(false);
-            return;
+  // Fetch data
+  const fetchData = useCallback(async () => {
+    if (!driversLicense) {
+      setError('Session expired. Please log in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    setError(null);
+    try {
+      const [active, today] = await Promise.all([
+        getMyActiveArrival(driversLicense),
+        getMyTodayArrivals(driversLicense),
+      ]);
+
+      setActiveArrival(active);
+      setTodayArrivals(today);
+    } catch (err) {
+      console.error('Failed to fetch driver data:', err);
+      setError('Failed to load data. Pull to refresh.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [driversLicense]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Handle PIN claim
+  const handleClaimArrival = async () => {
+    if (!pinCode.trim()) {
+      setError('Please enter the PIN code.');
+      return;
+    }
+
+    setIsClaiming(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await claimArrival(driversLicense, {
+        arrival_id: pinCode.trim(),
+      });
+
+      setClaimResult(result);
+      setSuccessMessage('Arrival registered successfully!');
+      setPinCode('');
+
+      // Refresh data
+      await fetchData();
+    } catch (err: unknown) {
+      console.error('Failed to claim arrival:', err);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
+        if (axiosError.response?.status === 404) {
+          setError('PIN code not found. Please check the code.');
+        } else if (axiosError.response?.status === 400) {
+          setError(axiosError.response?.data?.detail || 'Invalid PIN code.');
+        } else {
+          setError('Failed to register arrival. Please try again.');
         }
+      } else {
+        setError('Connection error. Please check your network.');
+      }
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
-        setError(null);
-        try {
-            const [active, today] = await Promise.all([
-                getMyActiveArrival(driversLicense),
-                getMyTodayArrivals(driversLicense),
-            ]);
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_info');
+    navigate('/login');
+  };
 
-            setActiveArrival(active);
-            setTodayArrivals(today);
-        } catch (err) {
-            console.error('Failed to fetch driver data:', err);
-            setError('Erro ao carregar dados. Puxe para atualizar.');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [driversLicense]);
+  // Handle refresh
+  const handleRefresh = () => {
+    setIsLoading(true);
+    fetchData();
+  };
 
-    // Initial fetch
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+  return (
+    <div className="driver-home">
+      {/* Header */}
+      <header className="driver-header">
+        <div className="header-content">
+          <div className="header-left">
+            <Truck size={28} />
+            <div className="header-text">
+              <h1>Intelligent Logistics</h1>
+              <span className="driver-name">Hello, {driverName}</span>
+            </div>
+          </div>
+          <div className="header-actions">
+            <button className="icon-btn" onClick={handleRefresh} disabled={isLoading}>
+              {isLoading ? <Loader2 size={20} className="spin" /> : <RefreshCw size={20} />}
+            </button>
+            <button className="icon-btn logout" onClick={handleLogout}>
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+      </header>
 
-    // Handle PIN claim
-    const handleClaimArrival = async () => {
-        if (!pinCode.trim()) {
-            setError('Por favor, introduza o código PIN.');
-            return;
-        }
+      <main className="driver-main">
+        {/* Error Message */}
+        {error && (
+          <div className="alert alert-error">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        setIsClaiming(true);
-        setError(null);
-        setSuccessMessage(null);
+        {/* Success Message */}
+        {successMessage && (
+          <div className="alert alert-success">
+            <CheckCircle size={18} />
+            <span>{successMessage}</span>
+          </div>
+        )}
 
-        try {
-            const result = await claimArrival(driversLicense, {
-                arrival_id: pinCode.trim(),
-            });
+        {/* PIN Claim Section */}
+        <section className="claim-section">
+          <div className="section-header">
+            <QrCode size={20} />
+            <h2>Register Arrival</h2>
+          </div>
+          <div className="claim-form">
+            <input
+              type="text"
+              placeholder="PIN Code / Arrival ID"
+              value={pinCode}
+              onChange={(e) => setPinCode(e.target.value.toUpperCase())}
+              className="pin-input"
+              disabled={isClaiming}
+            />
+            <button
+              className="claim-btn"
+              onClick={handleClaimArrival}
+              disabled={isClaiming || !pinCode.trim()}
+            >
+              {isClaiming ? (
+                <>
+                  <Loader2 size={18} className="spin" />
+                  Registering...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={18} />
+                  Register
+                </>
+              )}
+            </button>
+          </div>
+        </section>
 
-            setClaimResult(result);
-            setSuccessMessage('Chegada registada com sucesso!');
-            setPinCode('');
-
-            // Refresh data
-            await fetchData();
-        } catch (err: unknown) {
-            console.error('Failed to claim arrival:', err);
-            if (err && typeof err === 'object' && 'response' in err) {
-                const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
-                if (axiosError.response?.status === 404) {
-                    setError('Código PIN não encontrado. Verifique o código.');
-                } else if (axiosError.response?.status === 400) {
-                    setError(axiosError.response?.data?.detail || 'Código PIN inválido.');
-                } else {
-                    setError('Erro ao registar chegada. Tente novamente.');
-                }
-            } else {
-                setError('Erro de ligação. Verifique a sua ligação à rede.');
-            }
-        } finally {
-            setIsClaiming(false);
-        }
-    };
-
-    // Handle logout
-    const handleLogout = () => {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_info');
-        navigate('/login');
-    };
-
-    // Handle refresh
-    const handleRefresh = () => {
-        setIsLoading(true);
-        fetchData();
-    };
-
-    return (
-        <div className="driver-home">
-            {/* Header */}
-            <header className="driver-header">
-                <div className="header-content">
-                    <div className="header-left">
-                        <Truck size={28} />
-                        <div className="header-text">
-                            <h1>Intelligent Logistics</h1>
-                            <span className="driver-name">Olá, {driverName}</span>
-                        </div>
-                    </div>
-                    <div className="header-actions">
-                        <button className="icon-btn" onClick={handleRefresh} disabled={isLoading}>
-                            {isLoading ? <Loader2 size={20} className="spin" /> : <RefreshCw size={20} />}
-                        </button>
-                        <button className="icon-btn logout" onClick={handleLogout}>
-                            <LogOut size={20} />
-                        </button>
-                    </div>
+        {/* Claim Result - Navigation Info */}
+        {claimResult && (
+          <section className="navigation-card">
+            <div className="section-header">
+              <Navigation size={20} />
+              <h2>Navigation Instructions</h2>
+            </div>
+            <div className="navigation-content">
+              <div className="nav-row">
+                <span className="nav-label">License Plate:</span>
+                <span className="nav-value">{claimResult.license_plate}</span>
+              </div>
+              {claimResult.dock_bay_number && (
+                <div className="nav-row">
+                  <span className="nav-label">Dock:</span>
+                  <span className="nav-value highlight">{claimResult.dock_bay_number}</span>
                 </div>
-            </header>
+              )}
+              {claimResult.dock_location && (
+                <div className="nav-row">
+                  <span className="nav-label">Location:</span>
+                  <span className="nav-value">{claimResult.dock_location}</span>
+                </div>
+              )}
+              {claimResult.cargo_description && (
+                <div className="nav-row">
+                  <span className="nav-label">Cargo:</span>
+                  <span className="nav-value">{claimResult.cargo_description}</span>
+                </div>
+              )}
+              {claimResult.navigation_url && (
+                <a
+                  href={claimResult.navigation_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="navigation-link"
+                >
+                  <MapPin size={18} />
+                  Open GPS Navigation
+                </a>
+              )}
+            </div>
+          </section>
+        )}
 
-            <main className="driver-main">
-                {/* Error Message */}
-                {error && (
-                    <div className="alert alert-error">
-                        <AlertCircle size={18} />
-                        <span>{error}</span>
+        {/* Active Arrival */}
+        {activeArrival && (
+          <section className="active-arrival">
+            <div className="section-header">
+              <AlertTriangle size={20} className="active-icon" />
+              <h2>Active Arrival</h2>
+            </div>
+            <div className="arrival-card active">
+              <div className="arrival-row">
+                <Truck size={18} />
+                <span className="plate">{activeArrival.truck_license_plate}</span>
+                <span className={`status-badge ${getStatusClass(activeArrival.status)}`}>
+                  {mapStatusToLabel(activeArrival.status)}
+                </span>
+              </div>
+              <div className="arrival-details">
+                <div className="detail-item">
+                  <Clock size={16} />
+                  <span>
+                    {activeArrival.scheduled_start_time
+                      ? new Date(activeArrival.scheduled_start_time).toLocaleString('pt-PT', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                      : '--:--'}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <MapPin size={16} />
+                  <span>{activeArrival.gate_in?.label || 'N/A'}</span>
+                </div>
+                <div className="detail-item">
+                  <Package size={16} />
+                  <span>{activeArrival.booking?.reference || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Today's Arrivals */}
+        <section className="today-arrivals">
+          <div className="section-header">
+            <Calendar size={20} />
+            <h2>Today's Arrivals</h2>
+            <span className="count-badge">{todayArrivals.length}</span>
+          </div>
+
+          {isLoading && todayArrivals.length === 0 ? (
+            <div className="loading-state">
+              <Loader2 size={24} className="spin" />
+              <span>Loading arrivals...</span>
+            </div>
+          ) : todayArrivals.length === 0 ? (
+            <div className="empty-state">
+              <Package size={32} />
+              <span>No arrivals scheduled for today.</span>
+            </div>
+          ) : (
+            <div className="arrivals-list">
+              {todayArrivals.map((arrival) => (
+                <div key={arrival.id} className="arrival-card">
+                  <div className="arrival-row">
+                    <span className="plate">{arrival.truck_license_plate}</span>
+                    <span className={`status-badge ${getStatusClass(arrival.status)}`}>
+                      {mapStatusToLabel(arrival.status)}
+                    </span>
+                  </div>
+                  <div className="arrival-info">
+                    <div className="info-item">
+                      <Clock size={14} />
+                      {arrival.scheduled_start_time
+                        ? new Date(arrival.scheduled_start_time).toLocaleTimeString('pt-PT', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                        : '--:--'}
                     </div>
-                )}
-
-                {/* Success Message */}
-                {successMessage && (
-                    <div className="alert alert-success">
-                        <CheckCircle size={18} />
-                        <span>{successMessage}</span>
+                    <div className="info-item">
+                      <MapPin size={14} />
+                      {arrival.gate_in?.label || 'N/A'}
                     </div>
-                )}
-
-                {/* PIN Claim Section */}
-                <section className="claim-section">
-                    <div className="section-header">
-                        <QrCode size={20} />
-                        <h2>Registar Chegada</h2>
+                    <div className="info-item">
+                      <Package size={14} />
+                      {arrival.booking?.reference || 'N/A'}
                     </div>
-                    <div className="claim-form">
-                        <input
-                            type="text"
-                            placeholder="Código PIN / ID da Chegada"
-                            value={pinCode}
-                            onChange={(e) => setPinCode(e.target.value.toUpperCase())}
-                            className="pin-input"
-                            disabled={isClaiming}
-                        />
-                        <button
-                            className="claim-btn"
-                            onClick={handleClaimArrival}
-                            disabled={isClaiming || !pinCode.trim()}
-                        >
-                            {isClaiming ? (
-                                <>
-                                    <Loader2 size={18} className="spin" />
-                                    A registar...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle size={18} />
-                                    Registar
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </section>
+                  </div>
+                  <ChevronRight size={20} className="chevron" />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
 
-                {/* Claim Result - Navigation Info */}
-                {claimResult && (
-                    <section className="navigation-card">
-                        <div className="section-header">
-                            <Navigation size={20} />
-                            <h2>Instruções de Navegação</h2>
-                        </div>
-                        <div className="navigation-content">
-                            <div className="nav-row">
-                                <span className="nav-label">Matrícula:</span>
-                                <span className="nav-value">{claimResult.license_plate}</span>
-                            </div>
-                            {claimResult.dock_bay_number && (
-                                <div className="nav-row">
-                                    <span className="nav-label">Cais:</span>
-                                    <span className="nav-value highlight">{claimResult.dock_bay_number}</span>
-                                </div>
-                            )}
-                            {claimResult.dock_location && (
-                                <div className="nav-row">
-                                    <span className="nav-label">Localização:</span>
-                                    <span className="nav-value">{claimResult.dock_location}</span>
-                                </div>
-                            )}
-                            {claimResult.cargo_description && (
-                                <div className="nav-row">
-                                    <span className="nav-label">Carga:</span>
-                                    <span className="nav-value">{claimResult.cargo_description}</span>
-                                </div>
-                            )}
-                            {claimResult.navigation_url && (
-                                <a
-                                    href={claimResult.navigation_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="navigation-link"
-                                >
-                                    <MapPin size={18} />
-                                    Abrir Navegação GPS
-                                </a>
-                            )}
-                        </div>
-                    </section>
-                )}
-
-                {/* Active Arrival */}
-                {activeArrival && (
-                    <section className="active-arrival">
-                        <div className="section-header">
-                            <AlertTriangle size={20} className="active-icon" />
-                            <h2>Chegada Ativa</h2>
-                        </div>
-                        <div className="arrival-card active">
-                            <div className="arrival-row">
-                                <Truck size={18} />
-                                <span className="plate">{activeArrival.truck_license_plate}</span>
-                                <span className={`status-badge ${getStatusClass(activeArrival.status)}`}>
-                                    {mapStatusToPortuguese(activeArrival.status)}
-                                </span>
-                            </div>
-                            <div className="arrival-details">
-                                <div className="detail-item">
-                                    <Clock size={16} />
-                                    <span>
-                                        {activeArrival.scheduled_start_time
-                                            ? new Date(activeArrival.scheduled_start_time).toLocaleString('pt-PT', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })
-                                            : '--:--'}
-                                    </span>
-                                </div>
-                                <div className="detail-item">
-                                    <MapPin size={16} />
-                                    <span>{activeArrival.gate_in?.label || 'N/A'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <Package size={16} />
-                                    <span>{activeArrival.booking?.reference || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                )}
-
-                {/* Today's Arrivals */}
-                <section className="today-arrivals">
-                    <div className="section-header">
-                        <Calendar size={20} />
-                        <h2>Chegadas de Hoje</h2>
-                        <span className="count-badge">{todayArrivals.length}</span>
-                    </div>
-
-                    {isLoading && todayArrivals.length === 0 ? (
-                        <div className="loading-state">
-                            <Loader2 size={24} className="spin" />
-                            <span>A carregar chegadas...</span>
-                        </div>
-                    ) : todayArrivals.length === 0 ? (
-                        <div className="empty-state">
-                            <Package size={32} />
-                            <span>Nenhuma chegada agendada para hoje.</span>
-                        </div>
-                    ) : (
-                        <div className="arrivals-list">
-                            {todayArrivals.map((arrival) => (
-                                <div key={arrival.id} className="arrival-card">
-                                    <div className="arrival-row">
-                                        <span className="plate">{arrival.truck_license_plate}</span>
-                                        <span className={`status-badge ${getStatusClass(arrival.status)}`}>
-                                            {mapStatusToPortuguese(arrival.status)}
-                                        </span>
-                                    </div>
-                                    <div className="arrival-info">
-                                        <div className="info-item">
-                                            <Clock size={14} />
-                                            {arrival.scheduled_start_time
-                                                ? new Date(arrival.scheduled_start_time).toLocaleTimeString('pt-PT', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })
-                                                : '--:--'}
-                                        </div>
-                                        <div className="info-item">
-                                            <MapPin size={14} />
-                                            {arrival.gate_in?.label || 'N/A'}
-                                        </div>
-                                        <div className="info-item">
-                                            <Package size={14} />
-                                            {arrival.booking?.reference || 'N/A'}
-                                        </div>
-                                    </div>
-                                    <ChevronRight size={20} className="chevron" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-            </main>
-
-            <style>{`
+      <style>{`
         .driver-home {
           min-height: 100vh;
           background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -693,6 +693,6 @@ export default function DriverHome() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

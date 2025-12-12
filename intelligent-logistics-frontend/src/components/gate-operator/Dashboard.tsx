@@ -22,13 +22,13 @@ function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
   return "info";
 }
 
-// Map API status to Portuguese display
-function mapStatusToPortuguese(status: string): string {
+// Map API status to English display
+function mapStatusToLabel(status: string): string {
   const statusMap: Record<string, string> = {
-    in_transit: "Em trânsito",
-    delayed: "Atrasado",
-    completed: "Concluído",
-    canceled: "Cancelado",
+    in_transit: "In Transit",
+    delayed: "Delayed",
+    completed: "Completed",
+    canceled: "Canceled",
   };
   return statusMap[status] || status;
 }
@@ -59,8 +59,8 @@ function mapAlertToDetection(alert: Alert): UIDetection {
     id: String(alert.id),
     type: mapAlertTypeToDetection(alert.type),
     title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1),
-    description: alert.description || "Alerta sem descrição",
-    time: new Date(alert.timestamp).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+    description: alert.description || "Alert without description",
+    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     severity: mapAlertSeverity(alert.type),
     imageUrl: alert.image_url || undefined,
   };
@@ -72,11 +72,11 @@ function mapArrivalToUI(arrival: Appointment) {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
     arrivalTime: arrival.scheduled_start_time
-      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) + "m"
+      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + "m"
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     cargoAmount: arrival.notes || "",
-    status: mapStatusToPortuguese(arrival.status) as string,
+    status: mapStatusToLabel(arrival.status) as string,
     dock: arrival.gate_in?.label || "N/A",
   };
 }
@@ -84,7 +84,7 @@ function mapArrivalToUI(arrival: Appointment) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [expandedArrivalId, setExpandedArrivalId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
 
   // API data states
   const [arrivals, setArrivals] = useState<ReturnType<typeof mapArrivalToUI>[]>([]);
@@ -131,7 +131,7 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
-      setError("Erro ao carregar dados. Clique em atualizar para tentar novamente.");
+      setError("Failed to load data. Click refresh to try again.");
     } finally {
       setIsLoading(false);
     }
@@ -177,11 +177,11 @@ export default function Dashboard() {
           const newDetection: UIDetection = {
             id: `ws-${Date.now()}`,
             type: hz_result ? "adr" : "plate",
-            title: hz_result ? "Deteção Hazmat" : "Deteção Matrícula",
+            title: hz_result ? "Hazmat Detection" : "License Plate Detection",
             description: hz_result
               ? `Hazmat: ${hz_result}`
-              : `Matrícula: "${lp_result}" detetada`,
-            time: new Date(now).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+              : `License plate: "${lp_result}" detected`,
+            time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
             severity: hz_result ? "danger" : "info",
             imageUrl: lp_crop || hz_crop,
           };
@@ -214,7 +214,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+      setCurrentTime(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
     }, 1000);
 
     // Auto-refresh data every 30 seconds
@@ -282,7 +282,7 @@ export default function Dashboard() {
         <div className="detections-section">
           <div className="section-header-row">
             <h3 className="section-title">
-              <ShieldAlert size={20} className="inline-icon" /> Alertas e Deteções
+              <ShieldAlert size={20} className="inline-icon" /> Alerts & Detections
             </h3>
             <div className="header-badges">
               <span className={`ws-badge ${isWsConnected ? 'connected' : 'disconnected'}`}>
@@ -293,7 +293,7 @@ export default function Dashboard() {
                 className="refresh-btn"
                 onClick={handleRefresh}
                 disabled={isLoading}
-                title="Atualizar"
+                title="Refresh"
               >
                 {isLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
               </button>
@@ -311,11 +311,11 @@ export default function Dashboard() {
             {isLoading && detections.length === 0 ? (
               <div className="loading-state">
                 <Loader2 size={24} className="spin" />
-                <span>A carregar alertas...</span>
+                <span>Loading alerts...</span>
               </div>
             ) : detections.length === 0 ? (
               <div className="empty-state">
-                <span>Nenhum alerta recente.</span>
+                <span>No recent alerts.</span>
               </div>
             ) : (
               detections.map((detection) => (
@@ -348,7 +348,7 @@ export default function Dashboard() {
       {/* Coluna Direita - Próximas Chegadas */}
       <div className="right-panel">
         <div className="panel-header-row">
-          <h2 className="panel-title">Próximas Chegadas</h2>
+          <h2 className="panel-title">Upcoming Arrivals</h2>
           <div className="time-display">
             <span className="time-value">{currentTime}</span>
           </div>
@@ -358,18 +358,18 @@ export default function Dashboard() {
           className="view-toggle-btn"
           onClick={() => navigate("/gate/arrivals")}
         >
-          Lista de Chegadas
+          Arrivals List
         </button>
 
         <div className="arrivals-list custom-scrollbar">
           {isLoading && arrivals.length === 0 ? (
             <div className="loading-state">
               <Loader2 size={24} className="spin" />
-              <span>A carregar chegadas...</span>
+              <span>Loading arrivals...</span>
             </div>
           ) : arrivals.length === 0 ? (
             <div className="empty-state">
-              <span>Nenhuma chegada programada.</span>
+              <span>No scheduled arrivals.</span>
             </div>
           ) : (
             arrivals.map((arrival) => {
@@ -408,22 +408,22 @@ export default function Dashboard() {
                   {isExpanded && (
                     <div className="accordion-content">
                       <div className="detail-row">
-                        <span className="label">Cais:</span>
+                        <span className="label">Dock:</span>
                         <span className="value">{arrival.dock}</span>
                       </div>
                       <div className="detail-row">
-                        <span className="label">Referência:</span>
+                        <span className="label">Reference:</span>
                         <span className="value">{arrival.cargo}</span>
                       </div>
                       {arrival.cargoAmount && (
                         <div className="detail-row">
-                          <span className="label">Notas:</span>
+                          <span className="label">Notes:</span>
                           <span className="value">{arrival.cargoAmount}</span>
                         </div>
                       )}
                       <div className="actions-row">
                         <Link to={`/gate/arrival/${arrival.id}`} className="details-btn">
-                          Ver Detalhes Completos
+                          View Full Details
                         </Link>
                       </div>
                     </div>

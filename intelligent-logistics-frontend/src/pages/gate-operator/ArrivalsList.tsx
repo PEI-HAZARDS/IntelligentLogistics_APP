@@ -36,26 +36,26 @@ function mapAlertType(type: string): "plate" | "safety" | "adr" {
   return "plate";
 }
 
-// Map API status to Portuguese display
-function mapStatusToPortuguese(status: AppointmentStatusEnum): string {
+// Map API status to English display
+function mapStatusToLabel(status: AppointmentStatusEnum): string {
   const statusMap: Record<AppointmentStatusEnum, string> = {
-    in_transit: "Em trânsito",
-    delayed: "Atrasado",
-    completed: "Concluído",
-    canceled: "Cancelado",
+    in_transit: "In Transit",
+    delayed: "Delayed",
+    completed: "Completed",
+    canceled: "Canceled",
   };
   return statusMap[status] || status;
 }
 
-// Map Portuguese status back to API status
+// Map English status back to API status
 function mapStatusToAPI(status: string): AppointmentStatusEnum {
   const statusMap: Record<string, AppointmentStatusEnum> = {
-    "Pendente": "in_transit",
-    "Em trânsito": "in_transit",
-    "Em descarga": "in_transit",
-    "Atrasado": "delayed",
-    "Concluído": "completed",
-    "Cancelado": "canceled",
+    "Pending": "in_transit",
+    "In Transit": "in_transit",
+    "Unloading": "in_transit",
+    "Delayed": "delayed",
+    "Completed": "completed",
+    "Canceled": "canceled",
   };
   return statusMap[status] || "in_transit";
 }
@@ -82,7 +82,7 @@ type UIArrival = {
 
 export default function ArrivalsList() {
   const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
 
   // API data states
   const [arrivals, setArrivals] = useState<UIArrival[]>([]);
@@ -112,10 +112,10 @@ export default function ArrivalsList() {
     plate: arrival.truck_license_plate,
     dock: arrival.gate_in?.label || "N/A",
     arrivalTime: arrival.scheduled_start_time
-      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
+      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
-    status: mapStatusToPortuguese(arrival.status),
+    status: mapStatusToLabel(arrival.status),
     apiStatus: arrival.status,
   });
 
@@ -124,8 +124,8 @@ export default function ArrivalsList() {
     id: String(alert.id),
     type: mapAlertType(alert.type),
     title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
-    description: alert.description || "Alerta sem descrição",
-    time: new Date(alert.timestamp).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+    description: alert.description || "Alert without description",
+    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     severity: mapAlertSeverity(alert.type),
   });
 
@@ -144,7 +144,7 @@ export default function ArrivalsList() {
       setStats(statsData);
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setError("Erro ao carregar dados.");
+      setError("Failed to load data.");
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +153,7 @@ export default function ArrivalsList() {
   // Time update effect
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+      setCurrentTime(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -221,7 +221,7 @@ export default function ArrivalsList() {
       closeModal();
     } catch (err) {
       console.error("Failed to save:", err);
-      setError("Erro ao guardar alterações.");
+      setError("Failed to save changes.");
     } finally {
       setIsSaving(false);
     }
@@ -245,16 +245,16 @@ export default function ArrivalsList() {
     <div className="arrivals-list-page">
       {/* Coluna Esquerda - Alertas */}
       <aside className="alerts-sidebar">
-        <h2 className="sidebar-title">Últimos Alertas</h2>
+        <h2 className="sidebar-title">Latest Alerts</h2>
         <div className="alerts-list">
           {isLoading && alerts.length === 0 ? (
             <div className="loading-state">
               <Loader2 size={20} className="spin" />
-              <span>A carregar...</span>
+              <span>Loading...</span>
             </div>
           ) : alerts.length === 0 ? (
             <div className="empty-state">
-              <span>Sem alertas recentes.</span>
+              <span>No recent alerts.</span>
             </div>
           ) : (
             alerts.map((alert) => (
@@ -285,7 +285,7 @@ export default function ArrivalsList() {
           </div>
 
           <div className="header-center">
-            <h1 className="panel-title">Lista de Chegadas</h1>
+            <h1 className="panel-title">Arrivals List</h1>
           </div>
 
           <div className="header-right">
@@ -315,37 +315,37 @@ export default function ArrivalsList() {
             <div className="stat-icon"><FileText size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.total}</span>
-              <span className="stat-label">Total de Chegadas</span>
+              <span className="stat-label">Total Arrivals</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Em trânsito' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Em trânsito")}
+            className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("In Transit")}
           >
             <div className="stat-icon"><Clock size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
-              <span className="stat-label">Em Trânsito</span>
+              <span className="stat-label">In Transit</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Atrasado' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Atrasado")}
+            className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Delayed")}
           >
             <div className="stat-icon"><Truck size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
-              <span className="stat-label">Atrasados</span>
+              <span className="stat-label">Delayed</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Concluído' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Concluído")}
+            className={`stat-card ${statusFilter === 'Completed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Completed")}
           >
             <div className="stat-icon"><CheckCircle size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.completed}</span>
-              <span className="stat-label">Concluídos Hoje</span>
+              <span className="stat-label">Completed Today</span>
             </div>
           </div>
         </div>
@@ -354,68 +354,70 @@ export default function ArrivalsList() {
         <div className="filters-section">
           <h3 className="filters-title">
             <Search className="inline-icon" size={20} style={{ marginRight: '8px' }} />
-            Filtros e Pesquisa
+            Filters & Search
           </h3>
           <div className="filters-grid">
             <div className="filter-group">
-              <label htmlFor="dock-filter">Cais</label>
+              <label htmlFor="dock-filter">Dock</label>
               <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
-                <option value="all">Todos os Cais</option>
+                <option value="all">All Docks</option>
                 {availableDocks.map((dock) => (
-                  <option key={dock} value={dock}>Cais {dock}</option>
+                  <option key={dock} value={dock}>Dock {dock}</option>
                 ))}
               </select>
             </div>
             <div className="filter-group">
-              <label htmlFor="status-filter">Estado</label>
+              <label htmlFor="status-filter">Status</label>
               <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">Todos os estados</option>
-                <option value="Em trânsito">Em trânsito</option>
-                <option value="Atrasado">Atrasado</option>
-                <option value="Concluído">Concluído</option>
-                <option value="Cancelado">Cancelado</option>
+                <option value="all">All Statuses</option>
+                <option value="In Transit">In Transit</option>
+                <option value="Delayed">Delayed</option>
+                <option value="Completed">Completed</option>
+                <option value="Canceled">Canceled</option>
               </select>
             </div>
             <div className="filter-group">
-              <label htmlFor="search-input">Pesquisar</label>
+              <label htmlFor="search-input">Search</label>
               <input
                 id="search-input"
                 type="text"
-                placeholder="Matrícula..."
+                placeholder="License plate..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-          </div>
-          <div className="filters-actions">
-            <button className="btn-outline" onClick={handleClearFilters}>
-              <Trash2 size={16} /> Limpar
-            </button>
-            <button className="btn-primary" onClick={handleRefresh} disabled={isLoading}>
-              {isLoading ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
-              Atualizar
-            </button>
+            <div className="filter-group filter-actions-inline">
+              <label>&nbsp;</label>
+              <div className="filter-buttons">
+                <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
+                  <Trash2 size={18} />
+                </button>
+                <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
+                  {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Tabela/Cards */}
         <div className="arrivals-content">
           <div className="content-header">
-            <h3 className="content-title">📋 Lista de Chegadas</h3>
+            <h3 className="content-title">Arrivals List</h3>
           </div>
 
           {isLoading && arrivals.length === 0 ? (
             <div className="loading-state">
               <Loader2 size={32} className="spin" />
-              <span>A carregar chegadas...</span>
+              <span>Loading arrivals...</span>
             </div>
           ) : filteredArrivals.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><Inbox size={48} /></div>
               <p className="empty-message">
                 {arrivals.length === 0
-                  ? "Nenhuma chegada encontrada."
-                  : "Nenhuma chegada encontrada com os filtros atuais..."}
+                  ? "No arrivals found."
+                  : "No arrivals found with current filters..."}
               </p>
             </div>
           ) : (
@@ -423,12 +425,12 @@ export default function ArrivalsList() {
               <table>
                 <thead>
                   <tr>
-                    <th>Matrícula</th>
-                    <th>Cais</th>
-                    <th>Hora de Chegada</th>
-                    <th>Referência</th>
-                    <th>Estado</th>
-                    <th>Ações</th>
+                    <th>License Plate</th>
+                    <th>Dock</th>
+                    <th>Arrival Time</th>
+                    <th>Reference</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -444,10 +446,10 @@ export default function ArrivalsList() {
                         </span>
                       </td>
                       <td>
-                        <button className="btn-icon" onClick={() => handleView(arrival)} title="Ver Detalhes">
+                        <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
                           <Eye size={18} />
                         </button>
-                        <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Editar">
+                        <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
                           <Edit size={18} />
                         </button>
                       </td>
@@ -469,7 +471,7 @@ export default function ArrivalsList() {
             <div className="modal-header">
               <h3 className="modal-title">
                 {modalMode === "view" ? <Eye size={20} /> : <Edit size={20} />}
-                {modalMode === "view" ? "Detalhes da Chegada" : "Editar Chegada"}
+                {modalMode === "view" ? "Arrival Details" : "Edit Arrival"}
               </h3>
               <button className="modal-close-btn" onClick={closeModal}>
                 <X size={20} />
@@ -478,27 +480,27 @@ export default function ArrivalsList() {
 
             <div className="modal-body">
               <div className="detail-row">
-                <span className="detail-label">Matrícula</span>
+                <span className="detail-label">License Plate</span>
                 <span className="detail-value">{selectedArrival.plate}</span>
               </div>
 
               <div className="detail-row">
-                <span className="detail-label">Hora de Chegada</span>
+                <span className="detail-label">Arrival Time</span>
                 <span className="detail-value">{selectedArrival.arrivalTime}</span>
               </div>
 
               {modalMode === "view" ? (
                 <>
                   <div className="detail-row">
-                    <span className="detail-label">Cais</span>
+                    <span className="detail-label">Dock</span>
                     <span className="detail-value">{selectedArrival.dock}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Referência</span>
+                    <span className="detail-label">Reference</span>
                     <span className="detail-value">{selectedArrival.cargo}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Estado</span>
+                    <span className="detail-label">Status</span>
                     <span className="status-badge-wrapper" style={{ marginTop: '0.5rem' }}>
                       <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
                         {selectedArrival.status}
@@ -510,19 +512,19 @@ export default function ArrivalsList() {
                 /* Edit Mode Form */
                 <>
                   <div className="detail-row">
-                    <label className="detail-label">Cais</label>
+                    <label className="detail-label">Dock</label>
                     <select
                       className="detail-input"
                       value={editedArrival?.dock || selectedArrival.dock}
                       onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, dock: e.target.value } : null)}
                     >
                       {availableDocks.map((dock) => (
-                        <option key={dock} value={dock}>Cais {dock}</option>
+                        <option key={dock} value={dock}>Dock {dock}</option>
                       ))}
                     </select>
                   </div>
                   <div className="detail-row">
-                    <label className="detail-label">Referência (Restrito)</label>
+                    <label className="detail-label">Reference (Restricted)</label>
                     <input
                       className="detail-input"
                       type="text"
@@ -532,16 +534,16 @@ export default function ArrivalsList() {
                     />
                   </div>
                   <div className="detail-row">
-                    <label className="detail-label">Estado</label>
+                    <label className="detail-label">Status</label>
                     <select
                       className="detail-input"
                       value={editedArrival?.status || selectedArrival.status}
                       onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, status: e.target.value } : null)}
                     >
-                      <option value="Em trânsito">Em trânsito</option>
-                      <option value="Atrasado">Atrasado</option>
-                      <option value="Concluído">Concluído</option>
-                      <option value="Cancelado">Cancelado</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="Delayed">Delayed</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Canceled">Canceled</option>
                     </select>
                   </div>
                 </>
@@ -550,19 +552,19 @@ export default function ArrivalsList() {
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModal}>
-                Cancelar
+                Cancel
               </button>
               {modalMode === "edit" && (
                 <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
                   {isSaving ? (
                     <>
                       <Loader2 size={16} className="spin inline-icon" style={{ marginRight: '6px' }} />
-                      A guardar...
+                      Saving...
                     </>
                   ) : (
                     <>
                       <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
-                      Guardar Alterações
+                      Save Changes
                     </>
                   )}
                 </button>
