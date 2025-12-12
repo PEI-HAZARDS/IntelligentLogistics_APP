@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
@@ -14,10 +14,54 @@ import {
   Save,
   Eye,
   Edit,
-  ArrowLeft
+  ArrowLeft,
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
+import { getArrivals, getArrivalsStats, updateArrivalStatus } from "@/services/arrivals";
+import { getActiveAlerts } from "@/services/alerts";
+import type { Appointment, AppointmentStatusEnum, Alert } from "@/types/types";
 
-type Alert = {
+// Map API severity to UI
+function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
+  if (type === "problem" || type === "safety") return "danger";
+  if (type === "operational") return "warning";
+  return "info";
+}
+
+// Map API alert type to UI type
+function mapAlertType(type: string): "plate" | "safety" | "adr" {
+  if (type === "safety" || type === "problem") return "adr";
+  if (type === "operational") return "safety";
+  return "plate";
+}
+
+// Map API status to Portuguese display
+function mapStatusToPortuguese(status: AppointmentStatusEnum): string {
+  const statusMap: Record<AppointmentStatusEnum, string> = {
+    in_transit: "Em trânsito",
+    delayed: "Atrasado",
+    completed: "Concluído",
+    canceled: "Cancelado",
+  };
+  return statusMap[status] || status;
+}
+
+// Map Portuguese status back to API status
+function mapStatusToAPI(status: string): AppointmentStatusEnum {
+  const statusMap: Record<string, AppointmentStatusEnum> = {
+    "Pendente": "in_transit",
+    "Em trânsito": "in_transit",
+    "Em descarga": "in_transit",
+    "Atrasado": "delayed",
+    "Concluído": "completed",
+    "Cancelado": "canceled",
+  };
+  return statusMap[status] || "in_transit";
+}
+
+// UI types for component state
+type UIAlert = {
   id: string;
   type: "plate" | "safety" | "adr";
   title: string;
@@ -26,88 +70,87 @@ type Alert = {
   severity?: "warning" | "danger" | "info";
 };
 
-type Arrival = {
-  id: string;
+type UIArrival = {
+  id: number;
   plate: string;
   dock: string;
   arrivalTime: string;
   cargo: string;
-  status: "Pendente" | "Em descarga" | "Concluído";
+  status: string;
+  apiStatus: AppointmentStatusEnum;
 };
 
-const mockAlerts: Alert[] = [
-  {
-    id: "1",
-    type: "plate",
-    title: "Deteção Matrícula",
-    description: 'Matrícula: "BC 8003" detetada com 95% de confiança',
-    time: "22:00",
-    severity: "info",
-  },
-  {
-    id: "2",
-    type: "safety",
-    title: "Deteção Placa de Segurança",
-    description: '"30": líquido inflamável | "1202": óleo diesel',
-    time: "22:00",
-    severity: "warning",
-  },
-  {
-    id: "3",
-    type: "adr",
-    title: "Deteção Placa ADR",
-    description: "Líquidos inflamáveis: PERIGO DE COMBUSTÃO",
-    time: "22:00",
-    severity: "danger",
-  },
-  {
-    id: "4",
-    type: "adr",
-    title: "Deteção Placa ADR",
-    description: "Perigo Ambiental Aquático",
-    time: "22:01",
-    severity: "danger",
-  },
-];
-
-const mockArrivals: Arrival[] = [
-  {
-    id: "1",
-    plate: "AA-00-BB",
-    dock: "A",
-    arrivalTime: "22:00",
-    cargo: "Óleo Diesel (3000L)",
-    status: "Pendente",
-  },
-  {
-    id: "2",
-    plate: "BC-80-03",
-    dock: "B",
-    arrivalTime: "22:15",
-    cargo: "Gasolina (5000L)",
-    status: "Em descarga",
-  },
-  {
-    id: "3",
-    plate: "CC-11-DD",
-    dock: "C",
-    arrivalTime: "22:30",
-    cargo: "Etanol (2000L)",
-    status: "Concluído",
-  },
-  {
-    id: "4",
-    plate: "EE-22-FF",
-    dock: "A",
-    arrivalTime: "23:00",
-    cargo: "Contentores Variados",
-    status: "Pendente",
-  },
-];
-
 export default function ArrivalsList() {
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
 
+  // API data states
+  const [arrivals, setArrivals] = useState<UIArrival[]>([]);
+  const [alerts, setAlerts] = useState<UIAlert[]>([]);
+  const [stats, setStats] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter states
+  const [dockFilter, setDockFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal states
+  const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
+  const [editedArrival, setEditedArrival] = useState<UIArrival | null>(null);
+  const [modalMode, setModalMode] = useState<"view" | "edit">("view");
+
+  // Get gate ID from user info
+  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
+  const gateId = userInfo.gate_id || 1;
+
+  // Map API arrival to UI
+  const mapArrivalToUI = (arrival: Appointment): UIArrival => ({
+    id: arrival.id,
+    plate: arrival.truck_license_plate,
+    dock: arrival.gate_in?.label || "N/A",
+    arrivalTime: arrival.scheduled_start_time
+      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
+      : "--:--",
+    cargo: arrival.booking?.reference || "N/A",
+    status: mapStatusToPortuguese(arrival.status),
+    apiStatus: arrival.status,
+  });
+
+  // Map API alert to UI
+  const mapAlertToUI = (alert: Alert): UIAlert => ({
+    id: String(alert.id),
+    type: mapAlertType(alert.type),
+    title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
+    description: alert.description || "Alerta sem descrição",
+    time: new Date(alert.timestamp).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+    severity: mapAlertSeverity(alert.type),
+  });
+
+  // Fetch data function
+  const fetchData = useCallback(async () => {
+    setError(null);
+    try {
+      const [arrivalsData, alertsData, statsData] = await Promise.all([
+        getArrivals({ gate_id: gateId, limit: 100 }),
+        getActiveAlerts(20),
+        getArrivalsStats(gateId),
+      ]);
+
+      setArrivals(arrivalsData.map(mapArrivalToUI));
+      setAlerts(alertsData.map(mapAlertToUI));
+      setStats(statsData);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError("Erro ao carregar dados.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gateId]);
+
+  // Time update effect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
@@ -115,54 +158,73 @@ export default function ArrivalsList() {
     return () => clearInterval(timer);
   }, []);
 
-  const [dockFilter, setDockFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedArrival, setSelectedArrival] = useState<Arrival | null>(null);
-  const [modalMode, setModalMode] = useState<"view" | "edit">("view");
+  // Data fetch effect
+  useEffect(() => {
+    fetchData();
+    // Auto-refresh every 30 seconds
+    const refreshTimer = setInterval(fetchData, 30000);
+    return () => clearInterval(refreshTimer);
+  }, [fetchData]);
 
-  const handleView = (arrival: Arrival) => {
+  // Filter Logic
+  const filteredArrivals = arrivals.filter((arrival) => {
+    if (statusFilter !== "all" && arrival.status !== statusFilter) return false;
+    if (dockFilter !== "all" && arrival.dock !== dockFilter) return false;
+    if (searchQuery && !arrival.plate.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  // Calculate stats - use API stats if available, otherwise calculate from arrivals
+  const dynamicStats = {
+    total: arrivals.length,
+    pending: stats.in_transit || arrivals.filter(a => a.apiStatus === "in_transit").length,
+    inProgress: stats.delayed || arrivals.filter(a => a.apiStatus === "delayed").length,
+    completed: stats.completed || arrivals.filter(a => a.apiStatus === "completed").length,
+  };
+
+  const handleView = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
+    setEditedArrival(null);
     setModalMode("view");
   };
 
-  const handleEdit = (arrival: Arrival) => {
+  const handleEdit = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
+    setEditedArrival({ ...arrival });
     setModalMode("edit");
   };
 
   const closeModal = () => {
     setSelectedArrival(null);
+    setEditedArrival(null);
   };
 
-  const handleSave = () => {
-    // Here you would typically call an API to update the arrival
-    // For now we just close the modal
-    console.log("Saving changes...", selectedArrival);
-    closeModal();
-  };
+  const handleSave = async () => {
+    if (!editedArrival || !selectedArrival) return;
 
+    setIsSaving(true);
+    try {
+      const newApiStatus = mapStatusToAPI(editedArrival.status);
+      await updateArrivalStatus(editedArrival.id, {
+        status: newApiStatus,
+      });
 
-  const navigate = useNavigate();
+      // Update local state
+      setArrivals((prev) =>
+        prev.map((a) =>
+          a.id === editedArrival.id
+            ? { ...a, status: editedArrival.status, apiStatus: newApiStatus, dock: editedArrival.dock }
+            : a
+        )
+      );
 
-  // Filter Logic
-  const filteredArrivals = mockArrivals.filter((arrival) => {
-    // 1. Status Filter
-    if (statusFilter !== "all" && arrival.status !== statusFilter) return false;
-    // 2. Dock Filter
-    if (dockFilter !== "all" && arrival.dock !== dockFilter) return false;
-    // 3. Search Query (Plate)
-    if (searchQuery && !arrival.plate.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-
-    return true;
-  });
-
-  // Calculate stats dynamically based on mock data (or real data in future)
-  const dynamicStats = {
-    total: mockArrivals.length,
-    pending: mockArrivals.filter(a => a.status === "Pendente").length,
-    inProgress: mockArrivals.filter(a => a.status === "Em descarga").length,
-    completed: mockArrivals.filter(a => a.status === "Concluído").length
+      closeModal();
+    } catch (err) {
+      console.error("Failed to save:", err);
+      setError("Erro ao guardar alterações.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClearFilters = () => {
@@ -171,22 +233,40 @@ export default function ArrivalsList() {
     setSearchQuery("");
   };
 
+  const handleRefresh = () => {
+    setIsLoading(true);
+    fetchData();
+  };
+
+  // Get unique docks from arrivals
+  const availableDocks = [...new Set(arrivals.map(a => a.dock))].filter(d => d !== "N/A");
+
   return (
     <div className="arrivals-list-page">
       {/* Coluna Esquerda - Alertas */}
-
       <aside className="alerts-sidebar">
         <h2 className="sidebar-title">Últimos Alertas</h2>
         <div className="alerts-list">
-          {mockAlerts.map((alert) => (
-            <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
-              <div className="alert-header">
-                <h4>{alert.title}</h4>
-                <span className="alert-time">{alert.time}</span>
-              </div>
-              <p className="alert-description">{alert.description}</p>
+          {isLoading && alerts.length === 0 ? (
+            <div className="loading-state">
+              <Loader2 size={20} className="spin" />
+              <span>A carregar...</span>
             </div>
-          ))}
+          ) : alerts.length === 0 ? (
+            <div className="empty-state">
+              <span>Sem alertas recentes.</span>
+            </div>
+          ) : (
+            alerts.map((alert) => (
+              <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
+                <div className="alert-header">
+                  <h4>{alert.title}</h4>
+                  <span className="alert-time">{alert.time}</span>
+                </div>
+                <p className="alert-description">{alert.description}</p>
+              </div>
+            ))
+          )}
         </div>
       </aside>
 
@@ -215,6 +295,17 @@ export default function ArrivalsList() {
           </div>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div className="error-banner">
+            <AlertTriangle size={18} />
+            <span>{error}</span>
+            <button onClick={() => setError(null)}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Estatísticas (Clickable Filters) */}
         <div className="stats-grid">
           <div
@@ -228,23 +319,23 @@ export default function ArrivalsList() {
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Pendente' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Pendente")}
+            className={`stat-card ${statusFilter === 'Em trânsito' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Em trânsito")}
           >
             <div className="stat-icon"><Clock size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
-              <span className="stat-label">Pendentes</span>
+              <span className="stat-label">Em Trânsito</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Em descarga' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Em descarga")}
+            className={`stat-card ${statusFilter === 'Atrasado' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Atrasado")}
           >
             <div className="stat-icon"><Truck size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
-              <span className="stat-label">Em descarga</span>
+              <span className="stat-label">Atrasados</span>
             </div>
           </div>
           <div
@@ -270,23 +361,20 @@ export default function ArrivalsList() {
               <label htmlFor="dock-filter">Cais</label>
               <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
                 <option value="all">Todos os Cais</option>
-                <option value="A">Cais A</option>
-                <option value="B">Cais B</option>
-                <option value="C">Cais C</option>
+                {availableDocks.map((dock) => (
+                  <option key={dock} value={dock}>Cais {dock}</option>
+                ))}
               </select>
             </div>
             <div className="filter-group">
               <label htmlFor="status-filter">Estado</label>
               <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">Todos os estados</option>
-                <option value="Pendente">Pendente</option>
-                <option value="Em descarga">Em descarga</option>
+                <option value="Em trânsito">Em trânsito</option>
+                <option value="Atrasado">Atrasado</option>
                 <option value="Concluído">Concluído</option>
+                <option value="Cancelado">Cancelado</option>
               </select>
-            </div>
-            <div className="filter-group">
-              <label htmlFor="time-filter">Hora</label>
-              <input id="time-filter" type="time" />
             </div>
             <div className="filter-group">
               <label htmlFor="search-input">Pesquisar</label>
@@ -300,14 +388,12 @@ export default function ArrivalsList() {
             </div>
           </div>
           <div className="filters-actions">
-            <button className="btn-secondary">
-              <Filter size={16} /> Aplicar Filtros
-            </button>
             <button className="btn-outline" onClick={handleClearFilters}>
               <Trash2 size={16} /> Limpar
             </button>
-            <button className="btn-primary">
-              <RotateCcw size={16} /> Atualizar
+            <button className="btn-primary" onClick={handleRefresh} disabled={isLoading}>
+              {isLoading ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
+              Atualizar
             </button>
           </div>
         </div>
@@ -315,16 +401,22 @@ export default function ArrivalsList() {
         {/* Tabela/Cards */}
         <div className="arrivals-content">
           <div className="content-header">
-            <h3 className="content-title">📋 Lista de Chegadas Turno XXX</h3>
-            <div className="view-toggle">
-              {/* View content placeholder if needed, or remove completely */}
-            </div>
+            <h3 className="content-title">📋 Lista de Chegadas</h3>
           </div>
 
-          {filteredArrivals.length === 0 ? (
+          {isLoading && arrivals.length === 0 ? (
+            <div className="loading-state">
+              <Loader2 size={32} className="spin" />
+              <span>A carregar chegadas...</span>
+            </div>
+          ) : filteredArrivals.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><Inbox size={48} /></div>
-              <p className="empty-message">Nenhuma chegada encontrada com os filtros atuais...</p>
+              <p className="empty-message">
+                {arrivals.length === 0
+                  ? "Nenhuma chegada encontrada."
+                  : "Nenhuma chegada encontrada com os filtros atuais..."}
+              </p>
             </div>
           ) : (
             <div className="arrivals-table">
@@ -334,7 +426,7 @@ export default function ArrivalsList() {
                     <th>Matrícula</th>
                     <th>Cais</th>
                     <th>Hora de Chegada</th>
-                    <th>Carga</th>
+                    <th>Referência</th>
                     <th>Estado</th>
                     <th>Ações</th>
                   </tr>
@@ -366,7 +458,7 @@ export default function ArrivalsList() {
             </div>
           )}
         </div>
-      </main >
+      </main>
 
       {/* Modal / Information Card */}
       {selectedArrival && (
@@ -402,7 +494,7 @@ export default function ArrivalsList() {
                     <span className="detail-value">{selectedArrival.dock}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Carga</span>
+                    <span className="detail-label">Referência</span>
                     <span className="detail-value">{selectedArrival.cargo}</span>
                   </div>
                   <div className="detail-row">
@@ -421,16 +513,16 @@ export default function ArrivalsList() {
                     <label className="detail-label">Cais</label>
                     <select
                       className="detail-input"
-                      value={selectedArrival.dock}
-                      onChange={(e) => setSelectedArrival({ ...selectedArrival, dock: e.target.value })}
+                      value={editedArrival?.dock || selectedArrival.dock}
+                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, dock: e.target.value } : null)}
                     >
-                      <option value="A">Cais A</option>
-                      <option value="B">Cais B</option>
-                      <option value="C">Cais C</option>
+                      {availableDocks.map((dock) => (
+                        <option key={dock} value={dock}>Cais {dock}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="detail-row">
-                    <label className="detail-label">Carga (Restrito)</label>
+                    <label className="detail-label">Referência (Restrito)</label>
                     <input
                       className="detail-input"
                       type="text"
@@ -443,12 +535,13 @@ export default function ArrivalsList() {
                     <label className="detail-label">Estado</label>
                     <select
                       className="detail-input"
-                      value={selectedArrival.status}
-                      onChange={(e) => setSelectedArrival({ ...selectedArrival, status: e.target.value as any })}
+                      value={editedArrival?.status || selectedArrival.status}
+                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, status: e.target.value } : null)}
                     >
-                      <option value="Pendente">Pendente</option>
-                      <option value="Em descarga">Em descarga</option>
+                      <option value="Em trânsito">Em trânsito</option>
+                      <option value="Atrasado">Atrasado</option>
                       <option value="Concluído">Concluído</option>
+                      <option value="Cancelado">Cancelado</option>
                     </select>
                   </div>
                 </>
@@ -460,15 +553,24 @@ export default function ArrivalsList() {
                 Cancelar
               </button>
               {modalMode === "edit" && (
-                <button className="btn-primary" onClick={handleSave}>
-                  <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
-                  Guardar Alterações
+                <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="spin inline-icon" style={{ marginRight: '6px' }} />
+                      A guardar...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
+                      Guardar Alterações
+                    </>
+                  )}
                 </button>
               )}
             </div>
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 }
