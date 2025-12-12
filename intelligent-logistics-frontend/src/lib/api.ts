@@ -1,43 +1,16 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
-// Default to production API URL with /api/v1 prefix
-const API_BASE = import.meta.env.VITE_API_URL || 'http://10.255.32.82:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://<VM_IP>:8000';
 
 const api = axios.create({
   baseURL: API_BASE,
   withCredentials: false,
-  timeout: 30000, // 30 second timeout
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Request interceptor - add auth token
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((cfg) => {
   const token = localStorage.getItem('auth_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  if (token && cfg.headers) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
 });
-
-// Response interceptor - handle 401 errors
-api.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Clear stored auth data
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_info');
-
-      // Redirect to login page
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && currentPath !== '/') {
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 
 export default api;
