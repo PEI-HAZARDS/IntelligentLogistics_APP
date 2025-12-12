@@ -1,32 +1,93 @@
 import React, { Suspense } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import Login from './Login';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import Login from '@/pages/Login/Login';
 
-const DriverLayout = React.lazy(() => import('./app/driver/layout/DriverLayout'));
-const GateLayout = React.lazy(() => import('./app/gate-operator/layout/OperatorLayout'));
-const GateDashboard = React.lazy(() => import('./app/gate-operator/routes/Dashboard'));
-const ArrivalDetail = React.lazy(() => import('./app/gate-operator/routes/ArrivalDetail'));
-const ManagerLayout = React.lazy(() => import('./app/logistics-manager/layout/ManagerLayout'));
+// Layouts e Componentes do Operador de Portaria
+const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorQuick'));
+const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
+const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
+const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
 
-const router = createBrowserRouter([
+// Componentes do Motorista
+const DriverLayout = React.lazy(() => import('@/components/layout/driver/DriverLayout'));
+
+// Componentes do Gestor Logístico
+const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
+
+// Rotas Comuns (Login)
+const commonRoutes = [
   { path: '/', element: <Login /> },
   { path: '/login', element: <Login /> },
-  { path: '/driver/*', element: <DriverLayout /> },
+];
+
+// Rotas do Operador de Portaria
+const gateRoutes = [
+  ...commonRoutes,
   {
     path: '/gate',
-    element: <GateLayout />,
+    element: <GateQuickLayout />,
     children: [
-      { index: true, element: <GateDashboard /> },             // /gate
-      { path: 'arrival/:id', element: <ArrivalDetail /> },     // /gate/arrival/1234
-      // outras rotas: { path: 'plates', element: <Plates /> }, ...
+      { index: true, element: <Dashboard /> },
     ],
   },
-  { path: '/manager/*', element: <ManagerLayout /> },
-]);
+  {
+    path: '/gate/arrivals',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <ArrivalsList /> },
+    ],
+  },
+  // Redireciona qualquer rota desconhecida para /gate
+  { path: '*', element: <Navigate to="/gate" replace /> }
+];
+
+// Rotas do Motorista
+const driverRoutes = [
+  ...commonRoutes,
+  {
+    path: '/driver',
+    element: <DriverLayout />
+  },
+  // Redireciona qualquer rota desconhecida para /driver
+  { path: '*', element: <Navigate to="/driver" replace /> }
+];
+
+// Rotas do Gestor Logístico
+const managerRoutes = [
+  ...commonRoutes,
+  {
+    path: '/manager',
+    element: <ManagerDashboard />
+  },
+  // Redireciona qualquer rota desconhecida para /manager
+  { path: '*', element: <Navigate to="/manager" replace /> }
+];
+
+// Seleção de rotas baseada no modo
+const getRoutes = () => {
+  const mode = import.meta.env.MODE;
+
+  console.log(`Carregando rotas para o modo: ${mode}`);
+
+  switch (mode) {
+    case 'driver':
+      return driverRoutes;
+    case 'manager':
+      return managerRoutes;
+    case 'gate':
+      return gateRoutes;
+    default:
+      // Fallback para gate ou uma página de erro/seleção
+      console.warn('Modo desconhecido, carregando rotas do Operador (Gate) por padrão.');
+      return gateRoutes;
+  }
+};
+
+const router = createBrowserRouter(getRoutes());
 
 export default function AppRouter() {
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
       <RouterProvider router={router} />
     </Suspense>
   );
