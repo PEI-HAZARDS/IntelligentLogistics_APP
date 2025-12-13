@@ -68,13 +68,14 @@ export async function queryAppointments(
 
 /**
  * Submit manual review decision
+ * Uses API Gateway endpoint: POST /api/manual-review/{appointment_id}
  */
 export async function submitManualReview(
     appointmentId: number,
     decision: 'approved' | 'rejected',
     notes?: string
 ): Promise<void> {
-    await api.post(`${BASE_PATH}/manual-review/${appointmentId}`, null, {
+    await api.post(`/manual-review/${appointmentId}`, null, {
         params: { decision, notes }
     });
 }

@@ -46,7 +46,7 @@ class GateWebSocket {
     constructor(gateId: string | number, baseUrl?: string) {
         this.gateId = gateId;
         // Default to API Gateway WebSocket URL
-        this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://10.255.32.82:8081/api/v1';
+        this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://10.255.32.100:8000/api';
     }
 
     /**
@@ -58,7 +58,7 @@ class GateWebSocket {
             return;
         }
 
-        const url = `${this.baseUrl}/ws/gate/${this.gateId}`;
+        const url = `${this.baseUrl}/ws/decisions/${this.gateId}`;
         console.log(`[WS] Connecting to ${url}...`);
 
         try {
@@ -134,6 +134,18 @@ class GateWebSocket {
     }
 
     /**
+     * Reset connection state (call before connect on page load)
+     */
+    reset(): void {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.reconnectAttempts = 0;
+        console.log('[WS] Connection state reset');
+    }
+
+    /**
      * Check if connected
      */
     isConnected(): boolean {
@@ -189,6 +201,8 @@ export function getGateWebSocket(gateId: string | number): GateWebSocket {
         wsInstance?.disconnect();
         wsInstance = new GateWebSocket(gateId);
     }
+    // Always reset reconnect attempts when getting instance (handles page reload)
+    wsInstance.reset();
     return wsInstance;
 }
 
