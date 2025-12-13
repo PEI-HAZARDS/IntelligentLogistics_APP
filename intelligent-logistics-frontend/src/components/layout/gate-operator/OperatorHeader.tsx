@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
+import { getActiveAlerts } from "@/services/alerts";
+import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
+import type { Alert } from "@/types/types";
 import {
     Bell,
     Sun,
@@ -10,7 +13,8 @@ import {
     Clock,
     ChevronDown,
     User,
-    ArrowRightCircle
+    ArrowRightCircle,
+    Loader2
 } from "lucide-react";
 
 // Notification type definition
@@ -23,39 +27,38 @@ interface Notification {
     read: boolean;
 }
 
-// Mock notifications data
-const mockNotifications: Notification[] = [
-    {
-        id: "1",
-        type: "warning",
-        title: "Delayed Arrival",
-        message: "Truck ABC-1234 is 30 minutes late",
-        time: "10 min",
+// Map API alert to notification format
+function mapAlertToNotification(alert: Alert): Notification {
+    const typeMap: Record<string, "warning" | "info" | "danger"> = {
+        safety: "danger",
+        problem: "danger",
+        operational: "warning",
+        generic: "info",
+    };
+
+    const timeDiff = Date.now() - new Date(alert.timestamp).getTime();
+    const minutes = Math.floor(timeDiff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const timeStr = hours > 0 ? `${hours}h ago` : minutes > 0 ? `${minutes}m ago` : "Just now";
+
+    return {
+        id: String(alert.id),
+        type: typeMap[alert.type] || "info",
+        title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
+        message: alert.description || "No description",
+        time: timeStr,
         read: false,
-    },
-    {
-        id: "2",
-        type: "info",
-        title: "New Arrival Registered",
-        message: "Vehicle XYZ-5678 scheduled for 14:00",
-        time: "25 min",
-        read: false,
-    },
-    {
-        id: "3",
-        type: "danger",
-        title: "Missing Document",
-        message: "Vehicle DEF-9012 without valid documentation",
-        time: "1 hour",
-        read: true,
-    },
-];
+    };
+}
 
 export default function OperatorHeader() {
     const { isDarkMode, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+    const [readIds, setReadIds] = useState<Set<string>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
     const notificationsRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -64,6 +67,88 @@ export default function OperatorHeader() {
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
     const userName = userInfo.name || userInfo.email || 'Operator';
     const userRole = userInfo.role || 'Gate Operator';
+    const gateId = userInfo.gate_id || 1;
+
+    // Fetch notifications from API
+    const fetchNotifications = useCallback(async () => {
+        setIsLoadingNotifications(true);
+        try {
+            const alerts = await getActiveAlerts(10);
+            const mappedNotifications = alerts.map(mapAlertToNotification);
+            // Mark previously read ones
+            setNotifications(mappedNotifications.map(n => ({
+                ...n,
+                read: readIds.has(n.id)
+            })));
+        } catch (err) {
+            console.error("Failed to fetch notifications:", err);
+        } finally {
+            setIsLoadingNotifications(false);
+        }
+    }, [readIds]);
+
+    // Initial fetch and WebSocket setup for real-time updates
+    useEffect(() => {
+        fetchNotifications();
+
+        // Setup WebSocket for real-time notifications
+        const ws = getGateWebSocket(gateId);
+
+        const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
+            if (data.type === "decision_update" && data.payload) {
+                const { hz_result, lp_result, decision, timestamp, truck_id } = data.payload;
+
+                // Create notification for important events
+                if (hz_result) {
+                    // Hazmat detection - high priority
+                    const newNotif: Notification = {
+                        id: `ws-hz-${Date.now()}`,
+                        type: "danger",
+                        title: "⚠️ Hazmat Detection",
+                        message: `Hazardous cargo: ${hz_result} - Truck: ${truck_id || lp_result || 'Unknown'}`,
+                        time: "Just now",
+                        read: false,
+                    };
+                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
+                }
+
+                if (decision === "MANUAL_REVIEW") {
+                    const newNotif: Notification = {
+                        id: `ws-review-${Date.now()}`,
+                        type: "warning",
+                        title: "Manual Review Required",
+                        message: `Truck ${lp_result || truck_id || 'Unknown'} needs operator review`,
+                        time: "Just now",
+                        read: false,
+                    };
+                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
+                }
+
+                if (decision === "REJECTED") {
+                    const newNotif: Notification = {
+                        id: `ws-reject-${Date.now()}`,
+                        type: "danger",
+                        title: "Arrival Rejected",
+                        message: `Truck ${lp_result || truck_id || 'Unknown'} was rejected`,
+                        time: "Just now",
+                        read: false,
+                    };
+                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
+                }
+            }
+        });
+
+        ws.connect();
+
+        // Refresh notifications every 60 seconds
+        const refreshInterval = setInterval(fetchNotifications, 60000);
+
+        return () => {
+            unsubMessage();
+            ws.disconnect();
+            clearInterval(refreshInterval);
+        };
+    }, [gateId, fetchNotifications]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -117,7 +202,13 @@ export default function OperatorHeader() {
         setIsHandoverOpen(true);
     };
 
-    const unreadCount = mockNotifications.filter((n) => !n.read).length;
+    const handleMarkAllRead = () => {
+        const allIds = new Set(notifications.map(n => n.id));
+        setReadIds(allIds);
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
+    const unreadCount = notifications.filter((n) => !n.read).length;
 
     return (
         <header className="operator-header">
@@ -162,26 +253,41 @@ export default function OperatorHeader() {
                         <div className="notifications-popup">
                             <div className="notifications-header">
                                 <span className="notifications-title">Notifications</span>
-                                <button className="mark-read-btn">Mark as read</button>
+                                <button className="mark-read-btn" onClick={handleMarkAllRead}>
+                                    Mark as read
+                                </button>
                             </div>
                             <div className="notifications-list">
-                                {mockNotifications.map((notification) => (
-                                    <div
-                                        key={notification.id}
-                                        className={`notification-item ${notification.type} ${notification.read ? "read" : ""
-                                            }`}
-                                    >
-                                        <div className="notification-indicator" />
-                                        <div className="notification-content">
-                                            <span className="notification-title">{notification.title}</span>
-                                            <span className="notification-message">{notification.message}</span>
-                                            <span className="notification-time">{notification.time}</span>
-                                        </div>
+                                {isLoadingNotifications ? (
+                                    <div className="notification-loading">
+                                        <Loader2 size={20} className="spin" />
+                                        <span>Loading...</span>
                                     </div>
-                                ))}
+                                ) : notifications.length === 0 ? (
+                                    <div className="notification-empty">
+                                        <span>No notifications</span>
+                                    </div>
+                                ) : (
+                                    notifications.map((notification) => (
+                                        <div
+                                            key={notification.id}
+                                            className={`notification-item ${notification.type} ${notification.read ? "read" : ""
+                                                }`}
+                                        >
+                                            <div className="notification-indicator" />
+                                            <div className="notification-content">
+                                                <span className="notification-title">{notification.title}</span>
+                                                <span className="notification-message">{notification.message}</span>
+                                                <span className="notification-time">{notification.time}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                             <div className="notifications-footer">
-                                <button className="view-all-btn">View All</button>
+                                <button className="view-all-btn" onClick={() => navigate('/gate/alerts')}>
+                                    View All
+                                </button>
                             </div>
                         </div>
                     )}

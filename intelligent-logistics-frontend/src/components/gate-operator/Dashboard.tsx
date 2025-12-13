@@ -1,11 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HLSPlayer from "./HLSPlayer";
-import { getStreamUrl } from "@/config/streams";
 import { AlertTriangle, FileText, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff } from "lucide-react";
 import { getUpcomingArrivals } from "@/services/arrivals";
 import { getActiveAlerts } from "@/services/alerts";
-import { getGateWebSocket, type DecisionUpdatePayload, type CropUpdate } from "@/lib/websocket";
+import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
+import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
+import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import type { Appointment, Alert } from "@/types/types";
 
 // Map alert type to detection UI type
@@ -95,7 +96,11 @@ export default function Dashboard() {
   // WebSocket states
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [crops, setCrops] = useState<CropImage[]>([]);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const wsRef = useRef<ReturnType<typeof getGateWebSocket> | null>(null);
+
+  // Toast notifications
+  const { toasts, addToast, dismissToast } = useToasts();
 
   // Get gate ID from user info (default to 1 if not set)
   const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
@@ -117,7 +122,7 @@ export default function Dashboard() {
       const alertCrops = alertsData
         .filter(a => a.image_url)
         .slice(0, 5)
-        .map((a, idx) => ({
+        .map((a) => ({
           id: `alert-${a.id}`,
           url: a.image_url!,
           type: "lp" as const,
@@ -137,14 +142,14 @@ export default function Dashboard() {
     }
   }, [gateId]);
 
-  // WebSocket setup
+  // WebSocket setup with toast notifications
   useEffect(() => {
     const ws = getGateWebSocket(gateId);
     wsRef.current = ws;
 
     const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
       if (data.type === "decision_update" && data.payload) {
-        const { lp_crop, hz_crop, lp_result, hz_result, timestamp } = data.payload;
+        const { lp_crop, hz_crop, lp_result, hz_result, decision, timestamp, truck_id } = data.payload;
         const now = timestamp || new Date().toISOString();
 
         // Add new crops to the beginning of the list
@@ -172,27 +177,70 @@ export default function Dashboard() {
           setCrops(prev => [...newCrops, ...prev].slice(0, 5));
         }
 
-        // Also add as detection if we have results
-        if (lp_result || hz_result) {
+        // Create detection and toast notification based on results
+        if (hz_result) {
+          // Hazmat detection - DANGER toast
           const newDetection: UIDetection = {
-            id: `ws-${Date.now()}`,
-            type: hz_result ? "adr" : "plate",
-            title: hz_result ? "Hazmat Detection" : "License Plate Detection",
-            description: hz_result
-              ? `Hazmat: ${hz_result}`
-              : `License plate: "${lp_result}" detected`,
+            id: `ws-hz-${Date.now()}`,
+            type: "adr",
+            title: "⚠️ Hazmat Detection",
+            description: `Hazardous cargo detected: ${hz_result}`,
             time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-            severity: hz_result ? "danger" : "info",
-            imageUrl: lp_crop || hz_crop,
+            severity: "danger",
+            imageUrl: hz_crop || lp_crop,
           };
-
           setDetections(prev => [newDetection, ...prev].slice(0, 10));
+
+          // Toast notification for hazmat
+          addToast({
+            type: "danger",
+            title: "⚠️ Hazmat Detection",
+            message: `Hazardous cargo detected: ${hz_result}. Truck: ${truck_id || lp_result || 'Unknown'}`,
+            imageUrl: hz_crop,
+          });
+        }
+
+        if (lp_result && !hz_result) {
+          // License plate detection - INFO toast
+          const newDetection: UIDetection = {
+            id: `ws-lp-${Date.now()}`,
+            type: "plate",
+            title: "License Plate Detection",
+            description: `License plate: "${lp_result}" detected`,
+            time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+            severity: "info",
+            imageUrl: lp_crop,
+          };
+          setDetections(prev => [newDetection, ...prev].slice(0, 10));
+
+          // Toast notification for license plate (only for important ones)
+          if (decision) {
+            addToast({
+              type: decision === "ACCEPTED" ? "success" : decision === "REJECTED" ? "danger" : "warning",
+              title: decision === "ACCEPTED" ? "✅ Arrival Approved" :
+                decision === "REJECTED" ? "❌ Arrival Rejected" : "⏳ Manual Review Required",
+              message: `Truck ${lp_result}: ${decision}`,
+              imageUrl: lp_crop,
+            });
+          }
+        }
+
+        // Handle decision-specific notifications
+        if (decision === "MANUAL_REVIEW") {
+          addToast({
+            type: "warning",
+            title: "Manual Review Required",
+            message: `Truck ${lp_result || truck_id || 'Unknown'} requires operator review`,
+            imageUrl: lp_crop || hz_crop,
+          });
         }
       }
     });
 
     const unsubConnect = ws.onConnect(() => {
       setIsWsConnected(true);
+      // Note: Not showing toast here to avoid duplicate notifications
+      // WebSocket status is shown via the LIVE indicator
     });
 
     const unsubDisconnect = ws.onDisconnect(() => {
@@ -208,7 +256,7 @@ export default function Dashboard() {
       unsubDisconnect();
       ws.disconnect();
     };
-  }, [gateId]);
+  }, [gateId, addToast]);
 
   // Initial fetch and auto-refresh timer
   useEffect(() => {
@@ -226,6 +274,23 @@ export default function Dashboard() {
     };
   }, [fetchData]);
 
+  // Fetch stream URL from API Gateway on mount
+  useEffect(() => {
+    const loadStreamUrl = async () => {
+      try {
+        // Use gate1 format (not gate01) as expected by stream server
+        const gateKey = `gate${gateId}`;
+        const url = await fetchStreamUrl(gateKey, 'high');
+        setStreamUrl(url);
+      } catch (err) {
+        console.error('Failed to fetch stream URL:', err);
+        // Fallback to a default placeholder if API fails
+        setStreamUrl(null);
+      }
+    };
+    loadStreamUrl();
+  }, [gateId]);
+
   const toggleAccordion = (id: string) => {
     setExpandedArrivalId(expandedArrivalId === id ? null : id);
   };
@@ -237,15 +302,25 @@ export default function Dashboard() {
 
   return (
     <div className="operator-dashboard">
-      {/* Coluna Esquerda - Câmera e Deteções */}
+      {/* Toast Notifications */}
+      <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Left Panel - Camera and Detections */}
       <div className="left-panel">
         <div className="camera-section">
           <div className="video-area">
-            <HLSPlayer
-              streamUrl={getStreamUrl("gate01", "high")}
-              quality="high"
-              autoPlay={true}
-            />
+            {streamUrl ? (
+              <HLSPlayer
+                streamUrl={streamUrl}
+                quality="high"
+                autoPlay={true}
+              />
+            ) : (
+              <div className="video-loading">
+                <Loader2 size={32} className="spin" />
+                <span>Loading stream...</span>
+              </div>
+            )}
           </div>
 
           {/* Crops column - real-time images from WebSocket/MinIO */}
@@ -345,7 +420,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Coluna Direita - Próximas Chegadas */}
+      {/* Right Panel - Upcoming Arrivals */}
       <div className="right-panel">
         <div className="panel-header-row">
           <h2 className="panel-title">Upcoming Arrivals</h2>
