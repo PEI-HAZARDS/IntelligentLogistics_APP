@@ -3,25 +3,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import HLSPlayer from "./HLSPlayer";
 import { AlertTriangle, FileText, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
 import { getUpcomingArrivals } from "@/services/arrivals";
-import { getActiveAlerts } from "@/services/alerts";
 import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
-import type { Appointment, Alert } from "@/types/types";
-
-// Map alert type to detection UI type
-function mapAlertTypeToDetection(type: string): "plate" | "safety" | "adr" {
-  if (type === "safety" || type === "problem") return "adr";
-  if (type === "operational") return "safety";
-  return "plate";
-}
-
-// Map alert type to severity
-function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
-  if (type === "problem" || type === "safety") return "danger";
-  if (type === "operational") return "warning";
-  return "info";
-}
+import type { Appointment } from "@/types/types";
 
 // Map API status to English display
 function mapStatusToLabel(status: string): string {
@@ -61,18 +46,7 @@ function generateUniqueId(prefix: string): string {
   return `${prefix}-${Date.now()}-${uniqueIdCounter}`;
 }
 
-// Map API alert to UI detection
-function mapAlertToDetection(alert: Alert): UIDetection {
-  return {
-    id: String(alert.id),
-    type: mapAlertTypeToDetection(alert.type),
-    title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1),
-    description: alert.description || "Alert without description",
-    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-    severity: mapAlertSeverity(alert.type),
-    imageUrl: alert.image_url || undefined,
-  };
-}
+
 
 // Map API arrival to UI format  
 function mapArrivalToUI(arrival: Appointment) {
@@ -115,34 +89,12 @@ export default function Dashboard() {
   const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
   const gateId = userInfo.gate_id || 1;
 
-  // Fetch data function - now fetches alerts instead of detection events
+  // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
     setError(null);
     try {
-      const [arrivalsData, alertsData] = await Promise.all([
-        getUpcomingArrivals(gateId, 5),
-        getActiveAlerts(10),
-      ]);
-
+      const arrivalsData = await getUpcomingArrivals(gateId, 5);
       setArrivals(arrivalsData.map(mapArrivalToUI));
-      setDetections(alertsData.map(mapAlertToDetection));
-
-      // Extract crop images from alerts that have image_url
-      const alertCrops = alertsData
-        .filter(a => a.image_url)
-        .slice(0, 5)
-        .map((a) => ({
-          id: `alert-${a.id}`,
-          url: a.image_url!,
-          type: "lp" as const,
-          timestamp: a.timestamp,
-        }));
-
-      // Merge with WebSocket crops (WS crops take priority)
-      setCrops(prev => {
-        const wsCrops = prev.filter(c => c.id.startsWith("ws-"));
-        return [...wsCrops, ...alertCrops].slice(0, 5);
-      });
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setError("Failed to load data. Click refresh to try again.");
@@ -374,8 +326,8 @@ export default function Dashboard() {
                     src={crop.url}
                     alt={crop.type === 'lp' ? 'License plate crop' : 'Hazmat crop'}
                     onError={(e) => {
-                      // Fallback to placeholder on error
-                      (e.target as HTMLImageElement).src = '/licen_pl.png';
+                      // Hide image on error instead of showing placeholder
+                      (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                   {crop.id.startsWith('ws-') && (
@@ -384,14 +336,9 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-              <>
-                <div className="crop-thumb">
-                  <img src="/licen_pl.png" alt="crop placeholder" />
-                </div>
-                <div className="crop-thumb">
-                  <img src="/plate.png" alt="crop placeholder" />
-                </div>
-              </>
+              <div className="empty-crops">
+                <span>Waiting for detections...</span>
+              </div>
             )}
           </div>
         </div>

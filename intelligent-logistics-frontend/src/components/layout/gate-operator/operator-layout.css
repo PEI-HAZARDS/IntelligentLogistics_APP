@@ -319,6 +319,18 @@
   opacity: 0.9;
 }
 
+/* Empty crops state */
+.empty-crops {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1rem;
+}
+
 /* Detections Section */
 .detections-section {
   flex: 1;
