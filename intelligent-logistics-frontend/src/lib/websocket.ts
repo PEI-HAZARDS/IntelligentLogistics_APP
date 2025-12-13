@@ -134,6 +134,18 @@ class GateWebSocket {
     }
 
     /**
+     * Reset connection state (call before connect on page load)
+     */
+    reset(): void {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.reconnectAttempts = 0;
+        console.log('[WS] Connection state reset');
+    }
+
+    /**
      * Check if connected
      */
     isConnected(): boolean {
@@ -189,6 +201,8 @@ export function getGateWebSocket(gateId: string | number): GateWebSocket {
         wsInstance?.disconnect();
         wsInstance = new GateWebSocket(gateId);
     }
+    // Always reset reconnect attempts when getting instance (handles page reload)
+    wsInstance.reset();
     return wsInstance;
 }
 
