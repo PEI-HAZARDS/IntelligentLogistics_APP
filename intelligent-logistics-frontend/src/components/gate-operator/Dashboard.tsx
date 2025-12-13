@@ -54,6 +54,13 @@ interface CropImage {
   timestamp: string;
 }
 
+// Unique ID counter to prevent React duplicate key warnings
+let uniqueIdCounter = 0;
+function generateUniqueId(prefix: string): string {
+  uniqueIdCounter += 1;
+  return `${prefix}-${Date.now()}-${uniqueIdCounter}`;
+}
+
 // Map API alert to UI detection
 function mapAlertToDetection(alert: Alert): UIDetection {
   return {
@@ -73,7 +80,7 @@ function mapArrivalToUI(arrival: Appointment) {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
     arrivalTime: arrival.scheduled_start_time
-      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + "m"
+      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     cargoAmount: arrival.notes || "",
@@ -157,7 +164,7 @@ export default function Dashboard() {
 
         if (lp_crop) {
           newCrops.push({
-            id: `ws-lp-${Date.now()}`,
+            id: generateUniqueId('ws-lp'),
             url: lp_crop,
             type: "lp",
             timestamp: now,
@@ -166,7 +173,7 @@ export default function Dashboard() {
 
         if (hz_crop) {
           newCrops.push({
-            id: `ws-hz-${Date.now()}`,
+            id: generateUniqueId('ws-hz'),
             url: hz_crop,
             type: "hz",
             timestamp: now,
@@ -181,7 +188,7 @@ export default function Dashboard() {
         if (hz_result) {
           // Hazmat detection - DANGER toast
           const newDetection: UIDetection = {
-            id: `ws-hz-${Date.now()}`,
+            id: generateUniqueId('ws-hz'),
             type: "adr",
             title: "⚠️ Hazmat Detection",
             description: `Hazardous cargo detected: ${hz_result}`,
@@ -203,7 +210,7 @@ export default function Dashboard() {
         if (lp_result && !hz_result) {
           // License plate detection - INFO toast
           const newDetection: UIDetection = {
-            id: `ws-lp-${Date.now()}`,
+            id: generateUniqueId('ws-lp'),
             type: "plate",
             title: "License Plate Detection",
             description: `License plate: "${lp_result}" detected`,

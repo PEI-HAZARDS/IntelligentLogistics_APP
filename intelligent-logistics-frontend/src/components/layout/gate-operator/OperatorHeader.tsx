@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
 import { getActiveAlerts } from "@/services/alerts";
-import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
+// Note: WebSocket removed - Dashboard handles real-time updates, Header uses API polling
 import type { Alert } from "@/types/types";
 import {
     Bell,
@@ -67,7 +67,6 @@ export default function OperatorHeader() {
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
     const userName = userInfo.name || userInfo.email || 'Operator';
     const userRole = userInfo.role || 'Gate Operator';
-    const gateId = userInfo.gate_id || 1;
 
     // Fetch notifications from API
     const fetchNotifications = useCallback(async () => {
@@ -87,68 +86,17 @@ export default function OperatorHeader() {
         }
     }, [readIds]);
 
-    // Initial fetch and WebSocket setup for real-time updates
+    // Initial fetch and periodic refresh (no WebSocket - Dashboard handles that)
     useEffect(() => {
         fetchNotifications();
 
-        // Setup WebSocket for real-time notifications
-        const ws = getGateWebSocket(gateId);
-
-        const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
-            if (data.type === "decision_update" && data.payload) {
-                const { hz_result, lp_result, decision, timestamp, truck_id } = data.payload;
-
-                // Create notification for important events
-                if (hz_result) {
-                    // Hazmat detection - high priority
-                    const newNotif: Notification = {
-                        id: `ws-hz-${Date.now()}`,
-                        type: "danger",
-                        title: "⚠️ Hazmat Detection",
-                        message: `Hazardous cargo: ${hz_result} - Truck: ${truck_id || lp_result || 'Unknown'}`,
-                        time: "Just now",
-                        read: false,
-                    };
-                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
-                }
-
-                if (decision === "MANUAL_REVIEW") {
-                    const newNotif: Notification = {
-                        id: `ws-review-${Date.now()}`,
-                        type: "warning",
-                        title: "Manual Review Required",
-                        message: `Truck ${lp_result || truck_id || 'Unknown'} needs operator review`,
-                        time: "Just now",
-                        read: false,
-                    };
-                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
-                }
-
-                if (decision === "REJECTED") {
-                    const newNotif: Notification = {
-                        id: `ws-reject-${Date.now()}`,
-                        type: "danger",
-                        title: "Arrival Rejected",
-                        message: `Truck ${lp_result || truck_id || 'Unknown'} was rejected`,
-                        time: "Just now",
-                        read: false,
-                    };
-                    setNotifications(prev => [newNotif, ...prev].slice(0, 15));
-                }
-            }
-        });
-
-        ws.connect();
-
-        // Refresh notifications every 60 seconds
+        // Refresh notifications every 60 seconds via API
         const refreshInterval = setInterval(fetchNotifications, 60000);
 
         return () => {
-            unsubMessage();
-            ws.disconnect();
             clearInterval(refreshInterval);
         };
-    }, [gateId, fetchNotifications]);
+    }, [fetchNotifications]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -172,9 +120,9 @@ export default function OperatorHeader() {
     // Get current shift based on time
     const getShiftInfo = () => {
         const hour = new Date().getHours();
-        if (hour >= 6 && hour < 14) return { name: "Morning Shift", endTime: "14:00", endHour: 14 };
-        if (hour >= 14 && hour < 22) return { name: "Afternoon Shift", endTime: "22:00", endHour: 22 };
-        return { name: "Night Shift", endTime: "06:00", endHour: 6 };
+        if (hour >= 6 && hour < 14) return { name: "Morning Shift", startTime: "06:00", endTime: "14:00", startHour: 6, endHour: 14 };
+        if (hour >= 14 && hour < 22) return { name: "Afternoon Shift", startTime: "14:00", endTime: "22:00", startHour: 14, endHour: 22 };
+        return { name: "Night Shift", startTime: "22:00", endTime: "06:00", startHour: 22, endHour: 6 };
     };
 
     const shiftInfo = getShiftInfo();
@@ -324,7 +272,7 @@ export default function OperatorHeader() {
                             <div className="dropdown-divider" />
                             <div className="dropdown-shift">
                                 <Clock size={16} />
-                                <span>{shiftInfo.name} (ends {shiftInfo.endTime})</span>
+                                <span>{shiftInfo.name} ({shiftInfo.startTime} - {shiftInfo.endTime})</span>
                             </div>
                             <div className="dropdown-divider" />
                             <button className="dropdown-item end-shift" onClick={handleEndShift}>
