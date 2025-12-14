@@ -135,7 +135,11 @@ export default function Dashboard() {
   // Process a single payload and update UI (detections, crops, toasts)
   // showToast = true for real-time updates, false for initial load from storage
   const processPayload = useCallback((data: DecisionUpdatePayload, showToast: boolean = true) => {
-    if (data.type !== "decision_update" || !data.payload) return;
+    console.log('[Dashboard] processPayload called', { type: data?.type, hasPayload: !!data?.payload, showToast, data });
+    if (data.type !== "decision_update" || !data.payload) {
+      console.warn('[Dashboard] processPayload returning early - type mismatch or missing payload', { type: data?.type, payload: data?.payload });
+      return;
+    }
 
     const payload = data.payload as {
       lp_cropUrl?: string;
@@ -158,9 +162,28 @@ export default function Dashboard() {
 
 
 
-    const now = payload.timestamp
-      ? new Date(payload.timestamp * 1000).toISOString()
-      : new Date().toISOString();
+    // Parse timestamp - could be Unix seconds, Unix milliseconds, or ISO string
+    let now: string;
+    try {
+      if (payload.timestamp) {
+        const ts = payload.timestamp;
+        if (typeof ts === 'string') {
+          // ISO string or other date string
+          now = new Date(ts).toISOString();
+        } else if (typeof ts === 'number') {
+          // Check if it's seconds or milliseconds (timestamps before year 2001 in ms would be < 1e12)
+          const date = ts > 1e12 ? new Date(ts) : new Date(ts * 1000);
+          now = date.toISOString();
+        } else {
+          now = new Date().toISOString();
+        }
+      } else {
+        now = new Date().toISOString();
+      }
+    } catch (e) {
+      console.warn('[Dashboard] Failed to parse timestamp, using current time', payload.timestamp, e);
+      now = new Date().toISOString();
+    }
 
     // Add new crops to the beginning of the list
     const newCrops: CropImage[] = [];
@@ -275,9 +298,11 @@ export default function Dashboard() {
     const handleStorageChange = () => {
       try {
         const saved = localStorage.getItem('ws_payloads');
+        console.log('[Dashboard] handleStorageChange called', { hasSaved: !!saved });
         if (!saved) return;
 
         const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: DecisionUpdatePayload }>;
+        console.log('[Dashboard] Parsed messages', { count: messages.length, isInitialLoad: isInitialLoadRef.current, lastProcessedId: lastProcessedIdRef.current });
         if (messages.length === 0) return;
 
         // Update debug messages state
@@ -287,6 +312,7 @@ export default function Dashboard() {
           // On initial load:
           // - Process only the NEWEST payload for crops (with showToast=true to trigger crop loading)
           // - Process ALL payloads for detection cards (showToast=false, no toasts)
+          console.log('[Dashboard] Initial load - processing all messages');
           isInitialLoadRef.current = false;
 
           // First, process all messages for detections only (oldest first, no crops/toasts)
@@ -318,7 +344,9 @@ export default function Dashboard() {
         } else {
           // For subsequent updates, only process the newest payload (with toasts + crops)
           const newest = messages[0];
-          if (newest && newest.id !== lastProcessedIdRef.current) {
+          const shouldProcess = newest && newest.id !== lastProcessedIdRef.current;
+          console.log('[Dashboard] Subsequent update', { newestId: newest?.id, lastProcessedId: lastProcessedIdRef.current, shouldProcess });
+          if (shouldProcess) {
             lastProcessedIdRef.current = newest.id;
             processPayload(newest.data, true);
           }
@@ -828,7 +856,12 @@ export default function Dashboard() {
               Gate {gateId} | {isWsConnected ? 'Connected' : 'Disconnected'}
             </span>
             <button
-              onClick={() => setDebugMessages([])}
+              onClick={() => {
+                localStorage.removeItem('ws_payloads');
+                setDebugMessages([]);
+                lastProcessedIdRef.current = null;
+                isInitialLoadRef.current = true;
+              }}
               style={{
                 background: '#374151',
                 color: '#fff',

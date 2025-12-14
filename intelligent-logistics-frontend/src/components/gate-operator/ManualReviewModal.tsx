@@ -110,7 +110,7 @@ export default function ManualReviewModal({
             const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
             const gateId = reviewData?.gateId || userInfo.gate_id || undefined;
 
-            await submitManualReview(selectedAppointment.id, 'approved', notes || undefined, gateId);
+            await submitManualReview(selectedAppointment.id, 'approved', notes || undefined, gateId, selectedAppointment.truck_license_plate);
             onDecisionComplete(selectedAppointment.id, 'approved');
             onClose();
         } catch (err) {
@@ -130,7 +130,10 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-            await submitManualReview(selectedAppointment.id, 'rejected', notes || undefined);
+            // Get gate ID for rejection notification
+            const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+            const gateId = reviewData?.gateId || userInfo.gate_id || undefined;
+            await submitManualReview(selectedAppointment.id, 'rejected', notes || undefined, gateId, selectedAppointment.truck_license_plate);
             onDecisionComplete(selectedAppointment.id, 'rejected');
             onClose();
         } catch (err) {

@@ -71,15 +71,17 @@ export async function queryAppointments(
  * Uses API Gateway endpoint: POST /api/manual-review/{appointment_id}
  * 
  * @param gateId - If provided and decision is 'approved', creates a Visit with state='unloading'
+ * @param licensePlate - Required for Kafka notification to reach Driver UI
  */
 export async function submitManualReview(
     appointmentId: number,
     decision: 'approved' | 'rejected',
     notes?: string,
-    gateId?: number
+    gateId?: number,
+    licensePlate?: string
 ): Promise<void> {
     await api.post(`/manual-review/${appointmentId}`, null, {
-        params: { decision, notes, gate_id: gateId }
+        params: { decision, notes, gate_id: gateId, license_plate: licensePlate }
     });
 }
 

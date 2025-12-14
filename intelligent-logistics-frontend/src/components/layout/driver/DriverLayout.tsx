@@ -47,10 +47,13 @@ const DriverLayout = () => {
 
     // Decision notification from WebSocket
     const [decisionNotification, setDecisionNotification] = useState<{
-        type: 'ACCEPTED' | 'REJECTED';
+        type: 'ACCEPTED' | 'REJECTED' | 'MANUAL_REVIEW';
         licensePlate: string;
         timestamp: string;
     } | null>(null);
+
+    // Waiting for manual review state
+    const [waitingForReview, setWaitingForReview] = useState(false);
 
     // Auto-dismiss messages
     useEffect(() => {
@@ -60,9 +63,9 @@ const DriverLayout = () => {
         }
     }, [successMessage]);
 
-    // Auto-dismiss decision notification
+    // Auto-dismiss decision notification (but NOT for MANUAL_REVIEW - wait for final decision)
     useEffect(() => {
-        if (decisionNotification) {
+        if (decisionNotification && decisionNotification.type !== 'MANUAL_REVIEW') {
             const timer = setTimeout(() => setDecisionNotification(null), 10000);
             return () => clearTimeout(timer);
         }
@@ -116,7 +119,17 @@ const DriverLayout = () => {
             const decision = data.payload?.decision;
 
             if (driverPlate && msgPlate && driverPlate === msgPlate) {
-                if (decision === 'ACCEPTED' || decision === 'REJECTED') {
+                if (decision === 'MANUAL_REVIEW') {
+                    // Show waiting for review state
+                    setWaitingForReview(true);
+                    setDecisionNotification({
+                        type: 'MANUAL_REVIEW',
+                        licensePlate: msgPlate,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                } else if (decision === 'ACCEPTED' || decision === 'REJECTED') {
+                    // Final decision arrived - clear waiting state
+                    setWaitingForReview(false);
                     setDecisionNotification({
                         type: decision,
                         licensePlate: msgPlate,
@@ -125,7 +138,7 @@ const DriverLayout = () => {
                     // Auto-switch to internal view if accepted
                     if (decision === 'ACCEPTED') {
                         setMode('internal');
-                        // Ideally refresh appointment to get updated status
+                        // Refresh appointment to get updated status
                         fetchActiveAppointment();
                     }
                 }
@@ -457,19 +470,28 @@ const DriverLayout = () => {
                 {/* Decision Notification from Backend */}
                 {decisionNotification && (
                     <div
-                        className={`decision-notification ${decisionNotification.type === 'ACCEPTED' ? 'accepted' : 'rejected'}`}
-                        onClick={() => setDecisionNotification(null)}
+                        className={`decision-notification ${decisionNotification.type === 'ACCEPTED' ? 'accepted' :
+                            decisionNotification.type === 'REJECTED' ? 'rejected' :
+                                'waiting'
+                            }`}
+                        onClick={() => !waitingForReview && setDecisionNotification(null)}
                     >
                         <div className="notification-icon">
                             {decisionNotification.type === 'ACCEPTED' ? (
                                 <CheckCircle size={32} />
-                            ) : (
+                            ) : decisionNotification.type === 'REJECTED' ? (
                                 <AlertCircle size={32} />
+                            ) : (
+                                <Loader2 size={32} className="animate-spin" />
                             )}
                         </div>
                         <div className="notification-content">
                             <div className="notification-title">
-                                {decisionNotification.type === 'ACCEPTED' ? 'Entry Approved!' : 'Entry Rejected'}
+                                {decisionNotification.type === 'ACCEPTED'
+                                    ? 'Entry Approved!'
+                                    : decisionNotification.type === 'REJECTED'
+                                        ? 'Entry Rejected'
+                                        : 'Waiting for Review'}
                             </div>
                             <div className="notification-details">
                                 <span className="plate">{decisionNotification.licensePlate}</span>
@@ -478,7 +500,9 @@ const DriverLayout = () => {
                             <div className="notification-hint">
                                 {decisionNotification.type === 'ACCEPTED'
                                     ? 'You may proceed to the terminal'
-                                    : 'Please contact the gate operator'}
+                                    : decisionNotification.type === 'REJECTED'
+                                        ? 'Please contact the gate operator'
+                                        : 'A gate operator is reviewing your entry...'}
                             </div>
                         </div>
                     </div>
