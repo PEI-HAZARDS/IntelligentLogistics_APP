@@ -24,6 +24,11 @@ const DriverLayout = () => {
     // Claim state
     const [pinCode, setPinCode] = useState('');
     const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+    // Local confirmation state to enforce PIN entry even if API returns active
+    const [confirmedArrivalId, setConfirmedArrivalId] = useState<number | null>(() => {
+        const saved = localStorage.getItem('confirmed_arrival_id');
+        return saved ? parseInt(saved) : null;
+    });
     const [isExpanded, setIsExpanded] = useState(true);
     const [showDebug, setShowDebug] = useState(false);
     const [isWsConnected, setIsWsConnected] = useState(false);
@@ -145,6 +150,23 @@ const DriverLayout = () => {
             });
 
             await fetchActiveAppointment(); // Refresh full details
+
+            // Set local confirmation
+            // We need to get the ID from the response or wait for the fetch. 
+            // Better to wait for fetch or optimistic update. 
+            // Since we await fetchActiveAppointment directly below, let's assume it updates state? 
+            // Actually fetchActiveAppointment sets state, but we don't have the new value immediately here in closure.
+            // Let's use the result from claim if available, but claim returns ClaimAppointmentResponse which has appointment_id
+
+            // Re-fetch to be safe and use that
+            const updated = await getMyActiveArrival(driversLicense);
+            setActiveAppointment(updated);
+
+            if (updated?.id) {
+                setConfirmedArrivalId(updated.id);
+                localStorage.setItem('confirmed_arrival_id', updated.id.toString());
+            }
+
             setSuccessMessage('Arrival registered successfully!');
             setPinCode('');
         } catch (err: unknown) {
@@ -176,6 +198,8 @@ const DriverLayout = () => {
             await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
             setSuccessMessage('Delivery confirmed successfully!');
             setActiveAppointment(null);
+            setConfirmedArrivalId(null);
+            localStorage.removeItem('confirmed_arrival_id');
             setMode('external');
         } catch (err) {
             console.error('Failed to confirm delivery:', err);
@@ -199,7 +223,8 @@ const DriverLayout = () => {
                             />
 
                             {/* PIN Overlay - Centered on Map */}
-                            {!activeAppointment && (
+                            {/* Show if NO active appointment OR (active appointment exists BUT local confirmation mismatch) */}
+                            {(!activeAppointment || (activeAppointment && confirmedArrivalId !== activeAppointment.id)) && (
                                 <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
                                     <div className="w-full max-w-sm bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
                                         <div className="flex flex-col items-center gap-4 mb-6 text-center">
@@ -245,8 +270,8 @@ const DriverLayout = () => {
                             )}
                         </div>
 
-                        {/* Active Appointment details (Collapsible Bottom Sheet) */}
-                        {activeAppointment && (
+                        {/* Active Appointment details (Collapsible Bottom Sheet) - Only show if confirmed */}
+                        {activeAppointment && confirmedArrivalId === activeAppointment.id && (
                             <div className="bg-slate-900 border border-slate-700/50 shadow-xl z-40 transition-all duration-300 ease-in-out rounded-2xl overflow-hidden shrink-0 mb-4">
                                 <div className="p-4 flex flex-col gap-4">
                                     {/* Header: Terminal & Toggle */}
