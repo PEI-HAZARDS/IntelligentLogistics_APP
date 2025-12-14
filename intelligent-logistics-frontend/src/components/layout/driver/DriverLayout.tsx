@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Truck, User, Map, Navigation, QrCode, CheckCircle, Loader2, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { Menu, Truck, User, Map, Navigation, QrCode, CheckCircle, Loader2, AlertCircle, ChevronUp, ChevronDown, Bug, Wifi } from 'lucide-react';
 import ExternalRoute from '@/components/driver/ExternalRoute';
 import InternalRoute from '@/components/driver/InternalRoute';
 import Sidebar from '@/components/driver/Sidebar';
 import { claimArrival, getMyActiveArrival } from '@/services/drivers';
+import { getGateWebSocket, type DecisionUpdatePayload } from '@/lib/websocket';
 import type { Appointment } from '@/types/types';
 import './driver-layout.css';
 
@@ -24,6 +25,16 @@ const DriverLayout = () => {
     const [pinCode, setPinCode] = useState('');
     const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
+    const [showDebug, setShowDebug] = useState(false);
+    const [isWsConnected, setIsWsConnected] = useState(false);
+    const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>(() => {
+        try {
+            const saved = localStorage.getItem('ws_payloads');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
     const [isClaiming, setIsClaiming] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -56,6 +67,60 @@ const DriverLayout = () => {
             fetchActiveAppointment();
         }
     }, [driversLicense, navigate, fetchActiveAppointment]);
+
+    // WebSocket Setup (Gate 1 - Same as Gate UI default)
+    useEffect(() => {
+        const ws = getGateWebSocket(1);
+
+        const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
+            // Save to localStorage to sync with other tabs/components
+            try {
+                const saved = localStorage.getItem('ws_payloads');
+                const existing = saved ? JSON.parse(saved) : [];
+                const newMessages = [{
+                    id: `debug-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    timestamp: new Date().toISOString(),
+                    data: data
+                }, ...existing].slice(0, 10);
+
+                localStorage.setItem('ws_payloads', JSON.stringify(newMessages));
+                window.dispatchEvent(new Event('ws_payload_updated'));
+            } catch (e) {
+                console.warn('Failed to save payload:', e);
+            }
+        });
+
+        const unsubConnect = ws.onConnect(() => setIsWsConnected(true));
+        const unsubDisconnect = ws.onDisconnect(() => setIsWsConnected(false));
+
+        ws.connect();
+
+        return () => {
+            unsubMessage();
+            unsubConnect();
+            unsubDisconnect();
+        };
+    }, []);
+
+    // Listen for debug message updates
+    useEffect(() => {
+        const updateMessages = () => {
+            try {
+                const saved = localStorage.getItem('ws_payloads');
+                if (saved) setDebugMessages(JSON.parse(saved));
+            } catch (e) {
+                console.error('Error parsing debug messages:', e);
+            }
+        };
+
+        window.addEventListener('storage', updateMessages);
+        window.addEventListener('ws_payload_updated', updateMessages);
+
+        return () => {
+            window.removeEventListener('storage', updateMessages);
+            window.removeEventListener('ws_payload_updated', updateMessages);
+        };
+    }, []);
 
     // Handle PIN claim
     const handleClaimArrival = useCallback(async () => {
@@ -330,6 +395,76 @@ const DriverLayout = () => {
                     <Navigation size={24} />
                     <span>Inside Port</span>
                 </button>
+            </div>
+            {/* Debug Menu */}
+            <div style={{
+                position: 'fixed',
+                bottom: showDebug ? '0' : '-300px',
+                left: '0',
+                right: '0',
+                height: '300px',
+                background: 'rgba(15, 20, 35, 0.95)',
+                borderTop: '2px solid #4ade80',
+                transition: 'bottom 0.3s ease',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+            }}>
+                <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    style={{
+                        position: 'absolute',
+                        top: '-36px',
+                        left: '20px', // Left side to avoid bottom card toggle if it were centered
+                        background: showDebug ? '#4ade80' : '#374151',
+                        color: showDebug ? '#000' : '#fff',
+                        border: 'none',
+                        borderRadius: '8px 8px 0 0',
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        boxShadow: '0 -2px 10px rgba(0,0,0,0.2)'
+                    }}
+                >
+                    <Bug size={16} />
+                    Debug ({debugMessages.length})
+                    {showDebug ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+
+                <div style={{ padding: '12px', overflowY: 'auto', flex: 1, fontFamily: 'monospace', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#9ca3af' }}>
+                        <span>
+                            <Wifi size={14} style={{ marginRight: '6px', color: isWsConnected ? '#4ade80' : '#ef4444', verticalAlign: 'text-bottom' }} />
+                            Gate 1 | {isWsConnected ? 'Connected' : 'Disconnected'}
+                        </span>
+                        <button
+                            onClick={() => { localStorage.removeItem('ws_payloads'); setDebugMessages([]); }}
+                            style={{ background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '10px' }}
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    {debugMessages.map((msg) => (
+                        <div key={msg.id} style={{
+                            background: 'rgba(55, 65, 81, 0.5)',
+                            borderRadius: '6px',
+                            padding: '8px 12px',
+                            marginBottom: '8px',
+                            borderLeft: '3px solid #4ade80',
+                        }}>
+                            <div style={{ color: '#9ca3af', marginBottom: '4px' }}>
+                                {new Date(msg.timestamp).toLocaleTimeString()} — {msg.data?.type || 'unknown'}
+                            </div>
+                            <pre style={{ color: '#e5e7eb', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                {JSON.stringify(msg.data?.payload || msg.data, null, 2)}
+                            </pre>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
