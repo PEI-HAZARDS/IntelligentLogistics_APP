@@ -245,10 +245,13 @@ export default function Dashboard() {
     ws.connect();
 
     return () => {
+      // Only unsubscribe handlers - don't disconnect the singleton WebSocket
+      // The WebSocket persists across React Strict Mode remounts
       unsubMessage();
       unsubConnect();
       unsubDisconnect();
-      ws.disconnect();
+      // NOTE: Do NOT call ws.disconnect() here - it causes race conditions
+      // with React Strict Mode's mount/unmount/mount cycle
     };
   }, [gateId, addToast]);
 
