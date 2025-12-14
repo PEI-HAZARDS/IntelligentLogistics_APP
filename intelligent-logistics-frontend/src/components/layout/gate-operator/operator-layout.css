@@ -429,16 +429,44 @@
 
 .detection-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.detection-header h4 {
-  margin: 0;
-  font-size: 1rem;
+.detection-header .truck-id {
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--text-primary);
-  font-weight: 600;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.detection-header .decision-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.decision-badge.decision-accepted {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.decision-badge.decision-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.decision-badge.decision-manual-review {
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .detection-time {
@@ -448,6 +476,48 @@
   background: var(--bg-surface);
   padding: 2px 6px;
   border-radius: 4px;
+  margin-left: auto;
+}
+
+/* Detection Fields - LICENSE, KEMLER, UN */
+.detection-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.detection-field {
+  display: block;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.detection-field .field-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  width: 70px;
+  /* Fixed width for alignment */
+  text-transform: uppercase;
+  vertical-align: baseline;
+}
+
+.detection-field .field-value {
+  display: inline;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Consolas', monospace;
+  margin-right: 0.5rem;
+}
+
+.detection-field .field-description {
+  display: inline;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .detection-description {

@@ -2,9 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
-import { getActiveAlerts } from "@/services/alerts";
-// Note: WebSocket removed - Dashboard handles real-time updates, Header uses API polling
-import type { Alert } from "@/types/types";
 import {
     Bell,
     Sun,
@@ -13,10 +10,8 @@ import {
     Clock,
     ChevronDown,
     User,
-    ArrowRightCircle,
-    Loader2
+    ArrowRightCircle
 } from "lucide-react";
-
 // Notification type definition
 interface Notification {
     id: string;
@@ -27,38 +22,12 @@ interface Notification {
     read: boolean;
 }
 
-// Map API alert to notification format
-function mapAlertToNotification(alert: Alert): Notification {
-    const typeMap: Record<string, "warning" | "info" | "danger"> = {
-        safety: "danger",
-        problem: "danger",
-        operational: "warning",
-        generic: "info",
-    };
-
-    const timeDiff = Date.now() - new Date(alert.timestamp).getTime();
-    const minutes = Math.floor(timeDiff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const timeStr = hours > 0 ? `${hours}h ago` : minutes > 0 ? `${minutes}m ago` : "Just now";
-
-    return {
-        id: String(alert.id),
-        type: typeMap[alert.type] || "info",
-        title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
-        message: alert.description || "No description",
-        time: timeStr,
-        read: false,
-    };
-}
-
 export default function OperatorHeader() {
     const { isDarkMode, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isHandoverOpen, setIsHandoverOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
-    const [readIds, setReadIds] = useState<Set<string>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
     const notificationsRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -68,35 +37,66 @@ export default function OperatorHeader() {
     const userName = userInfo.name || userInfo.email || 'Operator';
     const userRole = userInfo.role || 'Gate Operator';
 
-    // Fetch notifications from API
-    const fetchNotifications = useCallback(async () => {
-        setIsLoadingNotifications(true);
+    // Listen for localStorage changes (same as Dashboard)
+    const updateNotificationsFromStorage = useCallback(() => {
         try {
-            const alerts = await getActiveAlerts(10);
-            const mappedNotifications = alerts.map(mapAlertToNotification);
-            // Mark previously read ones
-            setNotifications(mappedNotifications.map(n => ({
-                ...n,
-                read: readIds.has(n.id)
-            })));
-        } catch (err) {
-            console.error("Failed to fetch notifications:", err);
-        } finally {
-            setIsLoadingNotifications(false);
+            const saved = localStorage.getItem('ws_payloads');
+            if (!saved) return;
+
+            const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: any }>; // type 'any' to avoid import issues or need for full type here
+            if (messages.length === 0) return;
+
+            // Get the latest payload (last in the array is usually newest, but sorting by timestamp is safer)
+            const latest = messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+            // Fix: Access the nested 'payload' property from the WebSocket message
+            const payload = latest.data?.payload;
+
+            if (payload && payload.alerts && Array.isArray(payload.alerts)) {
+                const newNotifications: Notification[] = payload.alerts
+                    .filter((msg: any) => typeof msg === 'string' && msg.trim().length > 0)
+                    .map((msg: string, index: number) => {
+                        // Determine severity
+                        let type: "info" | "warning" | "danger" = "danger";
+                        if (msg.toLowerCase().includes('approved') || msg.toLowerCase().includes('success')) type = "info";
+                        else if (msg.toLowerCase().includes('review') || msg.toLowerCase().includes('pending')) type = "warning";
+
+                        return {
+                            id: `alert-${latest.id}-${index}`,
+                            type,
+                            title: "Safety Alert", // Generic title as per recent simplified design
+                            message: msg,
+                            time: new Date(latest.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            read: false // New alerts are always unread until opened/marked
+                        };
+                    });
+
+                // Overwrite notifications with the latest batch
+                setNotifications(newNotifications);
+            }
+        } catch (e) {
+            console.error("Failed to parse notifications from storage", e);
         }
-    }, [readIds]);
+    }, []);
 
-    // Initial fetch and periodic refresh (no WebSocket - Dashboard handles that)
     useEffect(() => {
-        fetchNotifications();
+        // Initial load
+        updateNotificationsFromStorage();
 
-        // Refresh notifications every 60 seconds via API
-        const refreshInterval = setInterval(fetchNotifications, 60000);
+        // Listen for updates
+        const handleStorageUpdate = (e: StorageEvent) => {
+            if (e.key === 'ws_payloads') updateNotificationsFromStorage();
+        };
+
+        const handleCustomUpdate = () => updateNotificationsFromStorage();
+
+        window.addEventListener('storage', handleStorageUpdate);
+        window.addEventListener('ws_payload_updated', handleCustomUpdate);
 
         return () => {
-            clearInterval(refreshInterval);
+            window.removeEventListener('storage', handleStorageUpdate);
+            window.removeEventListener('ws_payload_updated', handleCustomUpdate);
         };
-    }, [fetchNotifications]);
+    }, [updateNotificationsFromStorage]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -151,8 +151,6 @@ export default function OperatorHeader() {
     };
 
     const handleMarkAllRead = () => {
-        const allIds = new Set(notifications.map(n => n.id));
-        setReadIds(allIds);
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     };
 
@@ -206,12 +204,7 @@ export default function OperatorHeader() {
                                 </button>
                             </div>
                             <div className="notifications-list">
-                                {isLoadingNotifications ? (
-                                    <div className="notification-loading">
-                                        <Loader2 size={20} className="spin" />
-                                        <span>Loading...</span>
-                                    </div>
-                                ) : notifications.length === 0 ? (
+                                {notifications.length === 0 ? (
                                     <div className="notification-empty">
                                         <span>No notifications</span>
                                     </div>

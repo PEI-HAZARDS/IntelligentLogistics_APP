@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HLSPlayer from "./HLSPlayer";
-import { AlertTriangle, FileText, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
 import { getUpcomingArrivals } from "@/services/arrivals";
 import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
@@ -19,15 +19,20 @@ function mapStatusToLabel(status: string): string {
   return statusMap[status] || status;
 }
 
-// Detection/Alert UI type
+// Detection/Alert UI type - matches the new card design
 interface UIDetection {
   id: string;
   type: "plate" | "safety" | "adr";
-  title: string;
-  description: string;
-  confidence?: number;
   time: string;
   severity: "warning" | "danger" | "info";
+  // New fields for redesigned card
+  truckId?: string;
+  decision?: "ACCEPTED" | "REJECTED" | "MANUAL_REVIEW";
+  licensePlate?: string;
+  kemler?: string;
+  kemlerDescription?: string;
+  UN?: string;
+  unDescription?: string;
   imageUrl?: string;
 }
 
@@ -78,7 +83,15 @@ export default function Dashboard() {
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [crops, setCrops] = useState<CropImage[]>([]);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>([]);
+  // Load saved payloads from localStorage on mount
+  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>(() => {
+    try {
+      const saved = localStorage.getItem('ws_payloads');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showDebug, setShowDebug] = useState(false);
   const wsRef = useRef<ReturnType<typeof getGateWebSocket> | null>(null);
 
@@ -103,131 +116,225 @@ export default function Dashboard() {
     }
   }, [gateId]);
 
-  // WebSocket setup with toast notifications
+  // Process a single payload and update UI (detections, crops, toasts)
+  // showToast = true for real-time updates, false for initial load from storage
+  const processPayload = useCallback((data: DecisionUpdatePayload, showToast: boolean = true) => {
+    if (data.type !== "decision_update" || !data.payload) return;
+
+    const payload = data.payload as {
+      lp_cropUrl?: string;
+      hz_cropUrl?: string;
+      licensePlate?: string;
+      UN?: string;
+      kemler?: string;
+      decision?: string;
+      timestamp?: number;
+      truck_id?: string;
+      gate_id?: number;
+      alerts?: string[];
+    };
+
+    const lp_crop = payload.lp_cropUrl;
+    const hz_crop = payload.hz_cropUrl;
+    const lp_result = payload.licensePlate;
+    const decision = payload.decision;
+    const truck_id = payload.truck_id;
+
+
+
+    const now = payload.timestamp
+      ? new Date(payload.timestamp * 1000).toISOString()
+      : new Date().toISOString();
+
+    // Add new crops to the beginning of the list
+    const newCrops: CropImage[] = [];
+
+    if (lp_crop) {
+      newCrops.push({
+        id: generateUniqueId('ws-lp'),
+        url: lp_crop,
+        type: "lp",
+        timestamp: now,
+      });
+    }
+
+    if (hz_crop) {
+      newCrops.push({
+        id: generateUniqueId('ws-hz'),
+        url: hz_crop,
+        type: "hz",
+        timestamp: now,
+      });
+    }
+
+    // Only add crops for real-time updates, not on initial load
+    if (showToast && newCrops.length > 0) {
+      setCrops(newCrops);
+    }
+
+    // Parse UN and Kemler from payload (format: "1203: Description" or just "1203")
+    const parseCodeWithDescription = (value?: string | null): { code?: string; description?: string } => {
+      if (!value) return {};
+      const parts = value.split(':');
+      return {
+        code: parts[0]?.trim(),
+        description: parts[1]?.trim()
+      };
+    };
+
+    const unParsed = parseCodeWithDescription(payload.UN);
+    const kemlerParsed = parseCodeWithDescription(payload.kemler);
+
+    // Determine severity based on decision and hazmat
+    let severity: "warning" | "danger" | "info" = "info";
+    if (payload.UN || payload.kemler) {
+      severity = "danger";
+    } else if (decision === "REJECTED") {
+      severity = "danger";
+    } else if (decision === "MANUAL_REVIEW") {
+      severity = "warning";
+    }
+
+    // Create unified detection card
+    const newDetection: UIDetection = {
+      id: generateUniqueId('ws-det'),
+      type: (payload.UN || payload.kemler) ? "adr" : "plate",
+      time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+      severity,
+      truckId: truck_id,
+      decision: decision as UIDetection['decision'],
+      licensePlate: lp_result,
+      kemler: kemlerParsed.code,
+      kemlerDescription: kemlerParsed.description,
+      UN: unParsed.code,
+      unDescription: unParsed.description,
+      imageUrl: lp_crop || hz_crop,
+    };
+    setDetections(prev => [newDetection, ...prev].slice(0, 10));
+
+    // Toast notifications for real-time updates only
+    // Strictly follow backend alerts: One toast per alert in the payload
+    if (showToast && payload.alerts && Array.isArray(payload.alerts)) {
+      payload.alerts.forEach((alertMsg) => {
+        if (typeof alertMsg === 'string' && alertMsg.trim()) {
+          // Determine type based on alert content for better UX
+          let toastType: "danger" | "warning" | "success" | "info" = "danger";
+          if (alertMsg.toLowerCase().includes('approved') || alertMsg.toLowerCase().includes('accepted')) {
+            toastType = "success";
+          } else if (alertMsg.toLowerCase().includes('review') || alertMsg.toLowerCase().includes('pending')) {
+            toastType = "warning";
+          }
+
+          addToast({
+            type: toastType,
+            title: "Alert",
+            message: alertMsg,
+          });
+        }
+      });
+    }
+  }, [addToast]);
+
+  // Track the last processed payload ID to avoid duplicates
+  const lastProcessedIdRef = useRef<string | null>(null);
+  // Track if this is the initial load (to process all payloads)
+  const isInitialLoadRef = useRef(true);
+
+  // Listen for localStorage changes and process new payloads
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const saved = localStorage.getItem('ws_payloads');
+        if (!saved) return;
+
+        const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: DecisionUpdatePayload }>;
+        if (messages.length === 0) return;
+
+        // Update debug messages state
+        setDebugMessages(messages);
+
+        if (isInitialLoadRef.current) {
+          // On initial load:
+          // - Process only the NEWEST payload for crops (with showToast=true to trigger crop loading)
+          // - Process ALL payloads for detection cards (showToast=false, no toasts)
+          isInitialLoadRef.current = false;
+
+          // First, process all messages for detections only (oldest first, no crops/toasts)
+          const reversedMessages = [...messages].reverse();
+          reversedMessages.forEach(msg => {
+            processPayload(msg.data, false);
+          });
+
+          // Then load crops from the newest message only
+          const newest = messages[0];
+          if (newest) {
+            // Manually extract and set crops from newest payload
+            const payload = newest.data.payload as { lp_cropUrl?: string; hz_cropUrl?: string; timestamp?: number };
+            const newCrops: CropImage[] = [];
+            const now = payload?.timestamp ? new Date(payload.timestamp * 1000).toISOString() : new Date().toISOString();
+
+            if (payload?.lp_cropUrl) {
+              newCrops.push({ id: generateUniqueId('init-lp'), url: payload.lp_cropUrl, type: "lp", timestamp: now });
+            }
+            if (payload?.hz_cropUrl) {
+              newCrops.push({ id: generateUniqueId('init-hz'), url: payload.hz_cropUrl, type: "hz", timestamp: now });
+            }
+            if (newCrops.length > 0) {
+              setCrops(newCrops);
+            }
+          }
+
+          lastProcessedIdRef.current = messages[0]?.id || null;
+        } else {
+          // For subsequent updates, only process the newest payload (with toasts + crops)
+          const newest = messages[0];
+          if (newest && newest.id !== lastProcessedIdRef.current) {
+            lastProcessedIdRef.current = newest.id;
+            processPayload(newest.data, true);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to process localStorage payloads:', e);
+      }
+    };
+
+    // Listen for storage events (from other tabs)
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom event (from same tab)
+    window.addEventListener('ws_payload_updated', handleStorageChange);
+
+    // Process any existing payloads on mount
+    handleStorageChange();
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('ws_payload_updated', handleStorageChange);
+    };
+  }, [processPayload]);
+
+  // WebSocket setup - ONLY saves to localStorage, UI updates via storage listener
   useEffect(() => {
     const ws = getGateWebSocket(gateId);
     wsRef.current = ws;
 
     const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
-      // Store raw message for debug panel
-      setDebugMessages(prev => [{
-        id: generateUniqueId('debug'),
-        timestamp: new Date().toISOString(),
-        data: data
-      }, ...prev].slice(0, 10));
+      // Save to localStorage - UI will update via storage listener
+      try {
+        const saved = localStorage.getItem('ws_payloads');
+        const existing = saved ? JSON.parse(saved) : [];
+        const newMessages = [{
+          id: generateUniqueId('debug'),
+          timestamp: new Date().toISOString(),
+          data: data
+        }, ...existing].slice(0, 10);
 
-      if (data.type === "decision_update" && data.payload) {
-        // Map Decision Engine field names to frontend expected names
-        const payload = data.payload as {
-          lp_cropUrl?: string;
-          hz_cropUrl?: string;
-          licensePlate?: string;
-          UN?: string;
-          kemler?: string;
-          decision?: string;
-          timestamp?: number;
-          truck_id?: string;
-          gate_id?: number;
-          alerts?: string[];
-        };
+        localStorage.setItem('ws_payloads', JSON.stringify(newMessages));
 
-        const lp_crop = payload.lp_cropUrl;
-        const hz_crop = payload.hz_cropUrl;
-        const lp_result = payload.licensePlate;
-        const decision = payload.decision;
-        const truck_id = payload.truck_id;
-
-        // Build hz_result from UN and kemler
-        const hz_result = (payload.UN || payload.kemler)
-          ? `${payload.UN ? `UN: ${payload.UN}` : ''}${payload.UN && payload.kemler ? ' | ' : ''}${payload.kemler ? `Kemler: ${payload.kemler}` : ''}`
-          : null;
-
-        const now = payload.timestamp
-          ? new Date(payload.timestamp * 1000).toISOString()
-          : new Date().toISOString();
-
-        // Add new crops to the beginning of the list
-        const newCrops: CropImage[] = [];
-
-        if (lp_crop) {
-          newCrops.push({
-            id: generateUniqueId('ws-lp'),
-            url: lp_crop,
-            type: "lp",
-            timestamp: now,
-          });
-        }
-
-        if (hz_crop) {
-          newCrops.push({
-            id: generateUniqueId('ws-hz'),
-            url: hz_crop,
-            type: "hz",
-            timestamp: now,
-          });
-        }
-
-        if (newCrops.length > 0) {
-          setCrops(prev => [...newCrops, ...prev].slice(0, 5));
-        }
-
-        // Create detection and toast notification based on results
-        if (hz_result) {
-          // Hazmat detection - DANGER toast
-          const newDetection: UIDetection = {
-            id: generateUniqueId('ws-hz'),
-            type: "adr",
-            title: "⚠️ Hazmat Detection",
-            description: `Hazardous cargo detected: ${hz_result}`,
-            time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-            severity: "danger",
-            imageUrl: hz_crop || lp_crop,
-          };
-          setDetections(prev => [newDetection, ...prev].slice(0, 10));
-
-          // Toast notification for hazmat
-          addToast({
-            type: "danger",
-            title: "⚠️ Hazmat Detection",
-            message: `Hazardous cargo detected: ${hz_result}. Truck: ${truck_id || lp_result || 'Unknown'}`,
-            imageUrl: hz_crop,
-          });
-        }
-
-        if (lp_result && !hz_result) {
-          // License plate detection - INFO toast
-          const newDetection: UIDetection = {
-            id: generateUniqueId('ws-lp'),
-            type: "plate",
-            title: "License Plate Detection",
-            description: `License plate: "${lp_result}" detected`,
-            time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-            severity: "info",
-            imageUrl: lp_crop,
-          };
-          setDetections(prev => [newDetection, ...prev].slice(0, 10));
-
-          // Toast notification for license plate (only for important ones)
-          if (decision) {
-            addToast({
-              type: decision === "ACCEPTED" ? "success" : decision === "REJECTED" ? "danger" : "warning",
-              title: decision === "ACCEPTED" ? "✅ Arrival Approved" :
-                decision === "REJECTED" ? "❌ Arrival Rejected" : "⏳ Manual Review Required",
-              message: `Truck ${lp_result}: ${decision}`,
-              imageUrl: lp_crop,
-            });
-          }
-        }
-
-        // Handle decision-specific notifications
-        if (decision === "MANUAL_REVIEW") {
-          addToast({
-            type: "warning",
-            title: "Manual Review Required",
-            message: `Truck ${lp_result || truck_id || 'Unknown'} requires operator review`,
-            imageUrl: lp_crop || hz_crop,
-          });
-        }
+        // Dispatch custom event for same-tab updates
+        window.dispatchEvent(new Event('ws_payload_updated'));
+      } catch (e) {
+        console.warn('Failed to save payload to localStorage:', e);
       }
     });
 
@@ -349,7 +456,7 @@ export default function Dashboard() {
         <div className="detections-section">
           <div className="section-header-row">
             <h3 className="section-title">
-              <ShieldAlert size={20} className="inline-icon" /> Alerts & Detections
+              <ShieldAlert size={20} className="inline-icon" /> Detections & Decisions
             </h3>
             <div className="header-badges">
               <span className={`ws-badge ${isWsConnected ? 'connected' : 'disconnected'}`}>
@@ -390,21 +497,46 @@ export default function Dashboard() {
                   key={detection.id}
                   className={`detection-card severity-${detection.severity}`}
                 >
+                  {/* Header: DECISION and TRK-ID */}
                   <div className="detection-header">
-                    <div className="title-row">
-                      {detection.type === 'plate' && <FileText size={16} />}
-                      {detection.type === 'adr' && <ShieldAlert size={16} />}
-                      {detection.type === 'safety' && <AlertTriangle size={16} />}
-                      <h4>{detection.title}</h4>
-                    </div>
+                    {detection.decision ? (
+                      <span className={`decision-badge decision-${detection.decision.toLowerCase().replace('_', '-')}`}>
+                        {detection.decision}
+                      </span>
+                    ) : (
+                      <span className="decision-badge decision-manual-review">UNKNOWN</span>
+                    )}
+                    {detection.truckId && <span className="truck-id">{detection.truckId}</span>}
                     <span className="detection-time">{detection.time}</span>
                   </div>
-                  <p className="detection-description">{detection.description}</p>
-                  {detection.imageUrl && (
-                    <div className="detection-image">
-                      <img src={detection.imageUrl} alt="Detection" />
-                    </div>
-                  )}
+
+                  {/* Content: LICENSE, KEMLER, UN */}
+                  <div className="detection-fields">
+                    {detection.licensePlate && (
+                      <div className="detection-field">
+                        <span className="field-label">LICENSE</span>
+                        <span className="field-value">{detection.licensePlate}</span>
+                      </div>
+                    )}
+                    {detection.kemler && (
+                      <div className="detection-field">
+                        <span className="field-label">KEMLER</span>
+                        <span className="field-value">{detection.kemler}</span>
+                        {detection.kemlerDescription && (
+                          <span className="field-description">{detection.kemlerDescription}</span>
+                        )}
+                      </div>
+                    )}
+                    {detection.UN && (
+                      <div className="detection-field">
+                        <span className="field-label">UN</span>
+                        <span className="field-value">{detection.UN}</span>
+                        {detection.unDescription && (
+                          <span className="field-description">{detection.unDescription}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}

@@ -29,6 +29,7 @@
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -91,6 +92,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+  gap: 12px;
 }
 
 .toast-title {
@@ -102,6 +104,8 @@
 .toast-time {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .toast-message {
@@ -163,9 +167,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.1);
   }
