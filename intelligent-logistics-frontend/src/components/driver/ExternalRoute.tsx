@@ -21,6 +21,7 @@ interface ExternalRouteProps {
     destination?: string;
     destinationLat?: number;
     destinationLng?: number;
+    showControls?: boolean;
 }
 
 // Component to handle map adjustments (centering)
@@ -51,7 +52,8 @@ const MapAdjuster = ({
 const ExternalRoute = ({
     destination = 'Porto de Aveiro',
     destinationLat = 40.6443,
-    destinationLng = -8.7290
+    destinationLng = -8.7290,
+    showControls = true
 }: ExternalRouteProps) => {
     const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
     const [loading, setLoading] = useState(true);
@@ -183,27 +185,29 @@ const ExternalRoute = ({
 
     return (
         <div className="w-full h-full relative flex flex-col">
-            {/* Map Controls - Moved down to allow space for header info */}
-            <div className="absolute top-28 right-4 flex flex-col gap-2 z-[400]">
-                <button
-                    onClick={getLocation}
-                    className="p-3 bg-slate-800 text-blue-400 rounded-full hover:bg-slate-700 shadow-lg border border-slate-700 transition-all active:scale-95 flex items-center justify-center"
-                    title="Update Location"
-                >
-                    {loading ? <Loader2 size={24} className="animate-spin" /> : <Locate size={24} />}
-                </button>
-                <button
-                    onClick={openNavigation}
-                    className="p-3 bg-green-600 text-white rounded-full hover:bg-green-500 shadow-lg transition-all active:scale-95 flex items-center justify-center"
-                    title="Open GPS Navigation"
-                >
-                    <Navigation size={24} />
-                </button>
-            </div>
+            {/* Map Controls - Top right, side by side */}
+            {showControls && (
+                <div className="absolute top-6 right-6 flex flex-row gap-2 z-[400]">
+                    <button
+                        onClick={getLocation}
+                        className="p-3 bg-slate-800 text-blue-400 rounded-full hover:bg-slate-700 shadow-lg border border-slate-700 transition-all active:scale-95 flex items-center justify-center"
+                        title="Update Location"
+                    >
+                        {loading ? <Loader2 size={24} className="animate-spin" /> : <Locate size={24} />}
+                    </button>
+                    <button
+                        onClick={openNavigation}
+                        className="p-3 bg-green-600 text-white rounded-full hover:bg-green-500 shadow-lg transition-all active:scale-95 flex items-center justify-center"
+                        title="Open GPS Navigation"
+                    >
+                        <Navigation size={24} />
+                    </button>
+                </div>
+            )}
 
-            {/* Route Info Card */}
-            {routeInfo && (
-                <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-xl z-[400] max-w-[200px]">
+            {/* Route Info Card - With proper spacing from borders */}
+            {showControls && routeInfo && (
+                <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-xl z-[400] max-w-[200px]">
                     <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Estimated Trip</div>
                     <div className="text-xl font-bold text-white flex items-end gap-1">
                         {formatDuration(routeInfo.duration)}

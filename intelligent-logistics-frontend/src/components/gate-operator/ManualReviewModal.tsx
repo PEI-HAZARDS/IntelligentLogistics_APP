@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock } from 'lucide-react';
 import { queryArrivalsByLicensePlate, getArrivals } from '@/services/arrivals';
-import { submitManualReview } from '@/services/decisions';
+import { submitManualReview, rejectEntrance } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
 
 // Props passed from Dashboard
@@ -34,7 +34,6 @@ export default function ManualReviewModal({
 }: ManualReviewModalProps) {
     const [candidates, setCandidates] = useState<Appointment[]>([]);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-    const [notes, setNotes] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -45,7 +44,6 @@ export default function ManualReviewModal({
         if (isOpen && reviewData) {
             // Reset state for new review
             setSelectedAppointment(null);
-            setNotes('');
             setError(null);
 
             const plate = reviewData.licensePlate || '';
@@ -55,7 +53,6 @@ export default function ManualReviewModal({
             // Reset state when closed
             setCandidates([]);
             setSelectedAppointment(null);
-            setNotes('');
             setError(null);
             setSearchPlate('');
         }
@@ -69,15 +66,14 @@ export default function ManualReviewModal({
             let results: Appointment[] = [];
 
             if (plate && plate !== 'N/A') {
-                // Search by license plate
-                results = await queryArrivalsByLicensePlate(plate);
+                // Search by license plate and filter to only in_transit
+                const plateResults = await queryArrivalsByLicensePlate(plate);
+                results = plateResults.filter(apt => apt.status === 'in_transit');
             }
 
-            // If no results or no plate, get today's pending arrivals
+            // If no results or no plate, get today's in_transit arrivals
             if (results.length === 0) {
-                const pending = await getArrivals({ status: 'in_transit', limit: 20 });
-                const delayed = await getArrivals({ status: 'delayed', limit: 20 });
-                results = [...pending, ...delayed];
+                results = await getArrivals({ status: 'in_transit', limit: 50 });
             }
 
             setCandidates(results);
@@ -106,11 +102,24 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-            // Get gate ID from reviewData or from localStorage user info
+            // Get gate ID from reviewData or from localStorage user info - always default to 1
             const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-            const gateId = reviewData?.gateId || userInfo.gate_id || undefined;
+            const gateId = reviewData?.gateId || userInfo.gate_id || 1;
 
-            await submitManualReview(selectedAppointment.id, 'approved', notes || undefined, gateId, selectedAppointment.truck_license_plate);
+            // Pass original detection data so it appears in the WebSocket broadcast
+            await submitManualReview(
+                selectedAppointment.id,
+                'approved',
+                undefined,
+                gateId,
+                selectedAppointment.truck_license_plate,
+                {
+                    un: reviewData?.UN,
+                    kemler: reviewData?.kemler,
+                    lpCropUrl: reviewData?.lpCropUrl,
+                    hzCropUrl: reviewData?.hzCropUrl,
+                }
+            );
             onDecisionComplete(selectedAppointment.id, 'approved');
             onClose();
         } catch (err) {
@@ -122,19 +131,34 @@ export default function ManualReviewModal({
     };
 
     const handleReject = async () => {
-        if (!selectedAppointment) {
-            setError('Please select an appointment first.');
-            return;
-        }
-
         setIsSubmitting(true);
         setError(null);
         try {
-            // Get gate ID for rejection notification
+            // Get gate ID for rejection notification - always default to 1
             const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-            const gateId = reviewData?.gateId || userInfo.gate_id || undefined;
-            await submitManualReview(selectedAppointment.id, 'rejected', notes || undefined, gateId, selectedAppointment.truck_license_plate);
-            onDecisionComplete(selectedAppointment.id, 'rejected');
+            const gateId = reviewData?.gateId || userInfo.gate_id || 1;
+
+            if (selectedAppointment) {
+                // Reject with specific appointment
+                await submitManualReview(
+                    selectedAppointment.id,
+                    'rejected',
+                    undefined,
+                    gateId,
+                    selectedAppointment.truck_license_plate,
+                    {
+                        un: reviewData?.UN,
+                        kemler: reviewData?.kemler,
+                        lpCropUrl: reviewData?.lpCropUrl,
+                        hzCropUrl: reviewData?.hzCropUrl,
+                    }
+                );
+                onDecisionComplete(selectedAppointment.id, 'rejected');
+            } else {
+                // Reject entrance without appointment
+                await rejectEntrance(gateId, reviewData?.licensePlate, 'Entry denied by operator');
+                onDecisionComplete(0, 'rejected');
+            }
             onClose();
         } catch (err) {
             console.error('Failed to reject:', err);
@@ -162,36 +186,8 @@ export default function ManualReviewModal({
 
                 {/* Body */}
                 <div className="modal-body">
-                    {/* Detection Info Section */}
+                    {/* Detection Info Section - Text Only */}
                     <div className="detection-info-section">
-                        {/* Crops Row */}
-                        <div className="crops-row">
-                            {reviewData.lpCropUrl && (
-                                <div className="crop-container">
-                                    <span className="crop-label">License Plate</span>
-                                    <img
-                                        src={reviewData.lpCropUrl}
-                                        alt="License plate crop"
-                                        className="crop-image"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                    />
-                                </div>
-                            )}
-                            {reviewData.hzCropUrl && (
-                                <div className="crop-container hazmat">
-                                    <span className="crop-label">Hazmat</span>
-                                    <img
-                                        src={reviewData.hzCropUrl}
-                                        alt="Hazmat crop"
-                                        className="crop-image"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Detected Data */}
                         <div className="detected-data">
                             <div className="data-field">
                                 <span className="field-label">Detected Plate:</span>
@@ -275,17 +271,7 @@ export default function ManualReviewModal({
                         )}
                     </div>
 
-                    {/* Notes */}
-                    <div className="notes-section">
-                        <label className="notes-label">Notes (optional)</label>
-                        <textarea
-                            className="notes-input"
-                            placeholder="Add notes about this decision..."
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            rows={2}
-                        />
-                    </div>
+
 
                     {error && (
                         <div className="error-message">
@@ -300,7 +286,7 @@ export default function ManualReviewModal({
                     <button
                         className="btn-reject"
                         onClick={handleReject}
-                        disabled={!selectedAppointment || isSubmitting}
+                        disabled={isSubmitting}
                     >
                         {isSubmitting ? <Loader2 size={16} className="spin" /> : <XCircle size={16} />}
                         Reject

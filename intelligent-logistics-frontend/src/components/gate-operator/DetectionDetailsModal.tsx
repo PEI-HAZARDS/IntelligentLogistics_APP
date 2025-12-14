@@ -48,7 +48,7 @@ export default function DetectionDetailsModal({
                         <span className="detail-label">Decision</span>
                         <span
                             className={`decision-badge decision-${detection.decision?.toLowerCase().replace('_', '-')}`}
-                            style={{ fontSize: '1rem', padding: '0.5rem 1rem' }}
+                            style={{ fontSize: '1rem', padding: '0.5rem 1.25rem', borderRadius: '9999px' }}
                         >
                             {detection.decision || 'UNKNOWN'}
                         </span>
@@ -105,8 +105,8 @@ export default function DetectionDetailsModal({
 
                     {/* Hazmat Info */}
                     {(detection.UN || detection.kemler) && (
-                        <div className="hazmat-section" style={{ background: 'rgba(255, 193, 7, 0.1)', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.75rem 0', color: 'var(--warning)' }}>
+                        <div className="hazmat-section">
+                            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.75rem 0', color: '#f59e0b', fontWeight: 600 }}>
                                 <AlertTriangle size={18} />
                                 Hazardous Materials
                             </h4>

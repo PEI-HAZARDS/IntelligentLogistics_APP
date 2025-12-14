@@ -14,10 +14,10 @@ const ConfirmButton = ({ className, isLoading, children, ...props }: ConfirmButt
             {isLoading ? (
                 <>
                     <Loader2 size={20} className="animate-spin" />
-                    A confirmar...
+                    Confirming...
                 </>
             ) : (
-                children || 'Confirmar Entrega'
+                children || 'Confirm Delivery'
             )}
         </button>
     );

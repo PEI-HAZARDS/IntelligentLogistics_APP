@@ -32,6 +32,7 @@ interface UIDetection {
   // New fields for redesigned card
   truckId?: string;
   decision?: "ACCEPTED" | "REJECTED" | "MANUAL_REVIEW";
+  decisionSource?: "engine" | "operator";
   licensePlate?: string;
   kemler?: string;
   kemlerDescription?: string;
@@ -148,6 +149,7 @@ export default function Dashboard() {
       UN?: string;
       kemler?: string;
       decision?: string;
+      decision_source?: string;
       timestamp?: number;
       truck_id?: string;
       gate_id?: number;
@@ -242,6 +244,7 @@ export default function Dashboard() {
       severity,
       truckId: truck_id,
       decision: decision as UIDetection['decision'],
+      decisionSource: payload.decision_source as UIDetection['decisionSource'],
       licensePlate: lp_result,
       kemler: kemlerParsed.code,
       kemlerDescription: kemlerParsed.description,
@@ -637,7 +640,7 @@ export default function Dashboard() {
               detections.map((detection) => (
                 <div
                   key={detection.id}
-                  className={`detection-card severity-${detection.severity}`}
+                  className={`detection-card severity-${detection.severity} decision-${detection.decision?.toLowerCase().replace('_', '-') || 'unknown'}`}
                   onClick={() => {
                     // For MANUAL_REVIEW, open the action modal; for others, show details
                     if (detection.decision === 'MANUAL_REVIEW') {
@@ -655,7 +658,7 @@ export default function Dashboard() {
                   }}
                   style={{ cursor: 'pointer' }}
                 >
-                  {/* Header: DECISION and TRK-ID */}
+                  {/* Header: DECISION, SOURCE, and TRK-ID */}
                   <div className="detection-header">
                     {detection.decision ? (
                       <span className={`decision-badge decision-${detection.decision.toLowerCase().replace('_', '-')}`}>
@@ -663,6 +666,11 @@ export default function Dashboard() {
                       </span>
                     ) : (
                       <span className="decision-badge decision-manual-review">UNKNOWN</span>
+                    )}
+                    {detection.decisionSource && (
+                      <span className={`source-badge source-${detection.decisionSource}`}>
+                        {detection.decisionSource === 'engine' ? 'Engine' : 'Operator'}
+                      </span>
                     )}
                     {detection.truckId && <span className="truck-id">{detection.truckId}</span>}
                     <span className="detection-time">{detection.time}</span>

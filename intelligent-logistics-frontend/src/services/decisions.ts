@@ -72,16 +72,49 @@ export async function queryAppointments(
  * 
  * @param gateId - If provided and decision is 'approved', creates a Visit with state='unloading'
  * @param licensePlate - Required for Kafka notification to reach Driver UI
+ * @param originalDetection - Original detection data to preserve in the decision
  */
 export async function submitManualReview(
     appointmentId: number,
     decision: 'approved' | 'rejected',
     notes?: string,
     gateId?: number,
-    licensePlate?: string
+    licensePlate?: string,
+    originalDetection?: {
+        un?: string;
+        kemler?: string;
+        lpCropUrl?: string;
+        hzCropUrl?: string;
+    }
 ): Promise<void> {
-    await api.post(`/manual-review/${appointmentId}`, null, {
-        params: { decision, notes, gate_id: gateId, license_plate: licensePlate }
-    });
+    const params: Record<string, unknown> = {
+        decision,
+        notes,
+        gate_id: gateId,
+        license_plate: licensePlate,
+    };
+
+    // Add original detection data if available
+    if (originalDetection) {
+        if (originalDetection.un) params.original_un = originalDetection.un;
+        if (originalDetection.kemler) params.original_kemler = originalDetection.kemler;
+        if (originalDetection.lpCropUrl) params.original_lp_crop = originalDetection.lpCropUrl;
+        if (originalDetection.hzCropUrl) params.original_hz_crop = originalDetection.hzCropUrl;
+    }
+
+    await api.post(`/manual-review/${appointmentId}`, null, { params });
 }
 
+/**
+ * Reject entrance without selecting a specific appointment
+ * Used when operator wants to deny entry to a truck that doesn't match any appointment
+ */
+export async function rejectEntrance(
+    gateId: number,
+    licensePlate?: string,
+    notes?: string
+): Promise<void> {
+    await api.post('/manual-review/reject-entrance', null, {
+        params: { gate_id: gateId, license_plate: licensePlate, notes }
+    });
+}

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Truck, User, Map, Navigation, QrCode, CheckCircle, Loader2, AlertCircle, ChevronUp, ChevronDown, Bug, Wifi } from 'lucide-react';
+import { Menu, Truck, User, Map, Navigation, QrCode, CheckCircle, Loader2, AlertCircle, ChevronUp, ChevronDown, Bug, Wifi, XCircle } from 'lucide-react';
 import ExternalRoute from '@/components/driver/ExternalRoute';
 import InternalRoute from '@/components/driver/InternalRoute';
 import Sidebar from '@/components/driver/Sidebar';
@@ -215,10 +215,7 @@ const DriverLayout = () => {
             if (updated && updated.id) {
                 setConfirmedArrivalId(updated.id);
                 localStorage.setItem('confirmed_arrival_id', updated.id.toString());
-                // Auto-switch to internal if authorized
-                if (updated.status === 'in_process') {
-                    setMode('internal');
-                }
+                // Stay on external view - user can manually switch to internal when ready
             }
 
             setSuccessMessage('Arrival registered successfully!');
@@ -264,6 +261,22 @@ const DriverLayout = () => {
         }
     }, [activeAppointment]);
 
+    // Handle exit/cancel booking
+    const handleExitBooking = useCallback(() => {
+        setActiveAppointment(null);
+        setConfirmedArrivalId(null);
+        localStorage.removeItem('confirmed_arrival_id');
+        setMode('external');
+        setDecisionNotification(null);
+        setWaitingForReview(false);
+        setSuccessMessage('Booking cancelled. You can enter a new PIN.');
+    }, []);
+
+    // Check if driver is authorized to access internal view
+    const isAuthorizedForInternal = activeAppointment &&
+        (activeAppointment.status === 'in_process' ||
+            (decisionNotification?.type === 'ACCEPTED' && confirmedArrivalId === activeAppointment.id));
+
     const renderContent = () => {
         switch (mode) {
             case 'external':
@@ -275,6 +288,7 @@ const DriverLayout = () => {
                                 destination={activeAppointment?.terminal?.name || 'Terminal'}
                                 destinationLat={activeAppointment?.terminal?.latitude ? Number(activeAppointment.terminal.latitude) : undefined}
                                 destinationLng={activeAppointment?.terminal?.longitude ? Number(activeAppointment.terminal.longitude) : undefined}
+                                showControls={!!(activeAppointment && confirmedArrivalId === activeAppointment.id)}
                             />
 
                             {/* PIN Overlay - Centered on Map */}
@@ -345,27 +359,21 @@ const DriverLayout = () => {
                                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                     <span className="text-xs text-slate-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded">
                                                         {['in_transit', 'delayed'].includes(activeAppointment.status)
-                                                            ? 'Gate: Wait for Decision'
-                                                            : (activeAppointment.gate_in?.label?.split('-')[0]?.trim() || activeAppointment.id)}
+                                                            ? 'Awaiting Decision'
+                                                            : (activeAppointment.gate_in?.label?.split('-')[0]?.trim() || `Gate ${activeAppointment.id}`)}
                                                     </span>
-                                                    {/* Status Badge */}
-                                                    <span className={`text-xs font-bold flex items-center gap-1 px-2 py-0.5 rounded ${activeAppointment.status === 'in_transit' ? 'bg-blue-500/20 text-blue-400' :
+                                                    {/* Status Badge - Clean, no icons */}
+                                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${activeAppointment.status === 'in_transit' ? 'bg-blue-500/20 text-blue-400' :
                                                         activeAppointment.status === 'delayed' ? 'bg-amber-500/20 text-amber-400' :
                                                             activeAppointment.status === 'in_process' ? 'bg-green-500/20 text-green-400' :
                                                                 activeAppointment.status === 'completed' ? 'bg-slate-500/20 text-slate-400' :
                                                                     'bg-slate-500/20 text-slate-400'
                                                         }`}>
-                                                        {activeAppointment.status === 'in_transit' ? '🚛 In Transit' :
-                                                            activeAppointment.status === 'delayed' ? '⚠️ Delayed' :
-                                                                activeAppointment.status === 'in_process' ? '✅ In Process' :
-                                                                    activeAppointment.status === 'completed' ? '✓ Completed' :
-                                                                        activeAppointment.status?.toUpperCase() || 'PENDING'}
-                                                    </span>
-                                                    {/* Arrival Time */}
-                                                    <span className="text-xs text-white font-mono bg-slate-700 px-2 py-0.5 rounded flex items-center gap-1">
-                                                        🕐 {activeAppointment.scheduled_start_time
-                                                            ? new Date(activeAppointment.scheduled_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                            : '--:--'}
+                                                        {activeAppointment.status === 'in_transit' ? 'In Transit' :
+                                                            activeAppointment.status === 'delayed' ? 'Delayed' :
+                                                                activeAppointment.status === 'in_process' ? 'In Process' :
+                                                                    activeAppointment.status === 'completed' ? 'Completed' :
+                                                                        activeAppointment.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -396,7 +404,9 @@ const DriverLayout = () => {
                                                 <div className="space-y-1">
                                                     <span className="text-xs text-slate-500 uppercase tracking-wider">Arrival Time</span>
                                                     <p className="text-sm text-white font-mono">
-                                                        {activeAppointment.scheduled_start_time ? new Date(activeAppointment.scheduled_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                                        {activeAppointment.scheduled_start_time
+                                                            ? new Date(activeAppointment.scheduled_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                            : '--:--'}
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1">
@@ -406,6 +416,18 @@ const DriverLayout = () => {
                                                     </p>
                                                 </div>
                                             </div>
+
+                                            {/* Exit Booking Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleExitBooking();
+                                                }}
+                                                className="w-full mt-2 py-2 px-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg font-medium text-sm hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <XCircle size={16} />
+                                                Exit Booking
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -527,11 +549,18 @@ const DriverLayout = () => {
                 <div className="nav-divider" />
 
                 <button
-                    onClick={() => setMode('internal')}
-                    className={`nav-button ${mode === 'internal' ? 'active green' : ''}`}
+                    onClick={() => {
+                        if (isAuthorizedForInternal) {
+                            setMode('internal');
+                        } else {
+                            setError('Entry not yet authorized. Wait for gate decision.');
+                        }
+                    }}
+                    className={`nav-button ${mode === 'internal' ? 'active green' : ''} ${!isAuthorizedForInternal ? 'disabled' : ''}`}
+                    style={{ opacity: isAuthorizedForInternal ? 1 : 0.5 }}
                 >
                     <Navigation size={24} />
-                    <span>Inside Port</span>
+                    <span>In Port</span>
                 </button>
             </div>
             {/* Debug Menu */}
