@@ -10,8 +10,17 @@ export type DeliveryStatusEnum = 'unloading' | 'completed';
 export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
 export type DirectionEnum = 'inbound' | 'outbound';
 export type AlertTypeEnum = 'generic' | 'safety' | 'problem' | 'operational';
+export type PhysicalStateEnum = 'liquid' | 'solid' | 'gaseous' | 'hybrid';
 
 // ==================== CORE ENTITIES ====================
+
+export interface Cargo {
+    id: number;
+    booking_reference: string;
+    quantity: number;
+    state: PhysicalStateEnum;
+    description?: string | null;
+}
 
 export interface Company {
     nif: string;
@@ -55,7 +64,10 @@ export interface Booking {
     reference: string;
     direction?: DirectionEnum | null;
     created_at?: string | null;
+    cargos?: Cargo[];
 }
+
+// Booking definition moved to after Cargo
 
 // ==================== APPOINTMENTS / ARRIVALS ====================
 

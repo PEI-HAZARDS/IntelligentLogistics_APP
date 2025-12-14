@@ -65,38 +65,27 @@ const ExternalRoute = ({
 
     return (
         <div className="flex flex-col gap-4 w-full h-full">
-            <div className="driver-card flex items-center justify-between gap-3 flex-shrink-0">
-                <div className="flex items-center gap-3">
-                    <Truck className="text-blue-500" size={24} />
-                    <div>
-                        <h3 className="font-bold text-lg">Destino: {destination}</h3>
-                        <p className="text-sm opacity-70">
-                            {loading ? "A localizar..." : error ? "Siga a navegação externa" : "Siga a navegação externa"}
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={getLocation}
-                        className="p-2 bg-blue-500/10 text-blue-400 rounded-full hover:bg-blue-500/20 transition-colors"
-                        title="Atualizar Localização"
-                    >
-                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    <button
-                        onClick={openNavigation}
-                        className="p-2 bg-green-500/10 text-green-400 rounded-full hover:bg-green-500/20 transition-colors"
-                        title="Abrir Navegação GPS"
-                    >
-                        <Navigation size={20} />
-                    </button>
-                </div>
+            <div className="absolute top-4 right-4 flex gap-2 z-10">
+                <button
+                    onClick={getLocation}
+                    className="p-3 bg-slate-800 text-blue-400 rounded-full hover:bg-slate-700 shadow-lg border border-slate-700 transition-all active:scale-95"
+                    title="Update Location"
+                >
+                    <RefreshCw size={24} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                    onClick={openNavigation}
+                    className="p-3 bg-green-600 text-white rounded-full hover:bg-green-500 shadow-lg transition-all active:scale-95"
+                    title="Open GPS Navigation"
+                >
+                    <Navigation size={24} />
+                </button>
             </div>
 
             <div className="driver-card flex-1 p-0 overflow-hidden relative min-h-[400px]">
                 {loading ? (
                     <div className="w-full h-full flex items-center justify-center bg-slate-900/50">
-                        <div className="animate-pulse text-blue-400">A localizar...</div>
+                        <div className="animate-pulse text-blue-400">Locating...</div>
                     </div>
                 ) : (
                     <iframe
