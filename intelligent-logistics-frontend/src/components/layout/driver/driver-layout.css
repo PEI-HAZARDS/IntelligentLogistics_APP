@@ -350,3 +350,91 @@ p {
 .animate-ping {
     animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* ========== DECISION NOTIFICATION ========== */
+.decision-notification {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.decision-notification.accepted {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.15) 100%);
+    border: 2px solid rgba(34, 197, 94, 0.5);
+}
+
+.decision-notification.accepted .notification-icon {
+    color: #4ade80;
+}
+
+.decision-notification.rejected {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.15) 100%);
+    border: 2px solid rgba(239, 68, 68, 0.5);
+}
+
+.decision-notification.rejected .notification-icon {
+    color: #f87171;
+}
+
+.decision-notification:hover {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.notification-icon {
+    flex-shrink: 0;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.notification-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.notification-details .plate {
+    font-family: 'Roboto Mono', 'SF Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.notification-details .time {
+    opacity: 0.7;
+}
+
+.notification-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

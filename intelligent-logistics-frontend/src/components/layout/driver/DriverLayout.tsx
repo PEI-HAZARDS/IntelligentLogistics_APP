@@ -4,7 +4,7 @@ import { Menu, Truck, User, Map, Navigation, QrCode, CheckCircle, Loader2, Alert
 import ExternalRoute from '@/components/driver/ExternalRoute';
 import InternalRoute from '@/components/driver/InternalRoute';
 import Sidebar from '@/components/driver/Sidebar';
-import { claimArrival, getMyActiveArrival } from '@/services/drivers';
+import { claimArrival, getMyActiveArrival, completeAppointment } from '@/services/drivers';
 import { getGateWebSocket, type DecisionUpdatePayload } from '@/lib/websocket';
 import type { Appointment } from '@/types/types';
 import './driver-layout.css';
@@ -45,6 +45,13 @@ const DriverLayout = () => {
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+    // Decision notification from WebSocket
+    const [decisionNotification, setDecisionNotification] = useState<{
+        type: 'ACCEPTED' | 'REJECTED';
+        licensePlate: string;
+        timestamp: string;
+    } | null>(null);
+
     // Auto-dismiss messages
     useEffect(() => {
         if (successMessage) {
@@ -52,6 +59,14 @@ const DriverLayout = () => {
             return () => clearTimeout(timer);
         }
     }, [successMessage]);
+
+    // Auto-dismiss decision notification
+    useEffect(() => {
+        if (decisionNotification) {
+            const timer = setTimeout(() => setDecisionNotification(null), 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [decisionNotification]);
 
     // Fetch active appointment
     const fetchActiveAppointment = useCallback(async () => {
@@ -73,9 +88,10 @@ const DriverLayout = () => {
         }
     }, [driversLicense, navigate, fetchActiveAppointment]);
 
-    // WebSocket Setup (Gate 1 - Same as Gate UI default)
+    // WebSocket Setup - Use gate from active appointment or default to 1
     useEffect(() => {
-        const ws = getGateWebSocket(1);
+        const gateId = activeAppointment?.gate_in?.id || 1;
+        const ws = getGateWebSocket(gateId);
 
         const unsubMessage = ws.onMessage((data: DecisionUpdatePayload) => {
             // Save to localStorage to sync with other tabs/components
@@ -93,6 +109,27 @@ const DriverLayout = () => {
             } catch (e) {
                 console.warn('Failed to save payload:', e);
             }
+
+            // Check if this decision is for the driver's active appointment
+            const driverPlate = activeAppointment?.truck_license_plate?.toUpperCase();
+            const msgPlate = data.payload?.licensePlate?.toUpperCase();
+            const decision = data.payload?.decision;
+
+            if (driverPlate && msgPlate && driverPlate === msgPlate) {
+                if (decision === 'ACCEPTED' || decision === 'REJECTED') {
+                    setDecisionNotification({
+                        type: decision,
+                        licensePlate: msgPlate,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                    // Auto-switch to internal view if accepted
+                    if (decision === 'ACCEPTED') {
+                        setMode('internal');
+                        // Ideally refresh appointment to get updated status
+                        fetchActiveAppointment();
+                    }
+                }
+            }
         });
 
         const unsubConnect = ws.onConnect(() => setIsWsConnected(true));
@@ -105,7 +142,7 @@ const DriverLayout = () => {
             unsubConnect();
             unsubDisconnect();
         };
-    }, []);
+    }, [activeAppointment?.truck_license_plate, activeAppointment?.gate_in?.id]);
 
     // Listen for debug message updates
     useEffect(() => {
@@ -162,9 +199,13 @@ const DriverLayout = () => {
             const updated = await getMyActiveArrival(driversLicense);
             setActiveAppointment(updated);
 
-            if (updated?.id) {
+            if (updated && updated.id) {
                 setConfirmedArrivalId(updated.id);
                 localStorage.setItem('confirmed_arrival_id', updated.id.toString());
+                // Auto-switch to internal if authorized
+                if (updated.status === 'in_process') {
+                    setMode('internal');
+                }
             }
 
             setSuccessMessage('Arrival registered successfully!');
@@ -190,12 +231,13 @@ const DriverLayout = () => {
 
     // Handle confirm delivery
     const handleConfirmDelivery = useCallback(async () => {
+        if (!activeAppointment?.id) return;
+
         setIsConfirming(true);
         setError(null);
 
         try {
-            // TODO: Call API to confirm delivery / complete visit
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
+            await completeAppointment(activeAppointment.id);
             setSuccessMessage('Delivery confirmed successfully!');
             setActiveAppointment(null);
             setConfirmedArrivalId(null);
@@ -207,7 +249,7 @@ const DriverLayout = () => {
         } finally {
             setIsConfirming(false);
         }
-    }, []);
+    }, [activeAppointment]);
 
     const renderContent = () => {
         switch (mode) {
@@ -217,9 +259,9 @@ const DriverLayout = () => {
                         {/* Map Container - Takes available space */}
                         <div className="flex-1 relative w-full overflow-hidden rounded-2xl border border-slate-700/50">
                             <ExternalRoute
-                                destination={activeAppointment?.terminal?.name || undefined}
-                                destinationLat={Number(activeAppointment?.terminal?.latitude)}
-                                destinationLng={Number(activeAppointment?.terminal?.longitude)}
+                                destination={activeAppointment?.terminal?.name || 'Terminal'}
+                                destinationLat={activeAppointment?.terminal?.latitude ? Number(activeAppointment.terminal.latitude) : undefined}
+                                destinationLng={activeAppointment?.terminal?.longitude ? Number(activeAppointment.terminal.longitude) : undefined}
                             />
 
                             {/* PIN Overlay - Centered on Map */}
@@ -287,12 +329,30 @@ const DriverLayout = () => {
                                                 <h3 className="font-bold text-white text-lg leading-tight">
                                                     {activeAppointment.terminal?.name || 'Port Terminal'}
                                                 </h3>
-                                                <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                     <span className="text-xs text-slate-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded">
-                                                        {activeAppointment.gate_in?.label?.split('-')[0]?.trim() || activeAppointment.id}
+                                                        {['in_transit', 'delayed'].includes(activeAppointment.status)
+                                                            ? 'Gate: Wait for Decision'
+                                                            : (activeAppointment.gate_in?.label?.split('-')[0]?.trim() || activeAppointment.id)}
                                                     </span>
-                                                    <span className="text-xs text-green-400 font-bold flex items-center gap-1">
-                                                        <CheckCircle size={10} /> REGISTERED
+                                                    {/* Status Badge */}
+                                                    <span className={`text-xs font-bold flex items-center gap-1 px-2 py-0.5 rounded ${activeAppointment.status === 'in_transit' ? 'bg-blue-500/20 text-blue-400' :
+                                                        activeAppointment.status === 'delayed' ? 'bg-amber-500/20 text-amber-400' :
+                                                            activeAppointment.status === 'in_process' ? 'bg-green-500/20 text-green-400' :
+                                                                activeAppointment.status === 'completed' ? 'bg-slate-500/20 text-slate-400' :
+                                                                    'bg-slate-500/20 text-slate-400'
+                                                        }`}>
+                                                        {activeAppointment.status === 'in_transit' ? '🚛 In Transit' :
+                                                            activeAppointment.status === 'delayed' ? '⚠️ Delayed' :
+                                                                activeAppointment.status === 'in_process' ? '✅ In Process' :
+                                                                    activeAppointment.status === 'completed' ? '✓ Completed' :
+                                                                        activeAppointment.status?.toUpperCase() || 'PENDING'}
+                                                    </span>
+                                                    {/* Arrival Time */}
+                                                    <span className="text-xs text-white font-mono bg-slate-700 px-2 py-0.5 rounded flex items-center gap-1">
+                                                        🕐 {activeAppointment.scheduled_start_time
+                                                            ? new Date(activeAppointment.scheduled_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                            : '--:--'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -343,7 +403,7 @@ const DriverLayout = () => {
             case 'internal':
                 return (
                     <InternalRoute
-                        claimResult={null} // TODO: refactor InternalRoute to take appointment
+                        appointment={activeAppointment}
                         onConfirmDelivery={handleConfirmDelivery}
                         isConfirming={isConfirming}
                     />
@@ -392,6 +452,35 @@ const DriverLayout = () => {
                     <div className="alert alert-success">
                         <CheckCircle size={18} />
                         <span>{successMessage}</span>
+                    </div>
+                )}
+                {/* Decision Notification from Backend */}
+                {decisionNotification && (
+                    <div
+                        className={`decision-notification ${decisionNotification.type === 'ACCEPTED' ? 'accepted' : 'rejected'}`}
+                        onClick={() => setDecisionNotification(null)}
+                    >
+                        <div className="notification-icon">
+                            {decisionNotification.type === 'ACCEPTED' ? (
+                                <CheckCircle size={32} />
+                            ) : (
+                                <AlertCircle size={32} />
+                            )}
+                        </div>
+                        <div className="notification-content">
+                            <div className="notification-title">
+                                {decisionNotification.type === 'ACCEPTED' ? 'Entry Approved!' : 'Entry Rejected'}
+                            </div>
+                            <div className="notification-details">
+                                <span className="plate">{decisionNotification.licensePlate}</span>
+                                <span className="time">{decisionNotification.timestamp}</span>
+                            </div>
+                            <div className="notification-hint">
+                                {decisionNotification.type === 'ACCEPTED'
+                                    ? 'You may proceed to the terminal'
+                                    : 'Please contact the gate operator'}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

@@ -7,6 +7,7 @@ const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operat
 const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
 const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
 const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
+const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 
 // Componentes do Motorista
 const DriverLayout = React.lazy(() => import('@/components/layout/driver/DriverLayout'));
@@ -35,6 +36,13 @@ const gateRoutes = [
     element: <GateDetailLayout />,
     children: [
       { index: true, element: <ArrivalsList /> },
+    ],
+  },
+  {
+    path: '/gate/alerts',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <AlertsPage /> },
     ],
   },
   // Redireciona qualquer rota desconhecida para /gate

@@ -26,7 +26,7 @@ const Sidebar = ({ isOpen, onClose, driverName = 'Motorista' }: SidebarProps) =>
 
             {/* Drawer */}
             <div
-                className={`fixed top-0 left-0 bottom-0 w-[280px] z-[160] shadow-2xl transform transition-transform duration-300 ease-out flex flex-col font-sans ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+                className={`fixed top-0 left-0 bottom-0 w-[280px] z-[1000] shadow-2xl transform transition-transform duration-300 ease-out flex flex-col font-sans ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
                 style={{
                     backgroundColor: 'var(--bg-primary)',
                     color: 'var(--text-primary)',

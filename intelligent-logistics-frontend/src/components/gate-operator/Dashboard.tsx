@@ -1,6 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HLSPlayer from "./HLSPlayer";
+import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
+import DetectionDetailsModal from "./DetectionDetailsModal";
+import ImagePreviewModal from "./ImagePreviewModal";
 import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
 import { getUpcomingArrivals } from "@/services/arrivals";
 import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
@@ -12,6 +15,7 @@ import type { Appointment } from "@/types/types";
 function mapStatusToLabel(status: string): string {
   const statusMap: Record<string, string> = {
     in_transit: "In Transit",
+    in_process: "In Process",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -77,7 +81,7 @@ export default function Dashboard() {
   const [arrivals, setArrivals] = useState<ReturnType<typeof mapArrivalToUI>[]>([]);
   const [detections, setDetections] = useState<UIDetection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [arrivalsError, setArrivalsError] = useState<string | null>(null);
 
   // WebSocket states
   const [isWsConnected, setIsWsConnected] = useState(false);
@@ -95,6 +99,18 @@ export default function Dashboard() {
   const [showDebug, setShowDebug] = useState(false);
   const wsRef = useRef<ReturnType<typeof getGateWebSocket> | null>(null);
 
+  // Manual Review Modal state
+  const [manualReviewData, setManualReviewData] = useState<ManualReviewData | null>(null);
+
+  // Detection Details Modal state
+  const [selectedDetection, setSelectedDetection] = useState<UIDetection | null>(null);
+
+  // Image Preview Modal state
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Held Manual Reviews (displayed as cards in detections list)
+  const [heldReviews, setHeldReviews] = useState<ManualReviewData[]>([]);
+
   // Toast notifications
   const { toasts, addToast, dismissToast } = useToasts();
 
@@ -104,13 +120,13 @@ export default function Dashboard() {
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
-    setError(null);
+    setArrivalsError(null);
     try {
-      const arrivalsData = await getUpcomingArrivals(gateId, 5);
+      const arrivalsData = await getUpcomingArrivals(gateId, 10);
       setArrivals(arrivalsData.map(mapArrivalToUI));
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
-      setError("Failed to load data. Click refresh to try again.");
+      setArrivalsError("Failed to load arrivals. Click refresh to try again.");
     } finally {
       setIsLoading(false);
     }
@@ -211,6 +227,20 @@ export default function Dashboard() {
       imageUrl: lp_crop || hz_crop,
     };
     setDetections(prev => [newDetection, ...prev].slice(0, 10));
+
+    // Trigger Manual Review Modal when MANUAL_REVIEW decision arrives
+    if (showToast && decision === "MANUAL_REVIEW") {
+      setManualReviewData({
+        id: generateUniqueId('mr'),
+        licensePlate: lp_result,
+        lpCropUrl: lp_crop,
+        hzCropUrl: hz_crop,
+        UN: payload.UN,
+        kemler: payload.kemler,
+        timestamp: now,
+        gateId: payload.gate_id,
+      });
+    }
 
     // Toast notifications for real-time updates only
     // Strictly follow backend alerts: One toast per alert in the payload
@@ -404,8 +434,53 @@ export default function Dashboard() {
     fetchData();
   };
 
+  // Handle manual review completion
+  const handleManualReviewComplete = (appointmentId: number, decision: 'approved' | 'rejected') => {
+    addToast({
+      type: decision === 'approved' ? 'success' : 'warning',
+      title: 'Manual Review',
+      message: `Appointment ${appointmentId} ${decision}`,
+    });
+    // Refresh arrivals list
+    fetchData();
+  };
+
   return (
     <div className="operator-dashboard">
+      {/* Manual Review Modal */}
+      <ManualReviewModal
+        isOpen={manualReviewData !== null}
+        reviewData={manualReviewData}
+        onClose={() => setManualReviewData(null)}
+        onHold={(data) => {
+          // Add to held reviews if not already there
+          setHeldReviews(prev => {
+            if (prev.some(r => r.id === data.id)) return prev;
+            return [...prev, data];
+          });
+        }}
+        onDecisionComplete={(appointmentId, decision) => {
+          // Remove from held reviews when decision is made
+          setHeldReviews(prev => prev.filter(r => r.id !== manualReviewData?.id));
+          handleManualReviewComplete(appointmentId, decision);
+        }}
+      />
+
+      {/* Detection Details Modal */}
+      <DetectionDetailsModal
+        isOpen={selectedDetection !== null}
+        detection={selectedDetection}
+        onClose={() => setSelectedDetection(null)}
+      />
+
+      {/* Image Preview Modal (for crop zoom) */}
+      <ImagePreviewModal
+        isOpen={previewImage !== null}
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
+      />
+
       {/* Toast Notifications */}
       <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
 
@@ -431,7 +506,15 @@ export default function Dashboard() {
           <div className="crops-column custom-scrollbar">
             {crops.length > 0 ? (
               crops.map((crop) => (
-                <div key={crop.id} className={`crop-thumb ${crop.type === 'hz' ? 'hazmat' : ''}`}>
+                <div
+                  key={crop.id}
+                  className={`crop-thumb ${crop.type === 'hz' ? 'hazmat' : ''}`}
+                  onClick={() => setPreviewImage({
+                    url: crop.url,
+                    title: crop.type === 'lp' ? 'License Plate' : 'Hazmat Placard'
+                  })}
+                  style={{ cursor: 'pointer' }}
+                >
                   <img
                     src={crop.url}
                     alt={crop.type === 'lp' ? 'License plate crop' : 'Hazmat crop'}
@@ -474,20 +557,51 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {error && (
-            <div className="error-message">
-              <AlertTriangle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
+
 
           <div className="detections-list custom-scrollbar">
-            {isLoading && detections.length === 0 ? (
+            {/* Held Reviews - displayed prominently at top */}
+            {heldReviews.map((held) => (
+              <div
+                key={`held-${held.id}`}
+                className="detection-card severity-warning held-review"
+                onClick={() => setManualReviewData(held)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="detection-header">
+                  <span className="decision-badge decision-held">
+                    HELD
+                  </span>
+                  <span className="detection-time">{held.timestamp}</span>
+                </div>
+                <div className="detection-fields">
+                  <div className="detection-field">
+                    <span className="field-label">LICENSE</span>
+                    <span className="field-value">{held.licensePlate || 'N/A'}</span>
+                  </div>
+                  {held.kemler && (
+                    <div className="detection-field">
+                      <span className="field-label">KEMLER</span>
+                      <span className="field-value">{held.kemler}</span>
+                    </div>
+                  )}
+                  {held.UN && (
+                    <div className="detection-field">
+                      <span className="field-label">UN</span>
+                      <span className="field-value">{held.UN}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="held-hint">Click to resume review</div>
+              </div>
+            ))}
+
+            {isLoading && detections.length === 0 && heldReviews.length === 0 ? (
               <div className="loading-state">
                 <Loader2 size={24} className="spin" />
                 <span>Loading alerts...</span>
               </div>
-            ) : detections.length === 0 ? (
+            ) : detections.length === 0 && heldReviews.length === 0 ? (
               <div className="empty-state">
                 <span>No recent alerts.</span>
               </div>
@@ -496,6 +610,22 @@ export default function Dashboard() {
                 <div
                   key={detection.id}
                   className={`detection-card severity-${detection.severity}`}
+                  onClick={() => {
+                    // For MANUAL_REVIEW, open the action modal; for others, show details
+                    if (detection.decision === 'MANUAL_REVIEW') {
+                      setManualReviewData({
+                        id: detection.id,
+                        licensePlate: detection.licensePlate,
+                        UN: detection.UN,
+                        kemler: detection.kemler,
+                        timestamp: detection.time,
+                        gateId: gateId,
+                      });
+                    } else {
+                      setSelectedDetection(detection);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
                 >
                   {/* Header: DECISION and TRK-ID */}
                   <div className="detection-header">
@@ -559,6 +689,13 @@ export default function Dashboard() {
         >
           Arrivals List
         </button>
+
+        {arrivalsError && (
+          <div className="error-message">
+            <AlertTriangle size={16} />
+            <span>{arrivalsError}</span>
+          </div>
+        )}
 
         <div className="arrivals-list custom-scrollbar">
           {isLoading && arrivals.length === 0 ? (

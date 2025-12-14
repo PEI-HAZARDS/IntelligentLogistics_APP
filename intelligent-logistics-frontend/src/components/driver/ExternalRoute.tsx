@@ -2,8 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation, RefreshCw, Locate, Loader2 } from 'lucide-react';
-import axios from 'axios';
+import { Navigation, Locate, Loader2 } from 'lucide-react';
 
 // Fix Leaflet default icon issue in React
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -59,32 +58,53 @@ const ExternalRoute = ({
     const [error, setError] = useState<string | null>(null);
     const [routePath, setRoutePath] = useState<[number, number][]>([]);
     const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
+    const [usingFallback, setUsingFallback] = useState(false);
 
     const getLocation = () => {
         setLoading(true);
         setError(null);
+        setUsingFallback(false);
+
         if (!navigator.geolocation) {
             setError("Geolocalização não suportada pelo browser");
+            // Fallback: Centro de Aveiro (UA campus area)
+            setPosition({ lat: 40.6306, lng: -8.6571 });
+            setUsingFallback(true);
             setLoading(false);
             return;
         }
 
         navigator.geolocation.getCurrentPosition(
             (pos) => {
+                console.log('[GPS] Got real location:', pos.coords.latitude, pos.coords.longitude);
                 setPosition({
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude
                 });
+                setUsingFallback(false);
                 setLoading(false);
             },
             (err) => {
-                console.error("Error getting location:", err);
-                setError("Não foi possível obter localização. A usar fallback.");
-                // Default fallback near Aveiro center for demo
-                setPosition({ lat: 40.6405, lng: -8.6538 });
+                console.error("[GPS] Error getting location:", err.code, err.message);
+                let errorMsg = "Localização indisponível";
+                if (err.code === 1) {
+                    errorMsg = "Permissão de localização negada";
+                } else if (err.code === 2) {
+                    errorMsg = "GPS não disponível";
+                } else if (err.code === 3) {
+                    errorMsg = "Timeout ao obter GPS";
+                }
+                setError(errorMsg + " - A usar posição demo");
+                // Fallback: Centro de Aveiro (near Universidade de Aveiro)
+                setPosition({ lat: 40.6306, lng: -8.6571 });
+                setUsingFallback(true);
                 setLoading(false);
             },
-            { enableHighAccuracy: true }
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            }
         );
     };
 
@@ -108,51 +128,36 @@ const ExternalRoute = ({
         [],
     );
 
-    // Fetch Route from OSRM
+    // Calculate route using Haversine formula (no external API)
     useEffect(() => {
-        const fetchRoute = async () => {
-            if (!position) return;
+        if (!position) return;
 
-            // Reset path before fetching
-            // setRoutePath([]); 
+        console.log(`[Route] Calculating: ${position.lat}, ${position.lng} → ${destinationLat}, ${destinationLng}`);
 
-            try {
-                // Log coordinates for debugging
-                console.log(`[Route Debug] Current Location: ${position.lat}, ${position.lng} | Terminal Location: ${destinationLat}, ${destinationLng}`);
+        // Set straight line path
+        setRoutePath([[position.lat, position.lng], [destinationLat, destinationLng]]);
 
-                // OSRM expects: longitude,latitude
-                const start = `${position.lng},${position.lat}`;
-                const end = `${destinationLng},${destinationLat}`;
-                // Use proxy to avoid CORS
-                const url = `/osrm/route/v1/driving/${start};${end}?overview=full&geometries=geojson`;
+        // Calculate distance using Haversine formula
+        const R = 6371000; // Earth radius in meters
+        const lat1 = position.lat * Math.PI / 180;
+        const lat2 = destinationLat * Math.PI / 180;
+        const deltaLat = (destinationLat - position.lat) * Math.PI / 180;
+        const deltaLng = (destinationLng - position.lng) * Math.PI / 180;
 
-                const response = await axios.get(url);
+        const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) *
+            Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const straightLineDistance = R * c;
 
-                if (response.data.code === 'Ok' && response.data.routes.length > 0) {
-                    const route = response.data.routes[0];
-                    // OSRM returns [lng, lat], Leaflet needs [lat, lng]
-                    const coords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+        // Road distance is typically 1.3x straight line, average speed 50km/h
+        const estimatedRoadDistance = straightLineDistance * 1.3;
+        const estimatedDuration = (estimatedRoadDistance / 1000) / 50 * 3600; // seconds
 
-                    setRoutePath(coords);
-                    setRouteInfo({
-                        distance: route.distance, // meters
-                        duration: route.duration // seconds
-                    });
-                } else {
-                    throw new Error("No route found");
-                }
-            } catch (e) {
-                console.error("Failed to fetch route, using fallback:", e);
-                // Fallback: Straight line
-                setRoutePath([[position.lat, position.lng], [destinationLat, destinationLng]]);
-                setRouteInfo({
-                    distance: 0, // Unknown
-                    duration: 0 // Unknown
-                });
-            }
-        };
-
-        fetchRoute();
+        setRouteInfo({
+            distance: Math.round(estimatedRoadDistance),
+            duration: Math.round(estimatedDuration)
+        });
     }, [position, destinationLat, destinationLng]);
 
     // Open Google Maps for true navigation
@@ -177,9 +182,9 @@ const ExternalRoute = ({
     };
 
     return (
-        <div className="flex flex-col gap-4 w-full h-full relative">
-            {/* Control Buttons */}
-            <div className="absolute top-4 right-4 flex gap-2 z-[400]">
+        <div className="w-full h-full relative flex flex-col">
+            {/* Map Controls - Moved down to allow space for header info */}
+            <div className="absolute top-28 right-4 flex flex-col gap-2 z-[400]">
                 <button
                     onClick={getLocation}
                     className="p-3 bg-slate-800 text-blue-400 rounded-full hover:bg-slate-700 shadow-lg border border-slate-700 transition-all active:scale-95 flex items-center justify-center"
@@ -189,7 +194,7 @@ const ExternalRoute = ({
                 </button>
                 <button
                     onClick={openNavigation}
-                    className="p-3 bg-green-600 text-white rounded-full hover:bg-green-500 shadow-lg transition-all active:scale-95"
+                    className="p-3 bg-green-600 text-white rounded-full hover:bg-green-500 shadow-lg transition-all active:scale-95 flex items-center justify-center"
                     title="Open GPS Navigation"
                 >
                     <Navigation size={24} />

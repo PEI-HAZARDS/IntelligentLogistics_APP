@@ -5,7 +5,6 @@ import {
   Truck,
   CheckCircle,
   Search,
-  Filter,
   RotateCcw,
   Trash2,
   FileText,
@@ -40,6 +39,7 @@ function mapAlertType(type: string): "plate" | "safety" | "adr" {
 function mapStatusToLabel(status: AppointmentStatusEnum): string {
   const statusMap: Record<AppointmentStatusEnum, string> = {
     in_transit: "In Transit",
+    in_process: "In Process",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -52,7 +52,8 @@ function mapStatusToAPI(status: string): AppointmentStatusEnum {
   const statusMap: Record<string, AppointmentStatusEnum> = {
     "Pending": "in_transit",
     "In Transit": "in_transit",
-    "Unloading": "in_transit",
+    "In Process": "in_process",
+    "Unloading": "in_process",
     "Delayed": "delayed",
     "Completed": "completed",
     "Canceled": "canceled",
@@ -178,6 +179,7 @@ export default function ArrivalsList() {
   const dynamicStats = {
     total: arrivals.length,
     pending: stats.in_transit || arrivals.filter(a => a.apiStatus === "in_transit").length,
+    inProcess: stats.in_process || arrivals.filter(a => a.apiStatus === "in_process").length,
     inProgress: stats.delayed || arrivals.filter(a => a.apiStatus === "delayed").length,
     completed: stats.completed || arrivals.filter(a => a.apiStatus === "completed").length,
   };
@@ -329,10 +331,20 @@ export default function ArrivalsList() {
             </div>
           </div>
           <div
+            className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("In Process")}
+          >
+            <div className="stat-icon"><Truck size={24} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.inProcess}</span>
+              <span className="stat-label">In Process</span>
+            </div>
+          </div>
+          <div
             className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Delayed")}
           >
-            <div className="stat-icon"><Truck size={24} /></div>
+            <div className="stat-icon"><AlertTriangle size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
               <span className="stat-label">Delayed</span>
@@ -371,6 +383,7 @@ export default function ArrivalsList() {
               <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">All Statuses</option>
                 <option value="In Transit">In Transit</option>
+                <option value="In Process">In Process</option>
                 <option value="Delayed">Delayed</option>
                 <option value="Completed">Completed</option>
                 <option value="Canceled">Canceled</option>
@@ -541,6 +554,7 @@ export default function ArrivalsList() {
                       onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, status: e.target.value } : null)}
                     >
                       <option value="In Transit">In Transit</option>
+                      <option value="In Process">In Process</option>
                       <option value="Delayed">Delayed</option>
                       <option value="Completed">Completed</option>
                       <option value="Canceled">Canceled</option>

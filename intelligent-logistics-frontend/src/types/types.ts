@@ -5,8 +5,8 @@
 
 // ==================== ENUMS ====================
 
-export type AppointmentStatusEnum = 'in_transit' | 'canceled' | 'delayed' | 'completed';
-export type DeliveryStatusEnum = 'unloading' | 'completed';
+export type AppointmentStatusEnum = 'in_transit' | 'in_process' | 'canceled' | 'delayed' | 'completed';
+export type DeliveryStatusEnum = 'not_started' | 'unloading' | 'completed';
 export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
 export type DirectionEnum = 'inbound' | 'outbound';
 export type AlertTypeEnum = 'generic' | 'safety' | 'problem' | 'operational';

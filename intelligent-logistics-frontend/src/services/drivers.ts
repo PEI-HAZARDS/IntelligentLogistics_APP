@@ -92,3 +92,12 @@ export async function getDriverArrivals(
     );
     return response.data;
 }
+/**
+ * Complete an appointment (confirm delivery)
+ */
+export async function completeAppointment(appointmentId: number): Promise<void> {
+    // Status updates are handled by the arrivals endpoint
+    await api.patch(`/arrivals/${appointmentId}/status`, {
+        status: 'completed'
+    });
+}

@@ -1,22 +1,22 @@
-import { Navigation, MapPin, Package, Loader2 } from 'lucide-react';
+import { Navigation, MapPin, Package } from 'lucide-react';
 import ConfirmButton from './ConfirmButton';
-import type { ClaimAppointmentResponse } from '@/types/types';
+import type { Appointment } from '@/types/types';
 
 interface InternalRouteProps {
-    claimResult: ClaimAppointmentResponse | null;
+    appointment: Appointment | null;
     onConfirmDelivery: () => void;
     isConfirming?: boolean;
 }
 
-const InternalRoute = ({ claimResult, onConfirmDelivery, isConfirming }: InternalRouteProps) => {
-    if (!claimResult) {
+const InternalRoute = ({ appointment, onConfirmDelivery, isConfirming }: InternalRouteProps) => {
+    if (!appointment) {
         return (
             <div className="flex flex-col gap-4 w-full h-full items-center justify-center">
                 <div className="driver-card text-center p-8">
                     <Package size={48} className="text-gray-400 mx-auto mb-4" />
-                    <h3 className="font-bold text-lg mb-2">Nenhuma chegada registada</h3>
+                    <h3 className="font-bold text-lg mb-2">A aguardar entrada</h3>
                     <p className="text-sm opacity-70">
-                        Registe a sua chegada com o código PIN para ver as instruções de navegação interna.
+                        Dirija-se ao gate para validação automática.
                     </p>
                 </div>
             </div>
@@ -28,9 +28,9 @@ const InternalRoute = ({ claimResult, onConfirmDelivery, isConfirming }: Interna
             <div className="driver-card flex items-center gap-3 flex-shrink-0">
                 <Navigation className="text-green-500" size={24} />
                 <div>
-                    <h3 className="font-bold text-lg">Navegação Interna do Porto</h3>
+                    <h3 className="font-bold text-lg">Navegação Interna</h3>
                     <p className="text-sm opacity-70">
-                        Dirija-se ao cais indicado
+                        Autorizado. Dirija-se ao local de descarga.
                     </p>
                 </div>
             </div>
@@ -44,11 +44,11 @@ const InternalRoute = ({ claimResult, onConfirmDelivery, isConfirming }: Interna
                     <div>
                         <h2 className="text-slate-400 font-medium text-sm uppercase tracking-wide">Destino</h2>
                         <p className="text-white text-3xl font-bold mt-1">
-                            {claimResult.dock_bay_number || 'N/A'}
+                            {appointment.terminal?.name || 'Terminal'}
                         </p>
-                        {claimResult.dock_location && (
+                        {appointment.gate_in && (
                             <p className="text-slate-400 text-sm mt-1">
-                                {claimResult.dock_location}
+                                Gate: {appointment.gate_in.label}
                             </p>
                         )}
                     </div>
@@ -58,12 +58,12 @@ const InternalRoute = ({ claimResult, onConfirmDelivery, isConfirming }: Interna
                 <div className="space-y-3">
                     <div className="flex justify-between items-center">
                         <span className="text-slate-400 text-sm">Matrícula</span>
-                        <span className="font-semibold">{claimResult.license_plate}</span>
+                        <span className="font-semibold">{appointment.truck_license_plate}</span>
                     </div>
-                    {claimResult.cargo_description && (
+                    {appointment.booking?.cargos?.[0] && (
                         <div className="flex justify-between items-center">
                             <span className="text-slate-400 text-sm">Carga</span>
-                            <span className="font-medium">{claimResult.cargo_description}</span>
+                            <span className="font-medium">{appointment.booking.cargos[0].description}</span>
                         </div>
                     )}
                 </div>
