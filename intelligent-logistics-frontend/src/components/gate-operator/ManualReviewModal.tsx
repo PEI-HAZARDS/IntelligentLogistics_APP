@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock } from 'lucide-react';
-import { queryArrivalsByLicensePlate, getArrivals } from '@/services/arrivals';
+import { getArrivals } from '@/services/arrivals';
 import { submitManualReview, rejectEntrance } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
 
@@ -33,6 +33,7 @@ export default function ManualReviewModal({
     onDecisionComplete,
 }: ManualReviewModalProps) {
     const [candidates, setCandidates] = useState<Appointment[]>([]);
+    const [allCandidates, setAllCandidates] = useState<Appointment[]>([]);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,10 +49,11 @@ export default function ManualReviewModal({
 
             const plate = reviewData.licensePlate || '';
             setSearchPlate(plate);
-            fetchCandidates(plate);
+            fetchAllCandidates();
         } else if (!isOpen) {
             // Reset state when closed
             setCandidates([]);
+            setAllCandidates([]);
             setSelectedAppointment(null);
             setError(null);
             setSearchPlate('');
@@ -59,24 +61,38 @@ export default function ManualReviewModal({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, reviewData?.id]);
 
-    const fetchCandidates = async (plate: string) => {
+    // Filter candidates when search changes (client-side, like ArrivalsList)
+    useEffect(() => {
+        if (allCandidates.length > 0) {
+            if (searchPlate.trim()) {
+                const filtered = allCandidates.filter(apt =>
+                    apt.truck_license_plate.toLowerCase().includes(searchPlate.toLowerCase())
+                );
+                setCandidates(filtered);
+            } else {
+                setCandidates(allCandidates);
+            }
+        }
+    }, [searchPlate, allCandidates]);
+
+    const fetchAllCandidates = async () => {
         setIsLoading(true);
         setError(null);
         try {
-            let results: Appointment[] = [];
+            // Fetch all in_transit arrivals (like ArrivalsList does)
+            const results = await getArrivals({ status: 'in_transit', limit: 100 });
+            setAllCandidates(results);
 
+            // Apply initial filter if there's a detected plate
+            const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
-                // Search by license plate and filter to only in_transit
-                const plateResults = await queryArrivalsByLicensePlate(plate);
-                results = plateResults.filter(apt => apt.status === 'in_transit');
+                const filtered = results.filter(apt =>
+                    apt.truck_license_plate.toLowerCase().includes(plate.toLowerCase())
+                );
+                setCandidates(filtered.length > 0 ? filtered : results);
+            } else {
+                setCandidates(results);
             }
-
-            // If no results or no plate, get today's in_transit arrivals
-            if (results.length === 0) {
-                results = await getArrivals({ status: 'in_transit', limit: 50 });
-            }
-
-            setCandidates(results);
         } catch (err) {
             console.error('Failed to fetch candidates:', err);
             setError('Failed to load appointments. Try again.');
@@ -86,11 +102,9 @@ export default function ManualReviewModal({
     };
 
     const handleSearch = () => {
-        if (searchPlate.trim()) {
-            fetchCandidates(searchPlate.trim());
-        } else {
-            fetchCandidates('');
-        }
+        // Client-side filtering is now done automatically via useEffect
+        // This function just triggers the filter by making sure searchPlate is set
+        // The actual filtering happens in the useEffect above
     };
 
     const handleApprove = async () => {

@@ -221,19 +221,19 @@
 }
 
 .camera-section {
-  flex: 1.5;
+  flex: 0 0 auto;
+  /* Don't grow - size based on content/aspect-ratio */
+  aspect-ratio: 16 / 9;
+  /* Maintain video aspect ratio */
+  max-height: 45vh;
+  /* Cap maximum height */
   background: #000;
-  /* Camera area always dark */
   border-radius: 16px;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   display: grid;
-  /* CRITICAL FIX: minmax(0, 1fr) prevents video from blowing out grid width */
   grid-template-columns: minmax(0, 1fr) 140px;
-  /* Reduced crops width */
   border: 1px solid var(--border-color);
-  max-height: 100%;
-  /* Prevent overflow */
 }
 
 .video-area {
@@ -574,6 +574,8 @@
   flex-direction: column;
   gap: 1.25rem;
   min-width: 0;
+  overflow: hidden;
+  /* Contain overflow so arrivals-list can scroll */
 }
 
 .panel-header-row {
@@ -739,6 +741,25 @@
   padding-right: 0.5rem;
   min-height: 0;
   /* Allow flex to shrink and enable scrolling */
+}
+
+/* Scrollbar styling for arrivals list */
+.arrivals-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.arrivals-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.arrivals-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.arrivals-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .arrival-card {
