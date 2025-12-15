@@ -289,7 +289,13 @@ export default function Dashboard() {
         }
       });
     }
-  }, [addToast]);
+
+    // Refresh arrivals list when ACCEPTED or REJECTED decision arrives
+    // This ensures the "Upcoming Arrivals" list reflects the status change
+    if (showToast && (decision === "ACCEPTED" || decision === "REJECTED")) {
+      fetchData();
+    }
+  }, [addToast, fetchData]);
 
   // Track the last processed payload ID to avoid duplicates
   const lastProcessedIdRef = useRef<string | null>(null);
