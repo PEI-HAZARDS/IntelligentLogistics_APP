@@ -4,12 +4,12 @@ export const STREAM_CONFIG = {
   baseUrl: DEFAULT_STREAM_BASE_URL,
   gates: {
     gate01: {
-      low: "/hls/low/gate01/index.m3u8",
-      high: "/hls/high/gate01/index.m3u8",
+      low: "/hls/low/gate1/index.m3u8",
+      high: "/hls/high/gate1/index.m3u8",
     },
     gate02: {
-      low: "/hls/low/gate02/index.m3u8",
-      high: "/hls/high/gate02/index.m3u8",
+      low: "/hls/low/gate2/index.m3u8",
+      high: "/hls/high/gate2/index.m3u8",
     },
   },
 } as const;

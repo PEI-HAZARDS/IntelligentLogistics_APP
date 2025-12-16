@@ -1,16 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
+import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
 import {
     Bell,
     Sun,
     Moon,
-    User,
     LogOut,
     Clock,
-    ChevronDown
+    ChevronDown,
+    User,
+    ArrowRightCircle
 } from "lucide-react";
-
 // Notification type definition
 interface Notification {
     id: string;
@@ -21,41 +22,81 @@ interface Notification {
     read: boolean;
 }
 
-// Mock notifications data
-const mockNotifications: Notification[] = [
-    {
-        id: "1",
-        type: "warning",
-        title: "Chegada Atrasada",
-        message: "Camião ABC-1234 está 30 minutos atrasado",
-        time: "10 min",
-        read: false,
-    },
-    {
-        id: "2",
-        type: "info",
-        title: "Nova Chegada Registada",
-        message: "Veículo XYZ-5678 registado para 14:00",
-        time: "25 min",
-        read: false,
-    },
-    {
-        id: "3",
-        type: "danger",
-        title: "Documento em Falta",
-        message: "Veículo DEF-9012 sem documentação válida",
-        time: "1 hora",
-        read: true,
-    },
-];
-
 export default function OperatorHeader() {
     const { isDarkMode, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const notificationsRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+
+    // Get user info from localStorage
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    const userName = userInfo.name || userInfo.email || 'Operator';
+    const userRole = userInfo.role || 'Gate Operator';
+
+    // Listen for localStorage changes (same as Dashboard)
+    const updateNotificationsFromStorage = useCallback(() => {
+        try {
+            const saved = localStorage.getItem('ws_payloads');
+            if (!saved) return;
+
+            const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: any }>; // type 'any' to avoid import issues or need for full type here
+            if (messages.length === 0) return;
+
+            // Get the latest payload (last in the array is usually newest, but sorting by timestamp is safer)
+            const latest = messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+            // Fix: Access the nested 'payload' property from the WebSocket message
+            const payload = latest.data?.payload;
+
+            if (payload && payload.alerts && Array.isArray(payload.alerts)) {
+                const newNotifications: Notification[] = payload.alerts
+                    .filter((msg: any) => typeof msg === 'string' && msg.trim().length > 0)
+                    .map((msg: string, index: number) => {
+                        // Determine severity
+                        let type: "info" | "warning" | "danger" = "danger";
+                        if (msg.toLowerCase().includes('approved') || msg.toLowerCase().includes('success')) type = "info";
+                        else if (msg.toLowerCase().includes('review') || msg.toLowerCase().includes('pending')) type = "warning";
+
+                        return {
+                            id: `alert-${latest.id}-${index}`,
+                            type,
+                            title: "Safety Alert", // Generic title as per recent simplified design
+                            message: msg,
+                            time: new Date(latest.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            read: false // New alerts are always unread until opened/marked
+                        };
+                    });
+
+                // Overwrite notifications with the latest batch
+                setNotifications(newNotifications);
+            }
+        } catch (e) {
+            console.error("Failed to parse notifications from storage", e);
+        }
+    }, []);
+
+    useEffect(() => {
+        // Initial load
+        updateNotificationsFromStorage();
+
+        // Listen for updates
+        const handleStorageUpdate = (e: StorageEvent) => {
+            if (e.key === 'ws_payloads') updateNotificationsFromStorage();
+        };
+
+        const handleCustomUpdate = () => updateNotificationsFromStorage();
+
+        window.addEventListener('storage', handleStorageUpdate);
+        window.addEventListener('ws_payload_updated', handleCustomUpdate);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageUpdate);
+            window.removeEventListener('ws_payload_updated', handleCustomUpdate);
+        };
+    }, [updateNotificationsFromStorage]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -79,12 +120,41 @@ export default function OperatorHeader() {
     // Get current shift based on time
     const getShiftInfo = () => {
         const hour = new Date().getHours();
-        if (hour >= 6 && hour < 14) return "Turno da Manhã (06:00 - 14:00)";
-        if (hour >= 14 && hour < 22) return "Turno da Tarde (14:00 - 22:00)";
-        return "Turno da Noite (22:00 - 06:00)";
+        if (hour >= 6 && hour < 14) return { name: "Morning Shift", startTime: "06:00", endTime: "14:00", startHour: 6, endHour: 14 };
+        if (hour >= 14 && hour < 22) return { name: "Afternoon Shift", startTime: "14:00", endTime: "22:00", startHour: 14, endHour: 22 };
+        return { name: "Night Shift", startTime: "22:00", endTime: "06:00", startHour: 22, endHour: 6 };
     };
 
-    const unreadCount = mockNotifications.filter((n) => !n.read).length;
+    const shiftInfo = getShiftInfo();
+
+    // Auto-trigger handover modal when shift ends
+    useEffect(() => {
+        const checkShiftEnd = () => {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+
+            // Trigger modal at exact shift end time
+            if (currentHour === shiftInfo.endHour && currentMinute === 0) {
+                setIsHandoverOpen(true);
+            }
+        };
+
+        // Check every minute
+        const interval = setInterval(checkShiftEnd, 60000);
+        return () => clearInterval(interval);
+    }, [shiftInfo.endHour]);
+
+    const handleEndShift = () => {
+        setIsDropdownOpen(false);
+        setIsHandoverOpen(true);
+    };
+
+    const handleMarkAllRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
+    const unreadCount = notifications.filter((n) => !n.read).length;
 
     return (
         <header className="operator-header">
@@ -94,7 +164,7 @@ export default function OperatorHeader() {
                     <span className="logo-text">Porto de Aveiro</span>
                 </div>
                 <span className="header-subtitle">
-                    Painel de Gestão de Chegadas Diárias
+                    Daily Arrivals Management Panel
                 </span>
             </div>
 
@@ -103,7 +173,7 @@ export default function OperatorHeader() {
                 <button
                     className="header-icon-btn"
                     onClick={toggleTheme}
-                    aria-label="Alternar Tema"
+                    aria-label="Toggle Theme"
                 >
                     {isDarkMode ? (
                         <Moon size={20} />
@@ -116,7 +186,7 @@ export default function OperatorHeader() {
                 <div className="notifications-section" ref={notificationsRef}>
                     <button
                         className="header-icon-btn"
-                        aria-label="Notificações"
+                        aria-label="Notifications"
                         onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                     >
                         <Bell size={20} />
@@ -128,27 +198,37 @@ export default function OperatorHeader() {
                     {isNotificationsOpen && (
                         <div className="notifications-popup">
                             <div className="notifications-header">
-                                <span className="notifications-title">Notificações</span>
-                                <button className="mark-read-btn">Marcar como lidas</button>
+                                <span className="notifications-title">Notifications</span>
+                                <button className="mark-read-btn" onClick={handleMarkAllRead}>
+                                    Mark as read
+                                </button>
                             </div>
                             <div className="notifications-list">
-                                {mockNotifications.map((notification) => (
-                                    <div
-                                        key={notification.id}
-                                        className={`notification-item ${notification.type} ${notification.read ? "read" : ""
-                                            }`}
-                                    >
-                                        <div className="notification-indicator" />
-                                        <div className="notification-content">
-                                            <span className="notification-title">{notification.title}</span>
-                                            <span className="notification-message">{notification.message}</span>
-                                            <span className="notification-time">{notification.time}</span>
-                                        </div>
+                                {notifications.length === 0 ? (
+                                    <div className="notification-empty">
+                                        <span>No notifications</span>
                                     </div>
-                                ))}
+                                ) : (
+                                    notifications.map((notification) => (
+                                        <div
+                                            key={notification.id}
+                                            className={`notification-item ${notification.type} ${notification.read ? "read" : ""
+                                                }`}
+                                        >
+                                            <div className="notification-indicator" />
+                                            <div className="notification-content">
+                                                <span className="notification-title">{notification.title}</span>
+                                                <span className="notification-message">{notification.message}</span>
+                                                <span className="notification-time">{notification.time}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                             <div className="notifications-footer">
-                                <button className="view-all-btn">Ver Todas</button>
+                                <button className="view-all-btn" onClick={() => navigate('/gate/alerts')}>
+                                    View All
+                                </button>
                             </div>
                         </div>
                     )}
@@ -169,31 +249,47 @@ export default function OperatorHeader() {
                                 (e.target as HTMLImageElement).style.display = "none";
                             }}
                         />
-                        <div className="user-avatar-fallback">MV</div>
-                        <span className="user-name">Maria Vicente</span>
+                        <div className="user-avatar-fallback">
+                            <User size={18} />
+                        </div>
+                        <span className="user-name">{userName}</span>
                         <ChevronDown size={16} className={`dropdown-arrow ${isDropdownOpen ? "open" : ""}`} />
                     </button>
 
                     {isDropdownOpen && (
                         <div className="user-dropdown">
                             <div className="dropdown-header">
-                                <span className="dropdown-name">Maria Vicente</span>
-                                <span className="dropdown-role">Gate Operator</span>
+                                <span className="dropdown-name">{userName}</span>
+                                <span className="dropdown-role">{userRole}</span>
                             </div>
                             <div className="dropdown-divider" />
                             <div className="dropdown-shift">
                                 <Clock size={16} />
-                                <span>{getShiftInfo()}</span>
+                                <span>{shiftInfo.name} ({shiftInfo.startTime} - {shiftInfo.endTime})</span>
                             </div>
+                            <div className="dropdown-divider" />
+                            <button className="dropdown-item end-shift" onClick={handleEndShift}>
+                                <ArrowRightCircle size={16} />
+                                <span>End Shift</span>
+                            </button>
                             <div className="dropdown-divider" />
                             <button className="dropdown-item" onClick={handleLogout}>
                                 <LogOut size={16} />
-                                <span>Terminar Sessão</span>
+                                <span>Log Out</span>
                             </button>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Shift Handover Modal */}
+            <ShiftHandoverModal
+                isOpen={isHandoverOpen}
+                onClose={() => setIsHandoverOpen(false)}
+                onConfirmLogout={handleLogout}
+                shiftName={shiftInfo.name}
+                shiftEndTime={shiftInfo.endTime}
+            />
         </header>
     );
 }

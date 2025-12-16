@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
   Truck,
   CheckCircle,
   Search,
-  Filter,
   RotateCcw,
   Trash2,
   FileText,
@@ -14,10 +13,56 @@ import {
   Save,
   Eye,
   Edit,
-  ArrowLeft
+  ArrowLeft,
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
+import { getArrivals, getArrivalsStats, updateArrivalStatus } from "@/services/arrivals";
+import { getActiveAlerts } from "@/services/alerts";
+import type { Appointment, AppointmentStatusEnum, Alert } from "@/types/types";
 
-type Alert = {
+// Map API severity to UI
+function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
+  if (type === "problem" || type === "safety") return "danger";
+  if (type === "operational") return "warning";
+  return "info";
+}
+
+// Map API alert type to UI type
+function mapAlertType(type: string): "plate" | "safety" | "adr" {
+  if (type === "safety" || type === "problem") return "adr";
+  if (type === "operational") return "safety";
+  return "plate";
+}
+
+// Map API status to English display
+function mapStatusToLabel(status: AppointmentStatusEnum): string {
+  const statusMap: Record<AppointmentStatusEnum, string> = {
+    in_transit: "In Transit",
+    in_process: "In Process",
+    delayed: "Delayed",
+    completed: "Completed",
+    canceled: "Canceled",
+  };
+  return statusMap[status] || status;
+}
+
+// Map English status back to API status
+function mapStatusToAPI(status: string): AppointmentStatusEnum {
+  const statusMap: Record<string, AppointmentStatusEnum> = {
+    "Pending": "in_transit",
+    "In Transit": "in_transit",
+    "In Process": "in_process",
+    "Unloading": "in_process",
+    "Delayed": "delayed",
+    "Completed": "completed",
+    "Canceled": "canceled",
+  };
+  return statusMap[status] || "in_transit";
+}
+
+// UI types for component state
+type UIAlert = {
   id: string;
   type: "plate" | "safety" | "adr";
   title: string;
@@ -26,143 +71,162 @@ type Alert = {
   severity?: "warning" | "danger" | "info";
 };
 
-type Arrival = {
-  id: string;
+type UIArrival = {
+  id: number;
   plate: string;
   dock: string;
   arrivalTime: string;
   cargo: string;
-  status: "Pendente" | "Em descarga" | "Concluído";
+  status: string;
+  apiStatus: AppointmentStatusEnum;
 };
 
-const mockAlerts: Alert[] = [
-  {
-    id: "1",
-    type: "plate",
-    title: "Deteção Matrícula",
-    description: 'Matrícula: "BC 8003" detetada com 95% de confiança',
-    time: "22:00",
-    severity: "info",
-  },
-  {
-    id: "2",
-    type: "safety",
-    title: "Deteção Placa de Segurança",
-    description: '"30": líquido inflamável | "1202": óleo diesel',
-    time: "22:00",
-    severity: "warning",
-  },
-  {
-    id: "3",
-    type: "adr",
-    title: "Deteção Placa ADR",
-    description: "Líquidos inflamáveis: PERIGO DE COMBUSTÃO",
-    time: "22:00",
-    severity: "danger",
-  },
-  {
-    id: "4",
-    type: "adr",
-    title: "Deteção Placa ADR",
-    description: "Perigo Ambiental Aquático",
-    time: "22:01",
-    severity: "danger",
-  },
-];
-
-const mockArrivals: Arrival[] = [
-  {
-    id: "1",
-    plate: "AA-00-BB",
-    dock: "A",
-    arrivalTime: "22:00",
-    cargo: "Óleo Diesel (3000L)",
-    status: "Pendente",
-  },
-  {
-    id: "2",
-    plate: "BC-80-03",
-    dock: "B",
-    arrivalTime: "22:15",
-    cargo: "Gasolina (5000L)",
-    status: "Em descarga",
-  },
-  {
-    id: "3",
-    plate: "CC-11-DD",
-    dock: "C",
-    arrivalTime: "22:30",
-    cargo: "Etanol (2000L)",
-    status: "Concluído",
-  },
-  {
-    id: "4",
-    plate: "EE-22-FF",
-    dock: "A",
-    arrivalTime: "23:00",
-    cargo: "Contentores Variados",
-    status: "Pendente",
-  },
-];
-
 export default function ArrivalsList() {
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+  const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
 
+  // API data states
+  const [arrivals, setArrivals] = useState<UIArrival[]>([]);
+  const [alerts, setAlerts] = useState<UIAlert[]>([]);
+  const [stats, setStats] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter states
+  const [dockFilter, setDockFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal states
+  const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
+  const [editedArrival, setEditedArrival] = useState<UIArrival | null>(null);
+  const [modalMode, setModalMode] = useState<"view" | "edit">("view");
+
+  // Get gate ID from user info
+  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
+  const gateId = userInfo.gate_id || 1;
+
+  // Map API arrival to UI
+  const mapArrivalToUI = (arrival: Appointment): UIArrival => ({
+    id: arrival.id,
+    plate: arrival.truck_license_plate,
+    dock: arrival.gate_in?.label || "N/A",
+    arrivalTime: arrival.scheduled_start_time
+      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      : "--:--",
+    cargo: arrival.booking?.reference || "N/A",
+    status: mapStatusToLabel(arrival.status),
+    apiStatus: arrival.status,
+  });
+
+  // Map API alert to UI
+  const mapAlertToUI = (alert: Alert): UIAlert => ({
+    id: String(alert.id),
+    type: mapAlertType(alert.type),
+    title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
+    description: alert.description || "Alert without description",
+    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+    severity: mapAlertSeverity(alert.type),
+  });
+
+  // Fetch data function
+  const fetchData = useCallback(async () => {
+    setError(null);
+    try {
+      const [arrivalsData, alertsData, statsData] = await Promise.all([
+        getArrivals({ gate_id: gateId, limit: 100 }),
+        getActiveAlerts(20),
+        getArrivalsStats(gateId),
+      ]);
+
+      setArrivals(arrivalsData.map(mapArrivalToUI));
+      setAlerts(alertsData.map(mapAlertToUI));
+      setStats(statsData);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError("Failed to load data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gateId]);
+
+  // Time update effect
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+      setCurrentTime(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const [dockFilter, setDockFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedArrival, setSelectedArrival] = useState<Arrival | null>(null);
-  const [modalMode, setModalMode] = useState<"view" | "edit">("view");
+  // Data fetch effect
+  useEffect(() => {
+    fetchData();
+    // Auto-refresh every 30 seconds
+    const refreshTimer = setInterval(fetchData, 30000);
+    return () => clearInterval(refreshTimer);
+  }, [fetchData]);
 
-  const handleView = (arrival: Arrival) => {
+  // Filter Logic
+  const filteredArrivals = arrivals.filter((arrival) => {
+    if (statusFilter !== "all" && arrival.status !== statusFilter) return false;
+    if (dockFilter !== "all" && arrival.dock !== dockFilter) return false;
+    if (searchQuery && !arrival.plate.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  // Calculate stats - use API stats if available, otherwise calculate from arrivals
+  const dynamicStats = {
+    total: arrivals.length,
+    pending: stats.in_transit || arrivals.filter(a => a.apiStatus === "in_transit").length,
+    inProcess: stats.in_process || arrivals.filter(a => a.apiStatus === "in_process").length,
+    inProgress: stats.delayed || arrivals.filter(a => a.apiStatus === "delayed").length,
+    completed: stats.completed || arrivals.filter(a => a.apiStatus === "completed").length,
+  };
+
+  const handleView = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
+    setEditedArrival(null);
     setModalMode("view");
   };
 
-  const handleEdit = (arrival: Arrival) => {
+  const handleEdit = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
+    setEditedArrival({ ...arrival });
     setModalMode("edit");
   };
 
   const closeModal = () => {
     setSelectedArrival(null);
+    setEditedArrival(null);
   };
 
-  const handleSave = () => {
-    // Here you would typically call an API to update the arrival
-    // For now we just close the modal
-    console.log("Saving changes...", selectedArrival);
-    closeModal();
-  };
+  const handleSave = async () => {
+    if (!editedArrival || !selectedArrival) return;
 
+    setIsSaving(true);
+    try {
+      const newApiStatus = mapStatusToAPI(editedArrival.status);
+      await updateArrivalStatus(editedArrival.id, {
+        status: newApiStatus,
+      });
 
-  const navigate = useNavigate();
+      // Update local state
+      setArrivals((prev) =>
+        prev.map((a) =>
+          a.id === editedArrival.id
+            ? { ...a, status: editedArrival.status, apiStatus: newApiStatus, dock: editedArrival.dock }
+            : a
+        )
+      );
 
-  // Filter Logic
-  const filteredArrivals = mockArrivals.filter((arrival) => {
-    // 1. Status Filter
-    if (statusFilter !== "all" && arrival.status !== statusFilter) return false;
-    // 2. Dock Filter
-    if (dockFilter !== "all" && arrival.dock !== dockFilter) return false;
-    // 3. Search Query (Plate)
-    if (searchQuery && !arrival.plate.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-
-    return true;
-  });
-
-  // Calculate stats dynamically based on mock data (or real data in future)
-  const dynamicStats = {
-    total: mockArrivals.length,
-    pending: mockArrivals.filter(a => a.status === "Pendente").length,
-    inProgress: mockArrivals.filter(a => a.status === "Em descarga").length,
-    completed: mockArrivals.filter(a => a.status === "Concluído").length
+      closeModal();
+    } catch (err) {
+      console.error("Failed to save:", err);
+      setError("Failed to save changes.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClearFilters = () => {
@@ -171,22 +235,40 @@ export default function ArrivalsList() {
     setSearchQuery("");
   };
 
+  const handleRefresh = () => {
+    setIsLoading(true);
+    fetchData();
+  };
+
+  // Get unique docks from arrivals
+  const availableDocks = [...new Set(arrivals.map(a => a.dock))].filter(d => d !== "N/A");
+
   return (
     <div className="arrivals-list-page">
       {/* Coluna Esquerda - Alertas */}
-
       <aside className="alerts-sidebar">
-        <h2 className="sidebar-title">Últimos Alertas</h2>
+        <h2 className="sidebar-title">Latest Alerts</h2>
         <div className="alerts-list">
-          {mockAlerts.map((alert) => (
-            <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
-              <div className="alert-header">
-                <h4>{alert.title}</h4>
-                <span className="alert-time">{alert.time}</span>
-              </div>
-              <p className="alert-description">{alert.description}</p>
+          {isLoading && alerts.length === 0 ? (
+            <div className="loading-state">
+              <Loader2 size={20} className="spin" />
+              <span>Loading...</span>
             </div>
-          ))}
+          ) : alerts.length === 0 ? (
+            <div className="empty-state">
+              <span>No recent alerts.</span>
+            </div>
+          ) : (
+            alerts.map((alert) => (
+              <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
+                <div className="alert-header">
+                  <h4>{alert.title}</h4>
+                  <span className="alert-time">{alert.time}</span>
+                </div>
+                <p className="alert-description">{alert.description}</p>
+              </div>
+            ))
+          )}
         </div>
       </aside>
 
@@ -205,7 +287,7 @@ export default function ArrivalsList() {
           </div>
 
           <div className="header-center">
-            <h1 className="panel-title">Lista de Chegadas</h1>
+            <h1 className="panel-title">Arrivals List</h1>
           </div>
 
           <div className="header-right">
@@ -214,6 +296,17 @@ export default function ArrivalsList() {
             </div>
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="error-banner">
+            <AlertTriangle size={18} />
+            <span>{error}</span>
+            <button onClick={() => setError(null)}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Estatísticas (Clickable Filters) */}
         <div className="stats-grid">
@@ -224,37 +317,47 @@ export default function ArrivalsList() {
             <div className="stat-icon"><FileText size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.total}</span>
-              <span className="stat-label">Total de Chegadas</span>
+              <span className="stat-label">Total Arrivals</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Pendente' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Pendente")}
+            className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("In Transit")}
           >
             <div className="stat-icon"><Clock size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
-              <span className="stat-label">Pendentes</span>
+              <span className="stat-label">In Transit</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Em descarga' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Em descarga")}
+            className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("In Process")}
           >
             <div className="stat-icon"><Truck size={24} /></div>
             <div className="stat-content">
-              <span className="stat-value">{dynamicStats.inProgress}</span>
-              <span className="stat-label">Em descarga</span>
+              <span className="stat-value">{dynamicStats.inProcess}</span>
+              <span className="stat-label">In Process</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Concluído' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Concluído")}
+            className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Delayed")}
+          >
+            <div className="stat-icon"><AlertTriangle size={24} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.inProgress}</span>
+              <span className="stat-label">Delayed</span>
+            </div>
+          </div>
+          <div
+            className={`stat-card ${statusFilter === 'Completed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Completed")}
           >
             <div className="stat-icon"><CheckCircle size={24} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.completed}</span>
-              <span className="stat-label">Concluídos Hoje</span>
+              <span className="stat-label">Completed Today</span>
             </div>
           </div>
         </div>
@@ -263,80 +366,84 @@ export default function ArrivalsList() {
         <div className="filters-section">
           <h3 className="filters-title">
             <Search className="inline-icon" size={20} style={{ marginRight: '8px' }} />
-            Filtros e Pesquisa
+            Filters & Search
           </h3>
           <div className="filters-grid">
             <div className="filter-group">
-              <label htmlFor="dock-filter">Cais</label>
+              <label htmlFor="dock-filter">Dock</label>
               <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
-                <option value="all">Todos os Cais</option>
-                <option value="A">Cais A</option>
-                <option value="B">Cais B</option>
-                <option value="C">Cais C</option>
+                <option value="all">All Docks</option>
+                {availableDocks.map((dock) => (
+                  <option key={dock} value={dock}>Dock {dock}</option>
+                ))}
               </select>
             </div>
             <div className="filter-group">
-              <label htmlFor="status-filter">Estado</label>
+              <label htmlFor="status-filter">Status</label>
               <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">Todos os estados</option>
-                <option value="Pendente">Pendente</option>
-                <option value="Em descarga">Em descarga</option>
-                <option value="Concluído">Concluído</option>
+                <option value="all">All Statuses</option>
+                <option value="In Transit">In Transit</option>
+                <option value="In Process">In Process</option>
+                <option value="Delayed">Delayed</option>
+                <option value="Completed">Completed</option>
+                <option value="Canceled">Canceled</option>
               </select>
             </div>
             <div className="filter-group">
-              <label htmlFor="time-filter">Hora</label>
-              <input id="time-filter" type="time" />
-            </div>
-            <div className="filter-group">
-              <label htmlFor="search-input">Pesquisar</label>
+              <label htmlFor="search-input">Search</label>
               <input
                 id="search-input"
                 type="text"
-                placeholder="Matrícula..."
+                placeholder="License plate..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-          </div>
-          <div className="filters-actions">
-            <button className="btn-secondary">
-              <Filter size={16} /> Aplicar Filtros
-            </button>
-            <button className="btn-outline" onClick={handleClearFilters}>
-              <Trash2 size={16} /> Limpar
-            </button>
-            <button className="btn-primary">
-              <RotateCcw size={16} /> Atualizar
-            </button>
+            <div className="filter-group filter-actions-inline">
+              <label>&nbsp;</label>
+              <div className="filter-buttons">
+                <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
+                  <Trash2 size={18} />
+                </button>
+                <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
+                  {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Tabela/Cards */}
         <div className="arrivals-content">
           <div className="content-header">
-            <h3 className="content-title">📋 Lista de Chegadas Turno XXX</h3>
-            <div className="view-toggle">
-              {/* View content placeholder if needed, or remove completely */}
-            </div>
+            <h3 className="content-title">Arrivals List</h3>
           </div>
 
-          {filteredArrivals.length === 0 ? (
+          {isLoading && arrivals.length === 0 ? (
+            <div className="loading-state">
+              <Loader2 size={32} className="spin" />
+              <span>Loading arrivals...</span>
+            </div>
+          ) : filteredArrivals.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><Inbox size={48} /></div>
-              <p className="empty-message">Nenhuma chegada encontrada com os filtros atuais...</p>
+              <p className="empty-message">
+                {arrivals.length === 0
+                  ? "No arrivals found."
+                  : "No arrivals found with current filters..."}
+              </p>
             </div>
           ) : (
             <div className="arrivals-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Matrícula</th>
-                    <th>Cais</th>
-                    <th>Hora de Chegada</th>
-                    <th>Carga</th>
-                    <th>Estado</th>
-                    <th>Ações</th>
+                    <th>License Plate</th>
+                    <th>Dock</th>
+                    <th>Arrival Time</th>
+                    <th>Reference</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,10 +459,10 @@ export default function ArrivalsList() {
                         </span>
                       </td>
                       <td>
-                        <button className="btn-icon" onClick={() => handleView(arrival)} title="Ver Detalhes">
+                        <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
                           <Eye size={18} />
                         </button>
-                        <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Editar">
+                        <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
                           <Edit size={18} />
                         </button>
                       </td>
@@ -366,7 +473,7 @@ export default function ArrivalsList() {
             </div>
           )}
         </div>
-      </main >
+      </main>
 
       {/* Modal / Information Card */}
       {selectedArrival && (
@@ -377,7 +484,7 @@ export default function ArrivalsList() {
             <div className="modal-header">
               <h3 className="modal-title">
                 {modalMode === "view" ? <Eye size={20} /> : <Edit size={20} />}
-                {modalMode === "view" ? "Detalhes da Chegada" : "Editar Chegada"}
+                {modalMode === "view" ? "Arrival Details" : "Edit Arrival"}
               </h3>
               <button className="modal-close-btn" onClick={closeModal}>
                 <X size={20} />
@@ -386,27 +493,27 @@ export default function ArrivalsList() {
 
             <div className="modal-body">
               <div className="detail-row">
-                <span className="detail-label">Matrícula</span>
+                <span className="detail-label">License Plate</span>
                 <span className="detail-value">{selectedArrival.plate}</span>
               </div>
 
               <div className="detail-row">
-                <span className="detail-label">Hora de Chegada</span>
+                <span className="detail-label">Arrival Time</span>
                 <span className="detail-value">{selectedArrival.arrivalTime}</span>
               </div>
 
               {modalMode === "view" ? (
                 <>
                   <div className="detail-row">
-                    <span className="detail-label">Cais</span>
+                    <span className="detail-label">Dock</span>
                     <span className="detail-value">{selectedArrival.dock}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Carga</span>
+                    <span className="detail-label">Reference</span>
                     <span className="detail-value">{selectedArrival.cargo}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Estado</span>
+                    <span className="detail-label">Status</span>
                     <span className="status-badge-wrapper" style={{ marginTop: '0.5rem' }}>
                       <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
                         {selectedArrival.status}
@@ -418,19 +525,19 @@ export default function ArrivalsList() {
                 /* Edit Mode Form */
                 <>
                   <div className="detail-row">
-                    <label className="detail-label">Cais</label>
+                    <label className="detail-label">Dock</label>
                     <select
                       className="detail-input"
-                      value={selectedArrival.dock}
-                      onChange={(e) => setSelectedArrival({ ...selectedArrival, dock: e.target.value })}
+                      value={editedArrival?.dock || selectedArrival.dock}
+                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, dock: e.target.value } : null)}
                     >
-                      <option value="A">Cais A</option>
-                      <option value="B">Cais B</option>
-                      <option value="C">Cais C</option>
+                      {availableDocks.map((dock) => (
+                        <option key={dock} value={dock}>Dock {dock}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="detail-row">
-                    <label className="detail-label">Carga (Restrito)</label>
+                    <label className="detail-label">Reference (Restricted)</label>
                     <input
                       className="detail-input"
                       type="text"
@@ -440,15 +547,17 @@ export default function ArrivalsList() {
                     />
                   </div>
                   <div className="detail-row">
-                    <label className="detail-label">Estado</label>
+                    <label className="detail-label">Status</label>
                     <select
                       className="detail-input"
-                      value={selectedArrival.status}
-                      onChange={(e) => setSelectedArrival({ ...selectedArrival, status: e.target.value as any })}
+                      value={editedArrival?.status || selectedArrival.status}
+                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, status: e.target.value } : null)}
                     >
-                      <option value="Pendente">Pendente</option>
-                      <option value="Em descarga">Em descarga</option>
-                      <option value="Concluído">Concluído</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="In Process">In Process</option>
+                      <option value="Delayed">Delayed</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Canceled">Canceled</option>
                     </select>
                   </div>
                 </>
@@ -457,18 +566,27 @@ export default function ArrivalsList() {
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModal}>
-                Cancelar
+                Cancel
               </button>
               {modalMode === "edit" && (
-                <button className="btn-primary" onClick={handleSave}>
-                  <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
-                  Guardar Alterações
+                <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="spin inline-icon" style={{ marginRight: '6px' }} />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               )}
             </div>
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 }

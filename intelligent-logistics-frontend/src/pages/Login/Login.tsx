@@ -1,17 +1,94 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { login as workerLogin } from "@/services/workers";
+import { login as driverLogin } from "@/services/drivers";
 import "./Login.css";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
 
-  const onSubmit = (e: React.FormEvent) => {
+  // Determine the app mode from Vite environment
+  const mode = import.meta.env.MODE;
+  const isDriverMode = mode === 'driver';
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // login estático — redireciona para gestor de cancela
-    nav("/gate");
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      if (isDriverMode) {
+        // Driver login - uses driver's license
+        const response = await driverLogin({
+          drivers_license: username,
+          password: password,
+        });
+
+        // Store token and driver info
+        localStorage.setItem("auth_token", response.token);
+        localStorage.setItem(
+          "user_info",
+          JSON.stringify({
+            drivers_license: response.drivers_license,
+            name: response.name,
+            company_nif: response.company_nif,
+            company_name: response.company_name,
+            role: "driver",
+          })
+        );
+
+        nav("/driver");
+      } else {
+        // Worker (operator/manager) login - uses email
+        const response = await workerLogin({
+          email: username,
+          password: password,
+        });
+
+        // Store token and worker info
+        localStorage.setItem("auth_token", response.token);
+        localStorage.setItem(
+          "user_info",
+          JSON.stringify({
+            num_worker: response.num_worker,
+            name: response.name,
+            email: response.email,
+            active: response.active,
+            role: "operator",
+          })
+        );
+
+        // Redirect based on mode
+        if (mode === 'manager') {
+          nav("/manager");
+        } else {
+          nav("/gate");
+        }
+      }
+    } catch (err: unknown) {
+      console.error("Login error:", err);
+
+      // Handle different error types
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
+        if (axiosError.response?.status === 401) {
+          setError("Invalid credentials. Check your email/license and password.");
+        } else if (axiosError.response?.status === 404) {
+          setError("User not found.");
+        } else {
+          setError(axiosError.response?.data?.detail || "Login failed. Please try again.");
+        }
+      } else {
+        setError("Connection error. Please check your network.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,6 +109,23 @@ export default function Login() {
           {/* Título */}
           <h1 className="login-title">INTELLIGENT LOGISTICS</h1>
 
+          {/* Subtítulo baseado no modo */}
+          <p className="login-subtitle">
+            {isDriverMode ? "Driver Area" : mode === 'manager' ? "Logistics Manager" : "Gate Operator"}
+          </p>
+
+          {/* Mensagem de erro */}
+          {error && (
+            <div className="login-error">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* Formulário */}
           <form onSubmit={onSubmit} className="login-form">
             {/* Campo de Utilizador */}
@@ -49,12 +143,13 @@ export default function Login() {
               </div>
               <input
                 type="text"
-                placeholder=""
+                placeholder={isDriverMode ? "Driver's License" : "Email"}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="login-input"
-                aria-label="Nome de Utilizador"
+                aria-label={isDriverMode ? "Driver's License" : "Email"}
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -73,18 +168,20 @@ export default function Login() {
               </div>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder=""
+                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="login-input"
                 aria-label="Password"
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
                 className="toggle-password"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label="Toggle password visibility"
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <svg
@@ -111,14 +208,23 @@ export default function Login() {
             </div>
 
             {/* Botão de Login */}
-            <button type="submit" className="login-button">
-              LOGIN
+            <button type="submit" className="login-button" disabled={isLoading}>
+              {isLoading ? (
+                <span className="login-loading">
+                  <svg className="spinner" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" />
+                  </svg>
+                  Logging in...
+                </span>
+              ) : (
+                "LOGIN"
+              )}
             </button>
           </form>
 
           {/* Footer */}
           <div className="login-footer">
-            © 2025 Sistema de Gestão Logística Portuária
+            © 2025 Port Logistics Management System
           </div>
         </div>
       </div>
