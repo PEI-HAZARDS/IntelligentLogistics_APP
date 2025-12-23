@@ -9,9 +9,6 @@ const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'
 const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
 const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 
-// Componentes do Motorista
-const DriverLayout = React.lazy(() => import('@/components/layout/driver/DriverLayout'));
-
 // Componentes do Gestor Logístico
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
 
@@ -49,17 +46,6 @@ const gateRoutes = [
   { path: '*', element: <Navigate to="/gate" replace /> }
 ];
 
-// Rotas do Motorista
-const driverRoutes = [
-  ...commonRoutes,
-  {
-    path: '/driver',
-    element: <DriverLayout />
-  },
-  // Redireciona qualquer rota desconhecida para /driver
-  { path: '*', element: <Navigate to="/driver" replace /> }
-];
-
 // Rotas do Gestor Logístico
 const managerRoutes = [
   ...commonRoutes,
@@ -78,15 +64,11 @@ const getRoutes = () => {
   console.log(`Carregando rotas para o modo: ${mode}`);
 
   switch (mode) {
-    case 'driver':
-      return driverRoutes;
     case 'manager':
       return managerRoutes;
     case 'gate':
-      return gateRoutes;
     default:
-      // Fallback para gate ou uma página de erro/seleção
-      console.warn('Modo desconhecido, carregando rotas do Operador (Gate) por padrão.');
+      // Gate é agora o modo padrão (driver foi movido para app nativo)
       return gateRoutes;
   }
 };

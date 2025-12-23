@@ -145,33 +145,8 @@ export interface CreateHazmatAlertRequest {
     detected_hazmat?: string | null;
 }
 
-// ==================== DRIVERS ====================
-
-export interface DriverLoginRequest {
-    drivers_license: string;
-    password: string;
-}
-
-export interface DriverLoginResponse {
-    token: string;
-    drivers_license: string;
-    name: string;
-    company_nif?: string | null;
-    company_name?: string | null;
-}
-
-export interface ClaimAppointmentRequest {
-    arrival_id: string;
-}
-
-export interface ClaimAppointmentResponse {
-    appointment_id: number;
-    dock_bay_number?: string | null;
-    dock_location?: string | null;
-    license_plate: string;
-    cargo_description?: string | null;
-    navigation_url?: string | null;
-}
+// Note: Driver authentication types moved to the native Driver app
+// The Driver interface above is still used for displaying driver info in appointments
 
 // ==================== WORKERS ====================
 

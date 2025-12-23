@@ -5,15 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:driver": "vite --mode driver",
     "dev:gate": "vite --mode gate",
     "dev:manager": "vite --mode manager",
     "build": "vite build",
-    "build:driver": "vite build --mode driver && cap sync",
-    "build:gate": "vite build --mode gate && cap sync",
-    "preview": "vite preview",
-    "android": "cap open android",
-    "run:android": "cap run android"
+    "build:gate": "vite build --mode gate",
+    "build:manager": "vite build --mode manager",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

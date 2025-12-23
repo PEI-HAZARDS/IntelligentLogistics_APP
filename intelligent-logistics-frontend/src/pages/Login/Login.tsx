@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login as workerLogin } from "@/services/workers";
-import { login as driverLogin } from "@/services/drivers";
 import "./Login.css";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -14,7 +13,6 @@ export default function Login() {
 
   // Determine the app mode from Vite environment
   const mode = import.meta.env.MODE;
-  const isDriverMode = mode === 'driver';
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,53 +20,30 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      if (isDriverMode) {
-        // Driver login - uses driver's license
-        const response = await driverLogin({
-          drivers_license: username,
-          password: password,
-        });
+      // Worker (operator/manager) login - uses email
+      const response = await workerLogin({
+        email: email,
+        password: password,
+      });
 
-        // Store token and driver info
-        localStorage.setItem("auth_token", response.token);
-        localStorage.setItem(
-          "user_info",
-          JSON.stringify({
-            drivers_license: response.drivers_license,
-            name: response.name,
-            company_nif: response.company_nif,
-            company_name: response.company_name,
-            role: "driver",
-          })
-        );
+      // Store token and worker info
+      localStorage.setItem("auth_token", response.token);
+      localStorage.setItem(
+        "user_info",
+        JSON.stringify({
+          num_worker: response.num_worker,
+          name: response.name,
+          email: response.email,
+          active: response.active,
+          role: "operator",
+        })
+      );
 
-        nav("/driver");
+      // Redirect based on mode
+      if (mode === 'manager') {
+        nav("/manager");
       } else {
-        // Worker (operator/manager) login - uses email
-        const response = await workerLogin({
-          email: username,
-          password: password,
-        });
-
-        // Store token and worker info
-        localStorage.setItem("auth_token", response.token);
-        localStorage.setItem(
-          "user_info",
-          JSON.stringify({
-            num_worker: response.num_worker,
-            name: response.name,
-            email: response.email,
-            active: response.active,
-            role: "operator",
-          })
-        );
-
-        // Redirect based on mode
-        if (mode === 'manager') {
-          nav("/manager");
-        } else {
-          nav("/gate");
-        }
+        nav("/gate");
       }
     } catch (err: unknown) {
       console.error("Login error:", err);
@@ -77,7 +52,7 @@ export default function Login() {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
         if (axiosError.response?.status === 401) {
-          setError("Invalid credentials. Check your email/license and password.");
+          setError("Invalid credentials. Check your email and password.");
         } else if (axiosError.response?.status === 404) {
           setError("User not found.");
         } else {
@@ -97,7 +72,7 @@ export default function Login() {
 
       <div className="login-container">
         <div className="login-card">
-          {/* Logo e camião */}
+          {/* Logo */}
           <div className="login-visual">
             <img
               src="/logo.png"
@@ -111,7 +86,7 @@ export default function Login() {
 
           {/* Subtítulo baseado no modo */}
           <p className="login-subtitle">
-            {isDriverMode ? "Driver Area" : mode === 'manager' ? "Logistics Manager" : "Gate Operator"}
+            {mode === 'manager' ? "Logistics Manager" : "Gate Operator"}
           </p>
 
           {/* Mensagem de erro */}
@@ -128,7 +103,7 @@ export default function Login() {
 
           {/* Formulário */}
           <form onSubmit={onSubmit} className="login-form">
-            {/* Campo de Utilizador */}
+            {/* Campo de Email */}
             <div className="input-group">
               <div className="input-icon">
                 <svg
@@ -142,12 +117,12 @@ export default function Login() {
                 </svg>
               </div>
               <input
-                type="text"
-                placeholder={isDriverMode ? "Driver's License" : "Email"}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="login-input"
-                aria-label={isDriverMode ? "Driver's License" : "Email"}
+                aria-label="Email"
                 required
                 disabled={isLoading}
               />
