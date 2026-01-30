@@ -1,6 +1,7 @@
 /**
  * Login Screen for Driver App
  * Adapted from web version Login.tsx
+ * Enhanced with animations and haptic feedback
  */
 import React, { useState } from 'react';
 import {
@@ -15,11 +16,25 @@ import {
     ScrollView,
     ActivityIndicator,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { login } from '../services/drivers';
 import { useAuthStore } from '../stores/authStore';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { haptics } from '../components/AnimatedComponents';
 import type { UserInfo } from '../types/types';
+
+// ===== MOCK MODE - REMOVER DEPOIS DE TESTAR =====
+const DEV_MOCK_MODE = true; // Mudar para false para usar API real
+
+const MOCK_USER: UserInfo = {
+    drivers_license: 'AB-123456',
+    name: 'João Silva (MOCK)',
+    company_nif: '501234567',
+    company_name: 'TransLogis',
+    role: 'driver',
+};
+// ===== FIM MOCK MODE =====
 
 export default function LoginScreen() {
     const [driversLicense, setDriversLicense] = useState('');
@@ -29,6 +44,20 @@ export default function LoginScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const authLogin = useAuthStore((state) => state.login);
+
+    // ===== MOCK LOGIN - REMOVER DEPOIS DE TESTAR =====
+    const handleMockLogin = async () => {
+        setIsLoading(true);
+        haptics.medium();
+
+        // Simular delay de rede
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        await authLogin('mock-token-for-testing', MOCK_USER);
+        haptics.success();
+        setIsLoading(false);
+    };
+    // ===== FIM MOCK LOGIN =====
 
     const handleLogin = async () => {
         if (!driversLicense.trim() || !password.trim()) {
@@ -54,6 +83,7 @@ export default function LoginScreen() {
             };
 
             await authLogin(response.token, userInfo);
+            haptics.success();
         } catch (err: unknown) {
             console.error('Login error:', err);
 
@@ -74,6 +104,11 @@ export default function LoginScreen() {
         }
     };
 
+    const handleLoginPress = () => {
+        haptics.medium();
+        handleLogin();
+    };
+
     return (
         <KeyboardAvoidingView
             style={styles.container}
@@ -83,30 +118,34 @@ export default function LoginScreen() {
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={styles.card}>
-                    {/* Logo */}
-                    <View style={styles.logoContainer}>
+                <Animated.View style={styles.card} entering={FadeIn.duration(500)}>
+                    {/* Logo - Animated Zoom In */}
+                    <Animated.View style={styles.logoContainer} entering={ZoomIn.delay(200).duration(600).springify()}>
                         <Image
                             source={require('../../assets/logo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
-                    </View>
+                    </Animated.View>
 
-                    {/* Title */}
-                    <Text style={styles.title}>INTELLIGENT LOGISTICS</Text>
-                    <Text style={styles.subtitle}>Driver Area</Text>
+                    {/* Title - Fade In */}
+                    <Animated.Text style={styles.title} entering={FadeInDown.delay(400).duration(400)}>
+                        INTELLIGENT LOGISTICS
+                    </Animated.Text>
+                    <Animated.Text style={styles.subtitle} entering={FadeInDown.delay(500).duration(400)}>
+                        Driver Area
+                    </Animated.Text>
 
-                    {/* Error Message */}
+                    {/* Error Message - Animated */}
                     {error && (
-                        <View style={styles.errorContainer}>
+                        <Animated.View style={styles.errorContainer} entering={FadeInDown.duration(300).springify()}>
                             <Ionicons name="alert-circle" size={18} color={colors.error} />
                             <Text style={styles.errorText}>{error}</Text>
-                        </View>
+                        </Animated.View>
                     )}
 
-                    {/* Form */}
-                    <View style={styles.form}>
+                    {/* Form - Animated */}
+                    <Animated.View style={styles.form} entering={FadeInUp.delay(600).duration(500)}>
                         {/* Driver's License Input */}
                         <View style={styles.inputGroup}>
                             <View style={styles.inputIcon}>
@@ -153,10 +192,9 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Login Button */}
                         <TouchableOpacity
                             style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-                            onPress={handleLogin}
+                            onPress={handleLoginPress}
                             disabled={isLoading}
                             activeOpacity={0.8}
                         >
@@ -169,11 +207,24 @@ export default function LoginScreen() {
                                 <Text style={styles.loginButtonText}>LOGIN</Text>
                             )}
                         </TouchableOpacity>
-                    </View>
+
+                        {/* ===== MOCK LOGIN BUTTON - REMOVER DEPOIS DE TESTAR ===== */}
+                        {DEV_MOCK_MODE && (
+                            <TouchableOpacity
+                                style={[styles.loginButton, styles.mockLoginButton, isLoading && styles.loginButtonDisabled]}
+                                onPress={handleMockLogin}
+                                disabled={isLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.loginButtonText}>ENTRAR SEM API (TESTE)</Text>
+                            </TouchableOpacity>
+                        )}
+                        {/* ===== FIM MOCK LOGIN BUTTON ===== */}
+                    </Animated.View>
 
                     {/* Footer */}
                     <Text style={styles.footer}>© 2025 Port Logistics Management System</Text>
-                </View>
+                </Animated.View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -264,6 +315,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: spacing.sm,
     },
+    // ===== MOCK STYLE - REMOVER DEPOIS DE TESTAR =====
+    mockLoginButton: {
+        backgroundColor: '#f97316', // Orange for visibility
+        borderWidth: 2,
+        borderColor: '#ea580c',
+    },
+    // ===== FIM MOCK STYLE =====
     loginButtonDisabled: {
         opacity: 0.6,
     },

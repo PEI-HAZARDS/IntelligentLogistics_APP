@@ -1,6 +1,7 @@
 /**
  * Home Screen for Driver App
  * Adapted from web version DriverHome.tsx
+ * Enhanced with animations and haptic feedback
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -14,12 +15,14 @@ import {
     ActivityIndicator,
     Linking,
 } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, SlideInRight, Layout } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getMyActiveArrival, getMyTodayArrivals, claimArrival } from '../services/drivers';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import type { Appointment, ClaimAppointmentResponse } from '../types/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 
 // Map status to English
 function mapStatusToLabel(status: string): string {
@@ -54,6 +57,58 @@ export default function HomeScreen() {
     const driversLicense = user?.drivers_license || '';
     const driverName = user?.name || 'Driver';
 
+    // ===== MOCK MODE - REMOVER DEPOIS DE TESTAR =====
+    const DEV_MOCK_MODE = true; // Mudar para false para usar API real
+
+    const MOCK_ACTIVE_ARRIVAL: Appointment = {
+        id: 1001,
+        arrival_id: 'ARR-001',
+        booking_reference: 'BK-2026-001',
+        driver_license: driversLicense || 'AB-123456',
+        truck_license_plate: '00-AA-00',
+        terminal_id: 1,
+        scheduled_start_time: new Date().toISOString(),
+        status: 'in_transit',
+        notes: 'Container ABC-123',
+    };
+
+    const MOCK_TODAY_ARRIVALS: Appointment[] = [
+        {
+            id: 1001,
+            arrival_id: 'ARR-001',
+            booking_reference: 'BK-2026-001',
+            driver_license: driversLicense || 'AB-123456',
+            truck_license_plate: '00-AA-00',
+            terminal_id: 1,
+            scheduled_start_time: new Date().toISOString(),
+            status: 'in_transit',
+            notes: 'Container ABC-123',
+        },
+        {
+            id: 1002,
+            arrival_id: 'ARR-002',
+            booking_reference: 'BK-2026-002',
+            driver_license: driversLicense || 'AB-123456',
+            truck_license_plate: '11-BB-11',
+            terminal_id: 2,
+            scheduled_start_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            status: 'in_process',
+            notes: 'Paletes XYZ-789',
+        },
+        {
+            id: 1003,
+            arrival_id: 'ARR-003',
+            booking_reference: 'BK-2026-003',
+            driver_license: driversLicense || 'AB-123456',
+            truck_license_plate: '22-CC-22',
+            terminal_id: 1,
+            scheduled_start_time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+            status: 'completed',
+            notes: 'Materiais Construção',
+        },
+    ];
+    // ===== FIM MOCK MODE =====
+
     // State
     const [activeArrival, setActiveArrival] = useState<Appointment | null>(null);
     const [todayArrivals, setTodayArrivals] = useState<Appointment[]>([]);
@@ -75,6 +130,17 @@ export default function HomeScreen() {
 
         setError(null);
         try {
+            // ===== MOCK DATA - REMOVER DEPOIS DE TESTAR =====
+            if (DEV_MOCK_MODE) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Simula delay
+                setActiveArrival(MOCK_ACTIVE_ARRIVAL);
+                setTodayArrivals(MOCK_TODAY_ARRIVALS);
+                setIsLoading(false);
+                setIsRefreshing(false);
+                return;
+            }
+            // ===== FIM MOCK DATA =====
+
             const [active, today] = await Promise.all([
                 getMyActiveArrival(driversLicense),
                 getMyTodayArrivals(driversLicense),
@@ -118,6 +184,9 @@ export default function HomeScreen() {
                 arrival_id: pinCode.trim(),
             });
 
+            // Haptic success feedback
+            haptics.success();
+
             setClaimResult(result);
             setSuccessMessage('Arrival registered successfully!');
             setPinCode('');
@@ -126,6 +195,9 @@ export default function HomeScreen() {
             await fetchData();
         } catch (err: unknown) {
             console.error('Failed to claim arrival:', err);
+            // Haptic error feedback
+            haptics.error();
+
             if (err && typeof err === 'object' && 'response' in err) {
                 const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
                 if (axiosError.response?.status === 404) {
@@ -199,24 +271,33 @@ export default function HomeScreen() {
                     />
                 }
             >
-                {/* Error Alert */}
+                {/* Error Alert - Animated */}
                 {error && (
-                    <View style={styles.alertError}>
+                    <Animated.View
+                        entering={FadeInDown.duration(300).springify()}
+                        style={styles.alertError}
+                    >
                         <Ionicons name="alert-circle" size={18} color="#fca5a5" />
                         <Text style={styles.alertErrorText}>{error}</Text>
-                    </View>
+                    </Animated.View>
                 )}
 
-                {/* Success Alert */}
+                {/* Success Alert - Animated */}
                 {successMessage && (
-                    <View style={styles.alertSuccess}>
+                    <Animated.View
+                        entering={FadeInDown.duration(300).springify()}
+                        style={styles.alertSuccess}
+                    >
                         <Ionicons name="checkmark-circle" size={18} color="#86efac" />
                         <Text style={styles.alertSuccessText}>{successMessage}</Text>
-                    </View>
+                    </Animated.View>
                 )}
 
-                {/* PIN Claim Section */}
-                <View style={styles.section}>
+                {/* PIN Claim Section - Animated */}
+                <Animated.View
+                    entering={FadeInUp.delay(100).duration(400).springify()}
+                    style={styles.section}
+                >
                     <View style={styles.sectionHeader}>
                         <Ionicons name="qr-code" size={20} color={colors.primary} />
                         <Text style={styles.sectionTitle}>Register Arrival</Text>
@@ -233,7 +314,10 @@ export default function HomeScreen() {
                         />
                         <TouchableOpacity
                             style={[styles.claimButton, (!pinCode.trim() || isClaiming) && styles.buttonDisabled]}
-                            onPress={handleClaimArrival}
+                            onPress={() => {
+                                haptics.medium();
+                                handleClaimArrival();
+                            }}
                             disabled={isClaiming || !pinCode.trim()}
                         >
                             {isClaiming ? (
@@ -246,7 +330,7 @@ export default function HomeScreen() {
                             )}
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
 
                 {/* Navigation Result */}
                 {claimResult && (
