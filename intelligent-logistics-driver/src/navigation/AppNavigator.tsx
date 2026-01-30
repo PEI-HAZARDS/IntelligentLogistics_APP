@@ -9,13 +9,15 @@ import { colors } from '../theme/colors';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
-import HomeScreen from '../screens/HomeScreen';
 import LoadingScreen from '../screens/LoadingScreen';
+
+// Tab Navigator for authenticated users
+import MainTabNavigator from './MainTabNavigator';
 
 export type RootStackParamList = {
     Loading: undefined;
     Login: undefined;
-    Home: undefined;
+    Main: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,9 +39,10 @@ export default function AppNavigator() {
                 ) : !isAuthenticated ? (
                     <Stack.Screen name="Login" component={LoginScreen} />
                 ) : (
-                    <Stack.Screen name="Home" component={HomeScreen} />
+                    <Stack.Screen name="Main" component={MainTabNavigator} />
                 )}
             </Stack.Navigator>
         </NavigationContainer>
     );
 }
+
