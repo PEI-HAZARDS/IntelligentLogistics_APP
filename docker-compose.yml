@@ -5,27 +5,19 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5173:5173"
-    # Bind mounts removed due to environment issues (empty mounts)
-    # volumes:
-    #   - ./intelligent-logistics-frontend:/app
-    #   - /app/node_modules
     command: npm run dev:gate -- --host
     environment:
       - VITE_API_URL=/api
     networks:
       - logistics-network
 
-  driver-ui:
+  manager-ui:
     build:
       context: ./intelligent-logistics-frontend
       dockerfile: Dockerfile
     ports:
       - "5174:5173"
-    # Bind mounts removed due to environment issues (empty mounts)
-    # volumes:
-    #   - ./intelligent-logistics-frontend:/app
-    #   - /app/node_modules
-    command: npm run dev:driver -- --host
+    command: npm run dev:manager -- --host
     environment:
       - VITE_API_URL=/api
     networks:
@@ -34,3 +26,6 @@ services:
 networks:
   logistics-network:
     driver: bridge
+
+# Note: Driver app is now a separate React Native project (intelligent-logistics-driver/)
+# It runs independently via Expo and does not need Docker

@@ -5,15 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:driver": "vite --mode driver",
     "dev:gate": "vite --mode gate",
     "dev:manager": "vite --mode manager",
     "build": "vite build",
-    "build:driver": "vite build --mode driver && cap sync",
-    "build:gate": "vite build --mode gate && cap sync",
-    "preview": "vite preview",
-    "android": "cap open android",
-    "run:android": "cap run android"
+    "build:gate": "vite build --mode gate",
+    "build:manager": "vite build --mode manager",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -30,6 +27,8 @@
     "hls.js": "^1.6.15",
     "i18next": "^25.7.2",
     "i18next-browser-languagedetector": "^8.2.0",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.555.0",
