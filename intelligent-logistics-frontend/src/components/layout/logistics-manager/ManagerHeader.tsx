@@ -53,11 +53,11 @@ export default function ManagerHeader() {
     }, []);
 
     const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     };
 
     const formatDate = (date: Date) => {
-        return date.toLocaleDateString('pt-PT', {
+        return date.toLocaleDateString('en-GB', {
             weekday: 'long',
             day: 'numeric',
             month: 'long',
@@ -80,6 +80,7 @@ export default function ManagerHeader() {
             <div className="header-center">
                 <div className="time-display">
                     <span className="current-time">{formatTime(currentTime)}</span>
+                    <span className="time-separator">&nbsp;—&nbsp;</span>
                     <span className="current-date">{formatDate(currentTime)}</span>
                 </div>
             </div>

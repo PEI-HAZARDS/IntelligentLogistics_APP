@@ -8,7 +8,11 @@
   --bg-card: rgba(255, 255, 255, 0.05);
   --bg-card-hover: rgba(51, 65, 85, 0.8);
   --bg-dropdown: #1e293b;
-  /* Solid dropdown background */
+  --bg-header: #1e293b;
+  --bg-secondary: #1e293b;
+  --bg-hover: rgba(51, 65, 85, 0.6);
+  --accent-bg: rgba(59, 130, 246, 0.15);
+  --accent-hover: #2563eb;
 
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
@@ -36,7 +40,11 @@
   --bg-card: #ffffff;
   --bg-card-hover: #f8fafc;
   --bg-dropdown: #ffffff;
-  /* Solid dropdown background */
+  --bg-header: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --accent-bg: rgba(37, 99, 235, 0.1);
+  --accent-hover: #1d4ed8;
 
   --text-primary: #1e293b;
   --text-secondary: #475569;

@@ -13,6 +13,10 @@ const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 const ManagerLayout = React.lazy(() => import('@/components/layout/logistics-manager/ManagerLayout'));
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
 const ShiftsPage = React.lazy(() => import('@/pages/logistics-manager/ShiftsPage'));
+const AnalyticsPage = React.lazy(() => import('@/pages/logistics-manager/AnalyticsPage'));
+const TransportPage = React.lazy(() => import('@/pages/logistics-manager/TransportPage'));
+const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
+const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
 // Rotas Comuns (Login)
 const commonRoutes = [
@@ -57,11 +61,10 @@ const managerRoutes = [
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'shifts', element: <ShiftsPage /> },
-      // Placeholder routes - redirect to dashboard for now
-      { path: 'analytics', element: <ManagerDashboard /> },
-      { path: 'transport', element: <ManagerDashboard /> },
-      { path: 'reports', element: <ManagerDashboard /> },
-      { path: 'settings', element: <ManagerDashboard /> },
+      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'transport', element: <TransportPage /> },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
   // Redireciona qualquer rota desconhecida para /manager

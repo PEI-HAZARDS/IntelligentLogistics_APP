@@ -40,10 +40,10 @@ const SHIFT_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<ShiftStatus, string> = {
-    'active': 'Ativo',
-    'pending': 'Pendente',
-    'completed': 'Concluído',
-    'inactive': 'Sem Operador',
+    'active': 'Active',
+    'pending': 'Pending',
+    'completed': 'Completed',
+    'inactive': 'No Operator',
 };
 
 export default function ShiftsPage() {
@@ -99,17 +99,17 @@ export default function ShiftsPage() {
 
     const handleAddShift = () => {
         // TODO: Open modal to add new shift
-        alert('Funcionalidade de adicionar turno em desenvolvimento');
+        alert('Add shift functionality under development');
     };
 
     return (
         <div className="shifts-page">
             <div className="dashboard-header">
-                <h1 className="dashboard-title">Gestão de Turnos</h1>
+                <h1 className="dashboard-title">Shift Management</h1>
                 <div className="dashboard-filters">
                     <button className="action-btn primary" onClick={handleAddShift}>
                         <Plus size={16} />
-                        Novo Turno
+                        New Shift
                     </button>
                 </div>
             </div>
@@ -118,17 +118,17 @@ export default function ShiftsPage() {
             <div className="shifts-filters">
                 <h3 className="filters-title">
                     <Filter size={18} style={{ marginRight: '0.5rem', display: 'inline' }} />
-                    Filtros
+                    Filters
                 </h3>
                 <div className="filters-grid">
                     <div className="filter-group">
-                        <label className="filter-label">Número Trabalhador / Nome</label>
+                        <label className="filter-label">Worker ID / Name</label>
                         <div style={{ position: 'relative' }}>
                             <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                             <input
                                 type="text"
                                 className="filter-input"
-                                placeholder="Pesquisar operador..."
+                                placeholder="Search operator..."
                                 value={filters.workerId}
                                 onChange={(e) => setFilters(f => ({ ...f, workerId: e.target.value }))}
                                 style={{ paddingLeft: '2.25rem' }}
@@ -136,40 +136,40 @@ export default function ShiftsPage() {
                         </div>
                     </div>
                     <div className="filter-group">
-                        <label className="filter-label">Estado</label>
+                        <label className="filter-label">Status</label>
                         <select
                             className="filter-select"
                             value={filters.status}
                             onChange={(e) => setFilters(f => ({ ...f, status: e.target.value as ShiftStatus | '' }))}
                         >
-                            <option value="">Todos</option>
-                            <option value="active">Ativo</option>
-                            <option value="pending">Pendente</option>
-                            <option value="completed">Concluído</option>
-                            <option value="inactive">Sem Operador</option>
+                            <option value="">All</option>
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="completed">Completed</option>
+                            <option value="inactive">No Operator</option>
                         </select>
                     </div>
                     <div className="filter-group">
-                        <label className="filter-label">Horário</label>
+                        <label className="filter-label">Schedule</label>
                         <select
                             className="filter-select"
                             value={filters.shiftType}
                             onChange={(e) => setFilters(f => ({ ...f, shiftType: e.target.value as 'MORNING' | 'AFTERNOON' | 'NIGHT' | '' }))}
                         >
-                            <option value="">Todos</option>
-                            <option value="MORNING">Manhã (06:00 - 14:00)</option>
-                            <option value="AFTERNOON">Tarde (14:00 - 22:00)</option>
-                            <option value="NIGHT">Noite (22:00 - 06:00)</option>
+                            <option value="">All</option>
+                            <option value="MORNING">Morning (06:00 - 14:00)</option>
+                            <option value="AFTERNOON">Afternoon (14:00 - 22:00)</option>
+                            <option value="NIGHT">Night (22:00 - 06:00)</option>
                         </select>
                     </div>
                 </div>
                 <div className="filters-actions">
                     <button className="action-btn primary" onClick={fetchShifts} disabled={isLoading}>
                         <RefreshCw size={16} className={isLoading ? 'spinning' : ''} />
-                        Aplicar Filtros
+                        Apply Filters
                     </button>
                     <button className="action-btn" onClick={clearFilters}>
-                        Limpar
+                        Clear
                     </button>
                 </div>
             </div>
@@ -177,9 +177,9 @@ export default function ShiftsPage() {
             {/* Shifts Table */}
             <div className="data-table">
                 <div className="data-table-header">
-                    <h3 className="data-table-title">Lista de Turnos</h3>
+                    <h3 className="data-table-title">Shifts List</h3>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                        {shifts.length} resultado{shifts.length !== 1 ? 's' : ''}
+                        {shifts.length} result{shifts.length !== 1 ? 's' : ''}
                     </span>
                 </div>
                 <div className="table-responsive">
@@ -187,13 +187,13 @@ export default function ShiftsPage() {
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Portaria</th>
-                                <th>Horário</th>
-                                <th>Data</th>
-                                <th>Operador</th>
-                                <th>Chegadas</th>
-                                <th>Estado</th>
-                                <th>Ações</th>
+                                <th>Gate</th>
+                                <th>Schedule</th>
+                                <th>Date</th>
+                                <th>Operator</th>
+                                <th>Arrivals</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -201,13 +201,13 @@ export default function ShiftsPage() {
                                 <tr>
                                     <td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
                                         <RefreshCw size={20} className="spinning" style={{ marginRight: '0.5rem' }} />
-                                        A carregar...
+                                        Loading...
                                     </td>
                                 </tr>
                             ) : shifts.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
-                                        Nenhum turno encontrado
+                                        No shifts found
                                     </td>
                                 </tr>
                             ) : (
@@ -221,7 +221,7 @@ export default function ShiftsPage() {
                                                 {SHIFT_TYPE_LABELS[shift.shiftType]}
                                             </div>
                                         </td>
-                                        <td>{new Date(shift.date).toLocaleDateString('pt-PT')}</td>
+                                        <td>{new Date(shift.date).toLocaleDateString('en-GB')}</td>
                                         <td>
                                             {shift.operatorName ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -244,10 +244,10 @@ export default function ShiftsPage() {
                                             <button
                                                 className="action-btn"
                                                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
-                                                onClick={() => alert(`Ver detalhes do turno ${shift.id}`)}
+                                                onClick={() => alert(`View details for shift ${shift.id}`)}
                                             >
                                                 <Check size={14} />
-                                                Gerir
+                                                Manage
                                             </button>
                                         </td>
                                     </tr>
