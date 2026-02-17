@@ -448,11 +448,16 @@
   flex-wrap: wrap;
 }
 
-.detection-header .truck-id {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-family: 'Monaco', 'Consolas', monospace;
+.detection-header .decision-reason {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #FF7518;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .detection-header .decision-badge {
@@ -492,7 +497,7 @@
   letter-spacing: 0.5px;
 }
 
-.source-badge.source-engine {
+.source-badge.source-automated {
   background: rgba(99, 102, 241, 0.15);
   color: #818cf8;
   border: 1px solid rgba(99, 102, 241, 0.3);
@@ -550,9 +555,9 @@
 
 .detection-field .field-description {
   display: inline;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: 0.35rem;
 }
 
 .detection-description {

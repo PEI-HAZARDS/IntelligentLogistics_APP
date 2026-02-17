@@ -68,53 +68,39 @@ export async function queryAppointments(
 
 /**
  * Submit manual review decision
- * Uses API Gateway endpoint: POST /api/manual-review/{appointment_id}
+ * Uses API Gateway endpoint: POST /api/manual-review/
  * 
- * @param gateId - If provided and decision is 'approved', creates a Visit with state='unloading'
- * @param licensePlate - Required for Kafka notification to reach Driver UI
- * @param originalDetection - Original detection data to preserve in the decision
+ * Sends a DecisionResultsMessage via Kafka with the operator's decision.
+ * All fields are sent as query params matching the backend's FastAPI signature.
  */
-export async function submitManualReview(
-    appointmentId: number,
-    decision: 'approved' | 'rejected',
-    notes?: string,
-    gateId?: number,
-    licensePlate?: string,
-    originalDetection?: {
-        un?: string;
-        kemler?: string;
-        lpCropUrl?: string;
-        hzCropUrl?: string;
-    }
-): Promise<void> {
-    const params: Record<string, unknown> = {
-        decision,
-        notes,
-        gate_id: gateId,
-        license_plate: licensePlate,
+export async function submitManualReview(params: {
+    license_plate: string;
+    decision: string;
+    decision_reason: string;
+    decision_source?: string;
+    license_crop_url?: string;
+    un?: string;
+    kemler?: string;
+    hazard_crop_url?: string;
+    alerts?: string[];
+    route?: string;
+}): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+        license_plate: params.license_plate,
+        decision: params.decision,
+        decision_reason: params.decision_reason,
+        decision_source: params.decision_source || 'operator',
+        license_crop_url: params.license_crop_url || '',
+        un: params.un || '',
+        kemler: params.kemler || '',
+        hazard_crop_url: params.hazard_crop_url || '',
+        route: params.route || '',
     };
 
-    // Add original detection data if available
-    if (originalDetection) {
-        if (originalDetection.un) params.original_un = originalDetection.un;
-        if (originalDetection.kemler) params.original_kemler = originalDetection.kemler;
-        if (originalDetection.lpCropUrl) params.original_lp_crop = originalDetection.lpCropUrl;
-        if (originalDetection.hzCropUrl) params.original_hz_crop = originalDetection.hzCropUrl;
+    // FastAPI expects repeated query params for lists
+    if (params.alerts && params.alerts.length > 0) {
+        queryParams.alerts = params.alerts;
     }
 
-    await api.post(`/manual-review/${appointmentId}`, null, { params });
-}
-
-/**
- * Reject entrance without selecting a specific appointment
- * Used when operator wants to deny entry to a truck that doesn't match any appointment
- */
-export async function rejectEntrance(
-    gateId: number,
-    licensePlate?: string,
-    notes?: string
-): Promise<void> {
-    await api.post('/manual-review/reject-entrance', null, {
-        params: { gate_id: gateId, license_plate: licensePlate, notes }
-    });
+    await api.post('/manual-review/', null, { params: queryParams });
 }

@@ -7,43 +7,39 @@ type MessageHandler = (data: DecisionUpdatePayload) => void;
 type ConnectionHandler = () => void;
 
 /**
- * Payload structure from Decision Engine via Kafka
- * Matches the exact output from DecisionEngine._publish_decision()
+ * Payload structure from the API Gateway via Kafka.
+ * Matches the flat dict from DecisionResultsMessage.to_dict()
+ * broadcast directly by the gateway's consumer loop.
  */
 export interface DecisionUpdatePayload {
-    type: 'decision_update';
-    payload: {
-        // Timestamp (Unix epoch in seconds)
-        timestamp: number;
+    // Message type identifier (e.g. "decision_results")
+    message_type: string;
 
-        // Gate identification
-        gate_id: number;
+    // Timestamp (Unix epoch in seconds)
+    timestamp: number;
 
-        // License plate detection
-        licensePlate: string;
-        lp_cropUrl?: string;
+    // License plate detection
+    license_plate: string;
+    license_crop_url?: string;
 
-        // Hazmat detection (UN/Kemler with descriptions)
-        UN?: string | null;      // e.g., "1203: Sample UN Description"
-        kemler?: string | null;  // e.g., "33: Sample Kemler Description"
-        hz_cropUrl?: string;
+    // Hazmat detection
+    un?: string;
+    kemler?: string;
+    hazard_crop_url?: string;
 
-        // Decision result
-        decision: 'ACCEPTED' | 'REJECTED' | 'MANUAL_REVIEW';
+    // Decision result
+    decision: string;
+    decision_reason: string;
+    decision_source: string;
 
-        // Alerts array (reasons for rejection, warnings, etc.)
-        alerts: string[];
+    // Alerts array
+    alerts: string[];
 
-        // Route info (only present if appointment matched)
-        route?: {
-            gate_id?: number;
-            terminal_id?: number;
-            appointment_id?: number;
-        } | null;
+    // Route info (string, e.g. terminal/gate assignment)
+    route?: string;
 
-        // Allow additional fields
-        [key: string]: unknown;
-    };
+    // Allow additional fields
+    [key: string]: unknown;
 }
 
 export interface CropUpdate {
@@ -108,7 +104,7 @@ class GateWebSocket {
             this.ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data) as DecisionUpdatePayload;
-                    console.log('[WS] Message received:', data.type);
+                    console.log('[WS] Message received:', data.message_type);
                     this.messageHandlers.forEach(handler => handler(data));
                 } catch (err) {
                     console.error('[WS] Failed to parse message:', err);
@@ -220,12 +216,12 @@ class GateWebSocket {
     /**
      * Extract crop URLs from decision payload
      */
-    static extractCrops(payload: DecisionUpdatePayload['payload']): CropUpdate {
+    static extractCrops(payload: DecisionUpdatePayload): CropUpdate {
         return {
-            lpCrop: payload.lp_cropUrl,
-            hzCrop: payload.hz_cropUrl,
-            lpResult: payload.licensePlate,
-            hzResult: payload.UN || payload.kemler || undefined,
+            lpCrop: payload.license_crop_url,
+            hzCrop: payload.hazard_crop_url,
+            lpResult: payload.license_plate,
+            hzResult: payload.un || payload.kemler || undefined,
             timestamp: payload.timestamp ? new Date(payload.timestamp * 1000).toISOString() : new Date().toISOString(),
         };
     }
