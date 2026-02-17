@@ -69,7 +69,7 @@ class GateWebSocket {
     constructor(gateId: string | number, baseUrl?: string) {
         this.gateId = gateId;
         // Default to API Gateway WebSocket URL
-        this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://10.255.32.100:8000/api';
+        this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://10.255.32.70:8000/api';
     }
 
     /**

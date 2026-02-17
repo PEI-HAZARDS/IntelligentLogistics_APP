@@ -1,4 +1,4 @@
-const DEFAULT_STREAM_BASE_URL = "http://10.255.32.35:8080";
+const DEFAULT_STREAM_BASE_URL = "http://10.255.32.56:8080";
 // Configuração das streams HLS
 export const STREAM_CONFIG = {
   baseUrl: DEFAULT_STREAM_BASE_URL,
