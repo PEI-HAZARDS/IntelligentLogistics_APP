@@ -30,9 +30,9 @@ interface UIDetection {
   time: string;
   severity: "warning" | "danger" | "info";
   // New fields for redesigned card
-  truckId?: string;
   decision?: "ACCEPTED" | "REJECTED" | "MANUAL_REVIEW";
-  decisionSource?: "engine" | "operator";
+  decisionSource?: "automated" | "operator";
+  decisionReason?: string;
   licensePlate?: string;
   kemler?: string;
   kemlerDescription?: string;
@@ -136,39 +136,25 @@ export default function Dashboard() {
   // Process a single payload and update UI (detections, crops, toasts)
   // showToast = true for real-time updates, false for initial load from storage
   const processPayload = useCallback((data: DecisionUpdatePayload, showToast: boolean = true) => {
-    console.log('[Dashboard] processPayload called', { type: data?.type, hasPayload: !!data?.payload, showToast, data });
-    if (data.type !== "decision_update" || !data.payload) {
-      console.warn('[Dashboard] processPayload returning early - type mismatch or missing payload', { type: data?.type, payload: data?.payload });
+    console.log('[Dashboard] processPayload called', { message_type: data?.message_type, showToast, data });
+    if (!data || !data.message_type) {
+      console.warn('[Dashboard] processPayload returning early - missing message_type', { data });
       return;
     }
 
-    const payload = data.payload as {
-      lp_cropUrl?: string;
-      hz_cropUrl?: string;
-      licensePlate?: string;
-      UN?: string;
-      kemler?: string;
-      decision?: string;
-      decision_source?: string;
-      timestamp?: number;
-      truck_id?: string;
-      gate_id?: number;
-      alerts?: string[];
-    };
-
-    const lp_crop = payload.lp_cropUrl;
-    const hz_crop = payload.hz_cropUrl;
-    const lp_result = payload.licensePlate;
-    const decision = payload.decision;
-    const truck_id = payload.truck_id;
+    const lp_crop = data.license_crop_url;
+    const hz_crop = data.hazard_crop_url;
+    const lp_result = data.license_plate;
+    const decision = data.decision;
+    const decision_source = data.decision_source;
 
 
 
     // Parse timestamp - could be Unix seconds, Unix milliseconds, or ISO string
     let now: string;
     try {
-      if (payload.timestamp) {
-        const ts = payload.timestamp;
+      if (data.timestamp) {
+        const ts = data.timestamp;
         if (typeof ts === 'string') {
           // ISO string or other date string
           now = new Date(ts).toISOString();
@@ -183,7 +169,7 @@ export default function Dashboard() {
         now = new Date().toISOString();
       }
     } catch (e) {
-      console.warn('[Dashboard] Failed to parse timestamp, using current time', payload.timestamp, e);
+      console.warn('[Dashboard] Failed to parse timestamp, using current time', data.timestamp, e);
       now = new Date().toISOString();
     }
 
@@ -223,12 +209,12 @@ export default function Dashboard() {
       };
     };
 
-    const unParsed = parseCodeWithDescription(payload.UN);
-    const kemlerParsed = parseCodeWithDescription(payload.kemler);
+    const unParsed = parseCodeWithDescription(data.un);
+    const kemlerParsed = parseCodeWithDescription(data.kemler);
 
     // Determine severity based on decision and hazmat
     let severity: "warning" | "danger" | "info" = "info";
-    if (payload.UN || payload.kemler) {
+    if (data.un || data.kemler) {
       severity = "danger";
     } else if (decision === "REJECTED") {
       severity = "danger";
@@ -239,12 +225,12 @@ export default function Dashboard() {
     // Create unified detection card
     const newDetection: UIDetection = {
       id: generateUniqueId('ws-det'),
-      type: (payload.UN || payload.kemler) ? "adr" : "plate",
+      type: (data.un || data.kemler) ? "adr" : "plate",
       time: new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
       severity,
-      truckId: truck_id,
       decision: decision as UIDetection['decision'],
-      decisionSource: payload.decision_source as UIDetection['decisionSource'],
+      decisionSource: decision_source as UIDetection['decisionSource'],
+      decisionReason: data.decision_reason,
       licensePlate: lp_result,
       kemler: kemlerParsed.code,
       kemlerDescription: kemlerParsed.description,
@@ -261,17 +247,16 @@ export default function Dashboard() {
         licensePlate: lp_result,
         lpCropUrl: lp_crop,
         hzCropUrl: hz_crop,
-        UN: payload.UN,
-        kemler: payload.kemler,
+        UN: data.un,
+        kemler: data.kemler,
         timestamp: now,
-        gateId: payload.gate_id,
       });
     }
 
     // Toast notifications for real-time updates only
     // Strictly follow backend alerts: One toast per alert in the payload
-    if (showToast && payload.alerts && Array.isArray(payload.alerts)) {
-      payload.alerts.forEach((alertMsg) => {
+    if (showToast && data.alerts && Array.isArray(data.alerts)) {
+      data.alerts.forEach((alertMsg) => {
         if (typeof alertMsg === 'string' && alertMsg.trim()) {
           // Determine type based on alert content for better UX
           let toastType: "danger" | "warning" | "success" | "info" = "danger";
@@ -333,16 +318,16 @@ export default function Dashboard() {
           // Then load crops from the newest message only
           const newest = messages[0];
           if (newest) {
-            // Manually extract and set crops from newest payload
-            const payload = newest.data.payload as { lp_cropUrl?: string; hz_cropUrl?: string; timestamp?: number };
+            // Extract crops from newest flat payload
+            const newestData = newest.data as DecisionUpdatePayload;
             const newCrops: CropImage[] = [];
-            const now = payload?.timestamp ? new Date(payload.timestamp * 1000).toISOString() : new Date().toISOString();
+            const now = newestData?.timestamp ? new Date(newestData.timestamp * 1000).toISOString() : new Date().toISOString();
 
-            if (payload?.lp_cropUrl) {
-              newCrops.push({ id: generateUniqueId('init-lp'), url: payload.lp_cropUrl, type: "lp", timestamp: now });
+            if (newestData?.license_crop_url) {
+              newCrops.push({ id: generateUniqueId('init-lp'), url: newestData.license_crop_url, type: "lp", timestamp: now });
             }
-            if (payload?.hz_cropUrl) {
-              newCrops.push({ id: generateUniqueId('init-hz'), url: payload.hz_cropUrl, type: "hz", timestamp: now });
+            if (newestData?.hazard_crop_url) {
+              newCrops.push({ id: generateUniqueId('init-hz'), url: newestData.hazard_crop_url, type: "hz", timestamp: now });
             }
             if (newCrops.length > 0) {
               setCrops(newCrops);
@@ -472,11 +457,11 @@ export default function Dashboard() {
   };
 
   // Handle manual review completion
-  const handleManualReviewComplete = (appointmentId: number, decision: 'approved' | 'rejected') => {
+  const handleManualReviewComplete = (licensePlate: string, decision: 'approved' | 'rejected') => {
     addToast({
       type: decision === 'approved' ? 'success' : 'warning',
       title: 'Manual Review',
-      message: `Appointment ${appointmentId} ${decision}`,
+      message: `${licensePlate} ${decision}`,
     });
     // Refresh arrivals list
     fetchData();
@@ -496,10 +481,10 @@ export default function Dashboard() {
             return [...prev, data];
           });
         }}
-        onDecisionComplete={(appointmentId, decision) => {
+        onDecisionComplete={(licensePlate, decision) => {
           // Remove from held reviews when decision is made
           setHeldReviews(prev => prev.filter(r => r.id !== manualReviewData?.id));
-          handleManualReviewComplete(appointmentId, decision);
+          handleManualReviewComplete(licensePlate, decision);
         }}
       />
 
@@ -675,10 +660,10 @@ export default function Dashboard() {
                     )}
                     {detection.decisionSource && (
                       <span className={`source-badge source-${detection.decisionSource}`}>
-                        {detection.decisionSource === 'engine' ? 'Engine' : 'Operator'}
+                        {detection.decisionSource === 'automated' ? 'Automated' : 'Operator'}
                       </span>
                     )}
-                    {detection.truckId && <span className="truck-id">{detection.truckId}</span>}
+                    {detection.decisionReason && <span className="decision-reason">{detection.decisionReason}</span>}
                     <span className="detection-time">{detection.time}</span>
                   </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock } from 'lucide-react';
 import { getArrivals } from '@/services/arrivals';
-import { submitManualReview, rejectEntrance } from '@/services/decisions';
+import { submitManualReview } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
 
 // Props passed from Dashboard
@@ -14,7 +14,6 @@ export interface ManualReviewData {
     UN?: string;
     kemler?: string;
     timestamp: string;
-    gateId?: number;
 }
 
 interface ManualReviewModalProps {
@@ -22,7 +21,7 @@ interface ManualReviewModalProps {
     reviewData: ManualReviewData | null;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
-    onDecisionComplete: (appointmentId: number, decision: 'approved' | 'rejected') => void;
+    onDecisionComplete: (licensePlate: string, decision: 'approved' | 'rejected') => void;
 }
 
 export default function ManualReviewModal({
@@ -116,25 +115,19 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-            // Get gate ID from reviewData or from localStorage user info - always default to 1
-            const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-            const gateId = reviewData?.gateId || userInfo.gate_id || 1;
+            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
 
-            // Pass original detection data so it appears in the WebSocket broadcast
-            await submitManualReview(
-                selectedAppointment.id,
-                'approved',
-                undefined,
-                gateId,
-                selectedAppointment.truck_license_plate,
-                {
-                    un: reviewData?.UN,
-                    kemler: reviewData?.kemler,
-                    lpCropUrl: reviewData?.lpCropUrl,
-                    hzCropUrl: reviewData?.hzCropUrl,
-                }
-            );
-            onDecisionComplete(selectedAppointment.id, 'approved');
+            await submitManualReview({
+                license_plate: lp,
+                decision: 'approved',
+                decision_reason: `Operator approved for appointment ${selectedAppointment.id}`,
+                decision_source: 'operator',
+                license_crop_url: reviewData?.lpCropUrl || '',
+                un: reviewData?.UN || '',
+                kemler: reviewData?.kemler || '',
+                hazard_crop_url: reviewData?.hzCropUrl || '',
+            });
+            onDecisionComplete(lp, 'approved');
             onClose();
         } catch (err) {
             console.error('Failed to approve:', err);
@@ -148,31 +141,22 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-            // Get gate ID for rejection notification - always default to 1
-            const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-            const gateId = reviewData?.gateId || userInfo.gate_id || 1;
+            const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
+            const reason = selectedAppointment
+                ? `Operator rejected for appointment ${selectedAppointment.id}`
+                : 'Entry denied by operator';
 
-            if (selectedAppointment) {
-                // Reject with specific appointment
-                await submitManualReview(
-                    selectedAppointment.id,
-                    'rejected',
-                    undefined,
-                    gateId,
-                    selectedAppointment.truck_license_plate,
-                    {
-                        un: reviewData?.UN,
-                        kemler: reviewData?.kemler,
-                        lpCropUrl: reviewData?.lpCropUrl,
-                        hzCropUrl: reviewData?.hzCropUrl,
-                    }
-                );
-                onDecisionComplete(selectedAppointment.id, 'rejected');
-            } else {
-                // Reject entrance without appointment
-                await rejectEntrance(gateId, reviewData?.licensePlate, 'Entry denied by operator');
-                onDecisionComplete(0, 'rejected');
-            }
+            await submitManualReview({
+                license_plate: lp,
+                decision: 'rejected',
+                decision_reason: reason,
+                decision_source: 'operator',
+                license_crop_url: reviewData?.lpCropUrl || '',
+                un: reviewData?.UN || '',
+                kemler: reviewData?.kemler || '',
+                hazard_crop_url: reviewData?.hzCropUrl || '',
+            });
+            onDecisionComplete(lp, 'rejected');
             onClose();
         } catch (err) {
             console.error('Failed to reject:', err);

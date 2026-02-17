@@ -7,7 +7,7 @@
 export const API_CONFIG = {
     // Base URL for the API Gateway
     // TODO: Change this to your production URL for release builds
-    baseUrl: 'http://10.255.32.100:8000/api',
+    baseUrl: 'http://10.255.32.70:8000/api',
 
     // Request timeout in milliseconds
     timeout: 30000,

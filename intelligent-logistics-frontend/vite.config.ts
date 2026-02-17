@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://10.255.32.100:8000', // Update this IP to your API Gateway VM IP if different
+        target: 'http://10.255.32.70:8000', // Update this IP to your API Gateway VM IP if different
         changeOrigin: true,
       },
       '/osrm': {
