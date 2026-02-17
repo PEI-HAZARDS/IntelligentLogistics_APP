@@ -21,7 +21,7 @@ interface ManualReviewModalProps {
     reviewData: ManualReviewData | null;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
-    onDecisionComplete: (licensePlate: string, decision: 'approved' | 'rejected') => void;
+    onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
 }
 
 export default function ManualReviewModal({
@@ -119,15 +119,15 @@ export default function ManualReviewModal({
 
             await submitManualReview({
                 license_plate: lp,
-                decision: 'approved',
-                decision_reason: `Operator approved for appointment ${selectedAppointment.id}`,
+                decision: 'accepted',
+                decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
                 decision_source: 'operator',
                 license_crop_url: reviewData?.lpCropUrl || '',
                 un: reviewData?.UN || '',
                 kemler: reviewData?.kemler || '',
                 hazard_crop_url: reviewData?.hzCropUrl || '',
             });
-            onDecisionComplete(lp, 'approved');
+            onDecisionComplete(lp, 'accepted');
             onClose();
         } catch (err) {
             console.error('Failed to approve:', err);
@@ -143,8 +143,8 @@ export default function ManualReviewModal({
         try {
             const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
             const reason = selectedAppointment
-                ? `Operator rejected for appointment ${selectedAppointment.id}`
-                : 'Entry denied by operator';
+                ? `OPERATOR_REJECTED_FOR_APPOINTMENT_${selectedAppointment.id}`
+                : 'OPERATOR_REJECTED';
 
             await submitManualReview({
                 license_plate: lp,
