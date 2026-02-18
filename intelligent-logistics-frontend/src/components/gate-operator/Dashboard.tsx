@@ -39,6 +39,9 @@ interface UIDetection {
   UN?: string;
   unDescription?: string;
   imageUrl?: string;
+  truckId?: string;
+  /** Full original WS payload — forwarded as-is on manual review submission */
+  originalPayload?: DecisionUpdatePayload;
 }
 
 // Crop image type
@@ -237,6 +240,8 @@ export default function Dashboard() {
       UN: unParsed.code,
       unDescription: unParsed.description,
       imageUrl: lp_crop || hz_crop,
+      truckId: data.truck_id as string | undefined,
+      originalPayload: data as DecisionUpdatePayload,
     };
     setDetections(prev => [newDetection, ...prev].slice(0, 10));
 
@@ -250,6 +255,8 @@ export default function Dashboard() {
         UN: data.un,
         kemler: data.kemler,
         timestamp: now,
+        truckId: data.truck_id as string | undefined,
+        originalPayload: data as DecisionUpdatePayload,
       });
     }
 
@@ -645,7 +652,8 @@ export default function Dashboard() {
                           ? `${detection.kemler}: ${detection.kemlerDescription}`
                           : detection.kemler,
                         timestamp: detection.time,
-                        gateId: gateId,
+                        truckId: detection.truckId,
+                        originalPayload: detection.originalPayload,
                       });
                     } else {
                       setSelectedDetection(detection);

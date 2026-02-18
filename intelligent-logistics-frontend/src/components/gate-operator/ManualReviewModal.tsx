@@ -4,6 +4,7 @@ import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock }
 import { getArrivals } from '@/services/arrivals';
 import { submitManualReview } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
+import type { DecisionUpdatePayload } from '@/lib/websocket';
 
 // Props passed from Dashboard
 export interface ManualReviewData {
@@ -14,6 +15,9 @@ export interface ManualReviewData {
     UN?: string;
     kemler?: string;
     timestamp: string;
+    truckId?: string;
+    /** Full original WS payload — used to forward all fields on submission */
+    originalPayload?: DecisionUpdatePayload;
 }
 
 interface ManualReviewModalProps {
@@ -116,16 +120,22 @@ export default function ManualReviewModal({
         setError(null);
         try {
             const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
+            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                // Preserve every field from the original agent-decision payload
                 license_plate: lp,
+                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+                un: orig?.un || reviewData?.UN || '',
+                kemler: orig?.kemler || reviewData?.kemler || '',
+                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
+                alerts: orig?.alerts,
+                route: orig?.route || '',
+                truck_id: reviewData?.truckId,
+                // Override only the decision fields
                 decision: 'accepted',
                 decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
                 decision_source: 'operator',
-                license_crop_url: reviewData?.lpCropUrl || '',
-                un: reviewData?.UN || '',
-                kemler: reviewData?.kemler || '',
-                hazard_crop_url: reviewData?.hzCropUrl || '',
             });
             onDecisionComplete(lp, 'accepted');
             onClose();
@@ -145,16 +155,22 @@ export default function ManualReviewModal({
             const reason = selectedAppointment
                 ? `OPERATOR_REJECTED_FOR_APPOINTMENT_${selectedAppointment.id}`
                 : 'OPERATOR_REJECTED';
+            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                // Preserve every field from the original agent-decision payload
                 license_plate: lp,
+                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+                un: orig?.un || reviewData?.UN || '',
+                kemler: orig?.kemler || reviewData?.kemler || '',
+                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
+                alerts: orig?.alerts,
+                route: orig?.route || '',
+                truck_id: reviewData?.truckId,
+                // Override only the decision fields
                 decision: 'rejected',
                 decision_reason: reason,
                 decision_source: 'operator',
-                license_crop_url: reviewData?.lpCropUrl || '',
-                un: reviewData?.UN || '',
-                kemler: reviewData?.kemler || '',
-                hazard_crop_url: reviewData?.hzCropUrl || '',
             });
             onDecisionComplete(lp, 'rejected');
             onClose();

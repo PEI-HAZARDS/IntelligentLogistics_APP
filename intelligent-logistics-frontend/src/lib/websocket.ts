@@ -38,6 +38,9 @@ export interface DecisionUpdatePayload {
     // Route info (string, e.g. terminal/gate assignment)
     route?: string;
 
+    // Truck identifier (passed through from Kafka headers)
+    truck_id?: string;
+
     // Allow additional fields
     [key: string]: unknown;
 }
