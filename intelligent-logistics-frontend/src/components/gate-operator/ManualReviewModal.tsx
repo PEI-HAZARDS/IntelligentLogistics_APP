@@ -133,7 +133,7 @@ export default function ManualReviewModal({
                 route: orig?.route || '',
                 truck_id: reviewData?.truckId,
                 // Override only the decision fields
-                decision: 'accepted',
+                decision: 'ACCEPTED',
                 decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
                 decision_source: 'operator',
             });
@@ -168,7 +168,7 @@ export default function ManualReviewModal({
                 route: orig?.route || '',
                 truck_id: reviewData?.truckId,
                 // Override only the decision fields
-                decision: 'rejected',
+                decision: 'REJECTED',
                 decision_reason: reason,
                 decision_source: 'operator',
             });
