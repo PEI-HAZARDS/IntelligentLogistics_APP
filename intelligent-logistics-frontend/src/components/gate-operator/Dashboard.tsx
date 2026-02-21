@@ -754,7 +754,11 @@ export default function Dashboard() {
             </div>
           ) : arrivals.length === 0 ? (
             <div className="empty-state">
-              <span>No scheduled arrivals.</span>
+              {arrivalFilter === "in_transit" ? (
+                <span>No scheduled arrivals.</span>
+              ) : (
+                <span>No delayed arrivals.</span>
+              )}
             </div>
           ) : (
             arrivals.map((arrival) => {

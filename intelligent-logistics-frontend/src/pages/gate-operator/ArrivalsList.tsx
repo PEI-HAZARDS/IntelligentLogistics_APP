@@ -9,18 +9,18 @@ import {
   FileText,
   Inbox,
   X,
-  Save,
   Eye,
-  Edit,
   ArrowLeft,
   Loader2,
   AlertTriangle,
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Pin,
+  PinOff
 } from "lucide-react";
-import { getArrivals, getArrivalsStats, updateArrivalStatus } from "@/services/arrivals";
+import { getArrivals, getArrivalsStats } from "@/services/arrivals";
 import { getActiveAlerts } from "@/services/alerts";
 import type { Appointment, AppointmentStatusEnum, Alert, ArrivalsQueryParams } from "@/types/types";
 
@@ -96,13 +96,30 @@ function ArrivalsList() {
   const [alerts, setAlerts] = useState<UIAlert[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter states
   const [dockFilter, setDockFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Pinned state
+  const [pinnedArrivals, setPinnedArrivals] = useState<number[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("pinned_arrivals") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePin = (id: number) => {
+    setPinnedArrivals((prev) => {
+      const isPinned = prev.includes(id);
+      const next = isPinned ? prev.filter((p) => p !== id) : [...prev, id];
+      localStorage.setItem("pinned_arrivals", JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -130,8 +147,6 @@ function ArrivalsList() {
 
   // Modal states
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
-  const [editedArrival, setEditedArrival] = useState<UIArrival | null>(null);
-  const [modalMode, setModalMode] = useState<"view" | "edit">("view");
 
   // Get gate ID from user info
   const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
@@ -215,9 +230,18 @@ function ArrivalsList() {
   }, [fetchData]);
 
   // Filter Logic — dock is the only remaining client-side dimension
-  const displayArrivals = dockFilter !== "all"
+  const filteredArrivals = dockFilter !== "all"
     ? arrivals.filter(a => a.dock === dockFilter)
     : arrivals;
+
+  // Sort so pinned items always appear at the top
+  const displayArrivals = [...filteredArrivals].sort((a, b) => {
+    const aPinned = pinnedArrivals.includes(a.id);
+    const bPinned = pinnedArrivals.includes(b.id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return 0;
+  });
   const totalPages = serverPages;
 
   // Reset page when server-side filter status changes
@@ -236,47 +260,10 @@ function ArrivalsList() {
 
   const handleView = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
-    setEditedArrival(null);
-    setModalMode("view");
-  };
-
-  const handleEdit = (arrival: UIArrival) => {
-    setSelectedArrival(arrival);
-    setEditedArrival({ ...arrival });
-    setModalMode("edit");
   };
 
   const closeModal = () => {
     setSelectedArrival(null);
-    setEditedArrival(null);
-  };
-
-  const handleSave = async () => {
-    if (!editedArrival || !selectedArrival) return;
-
-    setIsSaving(true);
-    try {
-      const newApiStatus = mapStatusToAPI(editedArrival.status);
-      await updateArrivalStatus(editedArrival.id, {
-        status: newApiStatus,
-      });
-
-      // Update local state
-      setArrivals((prev) =>
-        prev.map((a) =>
-          a.id === editedArrival.id
-            ? { ...a, status: editedArrival.status, apiStatus: newApiStatus, dock: editedArrival.dock }
-            : a
-        )
-      );
-
-      closeModal();
-    } catch (err) {
-      console.error("Failed to save:", err);
-      setError("Failed to save changes.");
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleClearFilters = () => {
@@ -521,38 +508,49 @@ function ArrivalsList() {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayArrivals.map((arrival) => (
-                      <tr
-                        key={arrival.id}
-                        className={[
-                          arrival.highwayInfraction ? 'row-violation' : '',
-                          arrival.apiStatus === 'delayed' ? 'row-delayed' : '',
-                        ].filter(Boolean).join(' ')}
-                      >
-                        <td>{arrival.plate}</td>
-                        <td>{arrival.dock}</td>
-                        <td>{arrival.arrivalTime}</td>
-                        <td>{arrival.cargo}</td>
-                        <td>
-                          <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                            {arrival.status}
-                          </span>
-                          {arrival.highwayInfraction && (
-                            <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
-                              Infraction
+                    {displayArrivals.map((arrival) => {
+                      const isPinned = pinnedArrivals.includes(arrival.id);
+                      return (
+                        <tr
+                          key={arrival.id}
+                          className={[
+                            arrival.highwayInfraction ? 'row-violation' : '',
+                            arrival.apiStatus === 'delayed' ? 'row-delayed' : '',
+                            isPinned ? 'row-pinned' : '',
+                          ].filter(Boolean).join(' ')}
+                        >
+                          <td>
+                            {arrival.plate}
+                            {isPinned && <Pin fill="currentColor" size={14} style={{ marginLeft: '8px', verticalAlign: '-2px', opacity: 0.6 }} />}
+                          </td>
+                          <td>{arrival.dock}</td>
+                          <td>{arrival.arrivalTime}</td>
+                          <td>{arrival.cargo}</td>
+                          <td>
+                            <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
+                              {arrival.status}
                             </span>
-                          )}
-                        </td>
-                        <td>
-                          <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
-                            <Eye size={18} />
-                          </button>
-                          <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
-                            <Edit size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                            {arrival.highwayInfraction && (
+                              <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
+                                Infraction
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              className="btn-icon"
+                              onClick={() => togglePin(arrival.id)}
+                              title={isPinned ? "Unpin Arrival" : "Pin Arrival"}
+                            >
+                              {isPinned ? <PinOff size={18} /> : <Pin size={18} />}
+                            </button>
+                            <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
+                              <Eye size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -594,8 +592,8 @@ function ArrivalsList() {
           <div className="modal-content">
             <div className="modal-header">
               <h3 className="modal-title">
-                {modalMode === "view" ? <Eye size={20} /> : <Edit size={20} />}
-                {modalMode === "view" ? "Arrival Details" : "Edit Arrival"}
+                <Eye size={20} />
+                Arrival Details
               </h3>
               <button className="modal-close-btn" onClick={closeModal}>
                 <X size={20} />
@@ -613,92 +611,33 @@ function ArrivalsList() {
                 <span className="detail-value">{selectedArrival.arrivalTime}</span>
               </div>
 
-              {modalMode === "view" ? (
-                <>
-                  <div className="detail-row">
-                    <span className="detail-label">Dock</span>
-                    <span className="detail-value">{selectedArrival.dock}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Reference</span>
-                    <span className="detail-value">{selectedArrival.cargo}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Status</span>
-                    <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                      <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                        {selectedArrival.status}
-                      </span>
-                      {selectedArrival.highwayInfraction && (
-                        <span className="status-badge status-highway-infraction">
-                          Infraction
-                        </span>
-                      )}
+              <div className="detail-row">
+                <span className="detail-label">Dock</span>
+                <span className="detail-value">{selectedArrival.dock}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Reference</span>
+                <span className="detail-value">{selectedArrival.cargo}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Status</span>
+                <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                  <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
+                    {selectedArrival.status}
+                  </span>
+                  {selectedArrival.highwayInfraction && (
+                    <span className="status-badge status-highway-infraction">
+                      Infraction
                     </span>
-                  </div>
-                </>
-              ) : (
-                /* Edit Mode Form */
-                <>
-                  <div className="detail-row">
-                    <label className="detail-label">Dock</label>
-                    <select
-                      className="detail-input"
-                      value={editedArrival?.dock || selectedArrival.dock}
-                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, dock: e.target.value } : null)}
-                    >
-                      {availableDocks.map((dock) => (
-                        <option key={dock} value={dock}>Dock {dock}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="detail-row">
-                    <label className="detail-label">Reference (Restricted)</label>
-                    <input
-                      className="detail-input"
-                      type="text"
-                      value={selectedArrival.cargo}
-                      disabled
-                      style={{ opacity: 0.7, cursor: 'not-allowed' }}
-                    />
-                  </div>
-                  <div className="detail-row">
-                    <label className="detail-label">Status</label>
-                    <select
-                      className="detail-input"
-                      value={editedArrival?.status || selectedArrival.status}
-                      onChange={(e) => setEditedArrival((prev) => prev ? { ...prev, status: e.target.value } : null)}
-                    >
-                      <option value="In Transit">In Transit</option>
-                      <option value="In Process">In Process</option>
-                      <option value="Delayed">Delayed</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Canceled">Canceled</option>
-                    </select>
-                  </div>
-                </>
-              )}
+                  )}
+                </span>
+              </div>
             </div>
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModal}>
-                Cancel
+                Close
               </button>
-              {modalMode === "edit" && (
-                <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? (
-                    <>
-                      <Loader2 size={16} className="spin inline-icon" style={{ marginRight: '6px' }} />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} className="inline-icon" style={{ marginRight: '6px' }} />
-                      Save Changes
-                    </>
-                  )}
-                </button>
-              )}
             </div>
           </div>
         </div>

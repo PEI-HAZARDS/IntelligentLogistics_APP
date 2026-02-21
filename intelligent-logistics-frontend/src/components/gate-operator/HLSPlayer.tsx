@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 type HLSPlayerProps = {
   streamUrl: string;
@@ -22,7 +23,7 @@ export default function HLSPlayer({
     if (!video) return;
 
     try {
-      video.muted = true; // Garantir que está muted para autoplay
+      video.muted = true; // Ensure it is muted for autoplay
       await video.play();
       setStatus("playing");
       console.log(`[${quality.toUpperCase()}] Playback started`);
@@ -36,7 +37,7 @@ export default function HLSPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    // Limpar instância anterior se existir
+    // Clear previous instance if it exists
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -47,7 +48,7 @@ export default function HLSPlayer({
 
     console.log(`[${quality.toUpperCase()}] Connecting to:`, streamUrl);
 
-    // Verificar suporte HLS.js
+    // Check HLS.js support
     if (Hls.isSupported()) {
       const hls = new Hls({
         debug: false,
@@ -64,7 +65,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
             timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
         playlistLoadPolicy: {
@@ -72,7 +73,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
             timeoutRetry: { maxNumRetry: 4, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
         fragLoadPolicy: {
@@ -80,7 +81,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 20000,
             maxLoadTimeMs: 20000,
             timeoutRetry: { maxNumRetry: 6, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
       });
@@ -94,7 +95,7 @@ export default function HLSPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setStatus("ready");
         console.log(`[${quality.toUpperCase()}] Manifest parsed, stream ready`);
-        
+
         if (autoPlay) {
           setTimeout(() => startPlayback(), 500);
         }
@@ -106,7 +107,7 @@ export default function HLSPlayer({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              setErrorMessage("Erro de rede - Stream não disponível");
+              setErrorMessage("Network Error - Stream unavailable");
               setStatus("error");
               console.log("Attempting to recover from network error...");
               setTimeout(() => {
@@ -117,14 +118,14 @@ export default function HLSPlayer({
               break;
 
             case Hls.ErrorTypes.MEDIA_ERROR:
-              setErrorMessage("Erro de mídia - A recuperar...");
+              setErrorMessage("Media Error - Recovering...");
               console.log("Attempting to recover from media error...");
               hls.recoverMediaError();
               break;
 
             default:
               setStatus("error");
-              setErrorMessage(`Stream indisponível: ${data.details}`);
+              setErrorMessage(`Stream unavailable: ${data.details}`);
               break;
           }
         }
@@ -141,20 +142,20 @@ export default function HLSPlayer({
       hls.attachMedia(video);
 
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Suporte nativo (Safari)
+      // Native support (Safari)
       console.log(`[${quality.toUpperCase()}] Using native HLS`);
       video.src = streamUrl;
       setStatus("ready");
-      
+
       if (autoPlay) {
         setTimeout(() => startPlayback(), 500);
       }
     } else {
       setStatus("error");
-      setErrorMessage("Browser não suporta streaming HLS");
+      setErrorMessage("Browser does not support HLS streaming");
     }
 
-    // Event listeners do vídeo
+    // Video event listeners
     const handleLoadedData = () => {
       console.log(`[${quality.toUpperCase()}] Video loaded`);
     };
@@ -162,7 +163,7 @@ export default function HLSPlayer({
     const handleError = (e: Event) => {
       console.error(`[${quality.toUpperCase()}] Video error:`, e);
       setStatus("error");
-      setErrorMessage("Erro ao carregar stream");
+      setErrorMessage("Error loading stream");
     };
 
     video.addEventListener("loadeddata", handleLoadedData);
@@ -172,7 +173,7 @@ export default function HLSPlayer({
     return () => {
       video.removeEventListener("loadeddata", handleLoadedData);
       video.removeEventListener("error", handleError);
-      
+
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -191,15 +192,19 @@ export default function HLSPlayer({
       />
       {status === "loading" && (
         <div className="stream-overlay loading">
-          <span>⏳ A conectar à stream...</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Loader2 size={20} className="animate-spin" /> Connecting to stream...
+          </span>
         </div>
       )}
 
       {status === "error" && (
         <div className="stream-overlay error">
-          <div>❌ {errorMessage}</div>
-          <button className="retry-button" onClick={() => window.location.reload()}>
-            🔄 Tentar Novamente
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+            <AlertCircle size={20} /> {errorMessage}
+          </div>
+          <button className="retry-button" onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={16} /> Try Again
           </button>
         </div>
       )}
