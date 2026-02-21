@@ -65,7 +65,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
             timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
         playlistLoadPolicy: {
@@ -73,7 +73,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
             timeoutRetry: { maxNumRetry: 4, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
         fragLoadPolicy: {
@@ -81,7 +81,7 @@ export default function HLSPlayer({
             maxTimeToFirstByteMs: 20000,
             maxLoadTimeMs: 20000,
             timeoutRetry: { maxNumRetry: 6, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry:   { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
           },
         },
       });
