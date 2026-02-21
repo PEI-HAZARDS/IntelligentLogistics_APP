@@ -80,17 +80,18 @@ export default function ManualReviewModal({
         try {
             // Fetch all in_transit arrivals (like ArrivalsList does)
             const results = await getArrivals({ status: 'in_transit', limit: 100 });
-            setAllCandidates(results);
+            const appointments = results.items || [];
+            setAllCandidates(appointments);
 
             // Apply initial filter if there's a detected plate
             const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
-                const filtered = results.filter(apt =>
+                const filtered = appointments.filter(apt =>
                     apt.truck_license_plate.toLowerCase().includes(plate.toLowerCase())
                 );
-                setCandidates(filtered.length > 0 ? filtered : results);
+                setCandidates(filtered.length > 0 ? filtered : appointments);
             } else {
-                setCandidates(results);
+                setCandidates(appointments);
             }
         } catch (err) {
             console.error('Failed to fetch candidates:', err);
@@ -107,20 +108,23 @@ export default function ManualReviewModal({
     };
 
     const handleApprove = async () => {
-        if (!selectedAppointment) {
-            setError('Please select an appointment first.');
-            return;
-        }
-
         setIsSubmitting(true);
         setError(null);
         try {
-            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
+            const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
+
+            if (!lp) {
+                setError('No license plate detected or manually associated.');
+                setIsSubmitting(false);
+                return;
+            }
 
             await submitManualReview({
                 license_plate: lp,
                 decision: 'approved',
-                decision_reason: `Operator approved for appointment ${selectedAppointment.id}`,
+                decision_reason: selectedAppointment
+                    ? `Operator approved for appointment ${selectedAppointment.id}`
+                    : 'Operator approved manually without appointment matching',
                 decision_source: 'operator',
                 license_crop_url: reviewData?.lpCropUrl || '',
                 un: reviewData?.UN || '',

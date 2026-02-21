@@ -7,6 +7,7 @@ const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operat
 const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
 const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
 const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
+const ArrivalDetail = React.lazy(() => import('@/pages/gate-operator/ArrivalDetail'));
 const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 
 // Componentes do Gestor Logístico
@@ -39,6 +40,13 @@ const gateRoutes = [
     element: <GateDetailLayout />,
     children: [
       { index: true, element: <ArrivalsList /> },
+    ],
+  },
+  {
+    path: '/gate/arrival/:id',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <ArrivalDetail /> },
     ],
   },
   {

@@ -5,7 +5,6 @@ import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
 import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
-import { getUpcomingArrivals } from "@/services/arrivals";
 import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
@@ -70,6 +69,7 @@ function mapArrivalToUI(arrival: Appointment) {
     cargoAmount: arrival.notes || "",
     status: mapStatusToLabel(arrival.status) as string,
     dock: arrival.gate_in?.label || "N/A",
+    highwayInfraction: (arrival as any).highway_infraction || false,
   };
 }
 
@@ -77,6 +77,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [expandedArrivalId, setExpandedArrivalId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
+  const [arrivalFilter, setArrivalFilter] = useState<"in_transit" | "delayed">("in_transit");
 
   // API data states
   const [arrivals, setArrivals] = useState<ReturnType<typeof mapArrivalToUI>[]>([]);
@@ -123,15 +124,22 @@ export default function Dashboard() {
   const fetchData = useCallback(async () => {
     setArrivalsError(null);
     try {
-      const arrivalsData = await getUpcomingArrivals(gateId, 10);
-      setArrivals(arrivalsData.map(mapArrivalToUI));
+      const statusFilter = arrivalFilter === "delayed" ? "delayed" : "in_transit";
+      const { getArrivals } = await import('@/services/arrivals');
+      const arrivalsData = await getArrivals({
+        gate_id: gateId,
+        status: statusFilter,
+        page: 1,
+        limit: 10
+      });
+      setArrivals(arrivalsData.items.map(mapArrivalToUI));
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setArrivalsError("Failed to load arrivals. Click refresh to try again.");
     } finally {
       setIsLoading(false);
     }
-  }, [gateId]);
+  }, [gateId, arrivalFilter]);
 
   // Process a single payload and update UI (detections, crops, toasts)
   // showToast = true for real-time updates, false for initial load from storage
@@ -275,9 +283,9 @@ export default function Dashboard() {
       });
     }
 
-    // Refresh arrivals list when ACCEPTED or REJECTED decision arrives
-    // This ensures the "Upcoming Arrivals" list reflects the status change
-    if (showToast && (decision === "ACCEPTED" || decision === "REJECTED")) {
+    // Refresh arrivals list when ACCEPTED, REJECTED, or INFRACTION info arrives
+    // This ensures the "Upcoming Arrivals" list reflects the exact status or infraction change automatically
+    if (showToast && (decision === "ACCEPTED" || decision === "REJECTED" || data.message_type === 'decision_results')) {
       fetchData();
     }
   }, [addToast, fetchData]);
@@ -641,7 +649,6 @@ export default function Dashboard() {
                         UN: detection.UN,
                         kemler: detection.kemler,
                         timestamp: detection.time,
-                        gateId: gateId,
                       });
                     } else {
                       setSelectedDetection(detection);
@@ -717,6 +724,21 @@ export default function Dashboard() {
           Arrivals List
         </button>
 
+        <div className="arrival-filter-toggle">
+          <button
+            className={`arrival-filter-btn ${arrivalFilter === "in_transit" ? "active" : ""}`}
+            onClick={() => setArrivalFilter("in_transit")}
+          >
+            In Transit
+          </button>
+          <button
+            className={`arrival-filter-btn ${arrivalFilter === "delayed" ? "active" : ""}`}
+            onClick={() => setArrivalFilter("delayed")}
+          >
+            Delayed
+          </button>
+        </div>
+
         {arrivalsError && (
           <div className="error-message">
             <AlertTriangle size={16} />
@@ -751,12 +773,19 @@ export default function Dashboard() {
                       <span className="arrival-time">{arrival.arrivalTime}</span>
                     </div>
                     <div className="header-status">
-                      <span
-                        className={`status-badge status-${arrival.status
-                          .toLowerCase()
-                          .replace(/\s/g, "-")}`}
-                      >
-                        {arrival.status}
+                      <span className="status-badge-wrapper" style={{ display: 'flex', gap: '0.5rem' }}>
+                        <span
+                          className={`status-badge status-${arrival.status
+                            .toLowerCase()
+                            .replace(/\s/g, "-")}`}
+                        >
+                          {arrival.status}
+                        </span>
+                        {arrival.highwayInfraction && (
+                          <span className="status-badge status-highway-infraction">
+                            Infraction
+                          </span>
+                        )}
                       </span>
                       <svg
                         className={`chevron ${isExpanded ? 'open' : ''}`}

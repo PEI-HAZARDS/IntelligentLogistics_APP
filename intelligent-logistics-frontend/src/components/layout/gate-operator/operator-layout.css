@@ -208,8 +208,8 @@
 /* ========== DASHBOARD ========== */
 .operator-dashboard {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  /* Adjust if needed, 2.5fr 1fr might be better for widecam */
+  grid-template-columns: 3fr 1fr;
+  /* Table/Camera gets more space, upcoming arrivals gets less */
   gap: 1.5rem;
   width: 100%;
   height: 100%;
@@ -877,8 +877,9 @@
 
 /* Sidebar for alerts */
 .alerts-sidebar {
-  width: 320px;
+  width: 280px;
   flex-shrink: 0;
+  transition: width 0.3s ease;
   /* Existing styles below */
   background: var(--bg-surface);
   border-radius: 16px;
@@ -888,6 +889,37 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.alerts-sidebar.collapsed {
+  width: 70px;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.alerts-sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.sidebar-collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--text-primary);
 }
 
 .alerts-list {
@@ -969,7 +1001,7 @@
 /* Stats Cards */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
 }
@@ -977,38 +1009,56 @@
 .stat-card {
   background: var(--bg-surface);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.6rem 0.8rem;
   border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  transition: transform 0.2s;
+  gap: 0.75rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.stat-card.violators {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.stat-card.violators:hover {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.2) !important;
+}
+
+.stat-card.violators .stat-icon {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .stat-icon {
-  font-size: 2rem;
+  font-size: 1.5rem;
   background: var(--bg-card);
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: 10px;
   color: var(--text-primary);
 }
 
 .stat-value {
   display: block;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .stat-label {
@@ -1030,6 +1080,17 @@
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.filter-actions-inline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .filter-group label {
@@ -1221,9 +1282,18 @@ html {
   overflow: hidden;
 }
 
+.table-pagination-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .arrivals-table {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 /* Table Enhancements */
@@ -1264,6 +1334,50 @@ html {
 
 .arrivals-table tr:hover td {
   background: var(--bg-card-hover);
+}
+
+/* ===== Pagination Controls ===== */
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  margin-top: 0.5rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .btn-icon {
@@ -1532,6 +1646,13 @@ html {
   background: rgba(34, 197, 94, 0.2);
   color: #22c55e;
   border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-badge.status-highway-infraction {
+  background: rgba(220, 38, 38, 0.2) !important;
+  color: #ef4444 !important;
+  border: 1px solid #ef4444 !important;
+  font-weight: 700;
 }
 
 /* Portuguese status classes (legacy) */
@@ -2099,6 +2220,17 @@ html {
 .stat-card.active .stat-icon {
   background: var(--accent-color);
   color: white;
+}
+
+.stat-card.violators.active {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 0 0 1px #ef4444 !important;
+}
+
+.stat-card.violators.active .stat-icon {
+  background: #ef4444 !important;
+  color: white !important;
 }
 
 /* ========== WEBSOCKET & LIVE INDICATORS ========== */
@@ -3256,4 +3388,40 @@ html {
   overflow-y: auto;
   max-height: calc(100vh - 550px);
   min-height: 200px;
+}
+
+/* Upcoming Arrivals Custom Filter Toggle */
+.operator-dashboard .arrival-filter-toggle {
+  display: flex !important;
+  gap: 0.25rem !important;
+  background: var(--bg-card) !important;
+  padding: 0.35rem !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-color) !important;
+  margin-bottom: 1rem !important;
+}
+
+.operator-dashboard .arrival-filter-btn {
+  flex: 1 !important;
+  padding: 0.5rem 1rem !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 6px !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  text-align: center !important;
+}
+
+.operator-dashboard .arrival-filter-btn:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+.operator-dashboard .arrival-filter-btn.active {
+  background: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-sm) !important;
 }

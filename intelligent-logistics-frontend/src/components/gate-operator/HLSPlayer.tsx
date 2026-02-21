@@ -50,7 +50,7 @@ export default function HLSPlayer({
     // Verificar suporte HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
-        debug: true,
+        debug: false,
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 10,
@@ -59,13 +59,30 @@ export default function HLSPlayer({
         liveSyncDuration: 3,
         liveMaxLatencyDuration: 10,
         maxFragLookUpTolerance: 0.2,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingTimeOut: 10000,
-        levelLoadingMaxRetry: 4,
-        fragLoadingTimeOut: 20000,
-        fragLoadingMaxRetry: 6,
+        manifestLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10000,
+            maxLoadTimeMs: 10000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 0 },
+            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
+        playlistLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10000,
+            maxLoadTimeMs: 10000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry:   { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 20000,
+            maxLoadTimeMs: 20000,
+            timeoutRetry: { maxNumRetry: 6, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry:   { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
       });
 
       hlsRef.current = hls;

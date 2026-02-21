@@ -15,8 +15,8 @@ export default function OperatorDetail() {
         </main>
 
         <footer className="operator-footer">
-          <span>© 2025 Porto de Aveiro - Sistema Gestão Logístico</span>
-          <span>Versão 1.0.0</span>
+          <span>© 2025 Port of Aveiro - Logistics Management System</span>
+          <span>Version 1.0.0</span>
         </footer>
       </div>
     </ThemeProvider>

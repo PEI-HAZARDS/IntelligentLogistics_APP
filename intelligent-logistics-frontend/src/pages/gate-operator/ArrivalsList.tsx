@@ -4,7 +4,6 @@ import {
   Clock,
   Truck,
   CheckCircle,
-  Search,
   RotateCcw,
   Trash2,
   FileText,
@@ -15,11 +14,15 @@ import {
   Edit,
   ArrowLeft,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, updateArrivalStatus } from "@/services/arrivals";
 import { getActiveAlerts } from "@/services/alerts";
-import type { Appointment, AppointmentStatusEnum, Alert } from "@/types/types";
+import type { Appointment, AppointmentStatusEnum, Alert, ArrivalsQueryParams } from "@/types/types";
 
 // Map API severity to UI
 function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
@@ -79,9 +82,12 @@ type UIArrival = {
   cargo: string;
   status: string;
   apiStatus: AppointmentStatusEnum;
+  highwayInfraction?: boolean;
 };
 
-export default function ArrivalsList() {
+export const ITEMS_PER_PAGE = 10;
+
+function ArrivalsList() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
 
@@ -97,6 +103,30 @@ export default function ArrivalsList() {
   const [dockFilter, setDockFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverPages, setServerPages] = useState(1);
+  const [serverTotal, setServerTotal] = useState(0);
+
+  // Debounced search (400ms delay)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      // Reset page when search query changes to prevent empty pages
+      if (searchQuery !== debouncedSearch) {
+        setCurrentPage(1);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearch]);
+
+  // Sidebar collapse state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('alerts_sidebar_collapsed');
+    return saved === 'true';
+  });
 
   // Modal states
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
@@ -118,6 +148,7 @@ export default function ArrivalsList() {
     cargo: arrival.booking?.reference || "N/A",
     status: mapStatusToLabel(arrival.status),
     apiStatus: arrival.status,
+    highwayInfraction: (arrival as any).highway_infraction || false,
   });
 
   // Map API alert to UI
@@ -134,13 +165,29 @@ export default function ArrivalsList() {
   const fetchData = useCallback(async () => {
     setError(null);
     try {
+      const arrivalsParams: ArrivalsQueryParams = {
+        gate_id: gateId,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      };
+      // statusFilter "Violators" has no backend param — filter client-side after fetch
+      if (statusFilter !== "all" && statusFilter !== "Violators") {
+        arrivalsParams.status = mapStatusToAPI(statusFilter);
+      }
+      if (debouncedSearch) arrivalsParams.search = debouncedSearch;
+
       const [arrivalsData, alertsData, statsData] = await Promise.all([
-        getArrivals({ gate_id: gateId, limit: 100 }),
+        getArrivals(arrivalsParams),
         getActiveAlerts(20),
         getArrivalsStats(gateId),
       ]);
 
-      setArrivals(arrivalsData.map(mapArrivalToUI));
+      let mapped = arrivalsData.items.map(mapArrivalToUI);
+      if (statusFilter === "Violators") mapped = mapped.filter(a => a.highwayInfraction);
+
+      setArrivals(mapped);
+      setServerPages(arrivalsData.pages);
+      setServerTotal(arrivalsData.total);
       setAlerts(alertsData.map(mapAlertToUI));
       setStats(statsData);
     } catch (err) {
@@ -149,7 +196,7 @@ export default function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
-  }, [gateId]);
+  }, [gateId, currentPage, debouncedSearch, statusFilter]);
 
   // Time update effect
   useEffect(() => {
@@ -167,21 +214,24 @@ export default function ArrivalsList() {
     return () => clearInterval(refreshTimer);
   }, [fetchData]);
 
-  // Filter Logic
-  const filteredArrivals = arrivals.filter((arrival) => {
-    if (statusFilter !== "all" && arrival.status !== statusFilter) return false;
-    if (dockFilter !== "all" && arrival.dock !== dockFilter) return false;
-    if (searchQuery && !arrival.plate.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  // Filter Logic — dock is the only remaining client-side dimension
+  const displayArrivals = dockFilter !== "all"
+    ? arrivals.filter(a => a.dock === dockFilter)
+    : arrivals;
+  const totalPages = serverPages;
 
-  // Calculate stats - use API stats if available, otherwise calculate from arrivals
+  // Reset page when server-side filter status changes
+  useEffect(() => { setCurrentPage(1); }, [statusFilter]);
+
+  // All stats come from the /stats endpoint (full gate population, not current page)
+  const statsTotal = (stats.in_transit ?? 0) + (stats.in_process ?? 0) + (stats.delayed ?? 0) + (stats.completed ?? 0);
   const dynamicStats = {
-    total: arrivals.length,
-    pending: stats.in_transit || arrivals.filter(a => a.apiStatus === "in_transit").length,
-    inProcess: stats.in_process || arrivals.filter(a => a.apiStatus === "in_process").length,
-    inProgress: stats.delayed || arrivals.filter(a => a.apiStatus === "delayed").length,
-    completed: stats.completed || arrivals.filter(a => a.apiStatus === "completed").length,
+    total: statsTotal || serverTotal,
+    pending: stats.in_transit ?? 0,
+    inProcess: stats.in_process ?? 0,
+    inProgress: stats.delayed ?? 0,
+    completed: stats.completed ?? 0,
+    infractions: stats.infractions ?? 0,
   };
 
   const handleView = (arrival: UIArrival) => {
@@ -233,6 +283,7 @@ export default function ArrivalsList() {
     setDockFilter("all");
     setStatusFilter("all");
     setSearchQuery("");
+    setCurrentPage(1);
   };
 
   const handleRefresh = () => {
@@ -240,36 +291,55 @@ export default function ArrivalsList() {
     fetchData();
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('alerts_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   // Get unique docks from arrivals
   const availableDocks = [...new Set(arrivals.map(a => a.dock))].filter(d => d !== "N/A");
 
   return (
     <div className="arrivals-list-page">
-      {/* Coluna Esquerda - Alertas */}
-      <aside className="alerts-sidebar">
-        <h2 className="sidebar-title">Latest Alerts</h2>
-        <div className="alerts-list">
-          {isLoading && alerts.length === 0 ? (
-            <div className="loading-state">
-              <Loader2 size={20} className="spin" />
-              <span>Loading...</span>
-            </div>
-          ) : alerts.length === 0 ? (
-            <div className="empty-state">
-              <span>No recent alerts.</span>
-            </div>
-          ) : (
-            alerts.map((alert) => (
-              <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
-                <div className="alert-header">
-                  <h4>{alert.title}</h4>
-                  <span className="alert-time">{alert.time}</span>
-                </div>
-                <p className="alert-description">{alert.description}</p>
-              </div>
-            ))
-          )}
+      {/* Álerta Sidebar — collapsible */}
+      <aside className={`alerts-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
+        <div className="sidebar-header">
+          {!sidebarCollapsed && <h2 className="sidebar-title">Latest Alerts</h2>}
+          <button
+            className="sidebar-collapse-btn"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <ChevronsLeft size={18} style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
+          </button>
         </div>
+        {!sidebarCollapsed && (
+          <div className="alerts-list">
+            {isLoading && alerts.length === 0 ? (
+              <div className="loading-state">
+                <Loader2 size={20} className="spin" />
+                <span>Loading...</span>
+              </div>
+            ) : alerts.length === 0 ? (
+              <div className="empty-state">
+                <span>No recent alerts.</span>
+              </div>
+            ) : (
+              alerts.map((alert) => (
+                <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
+                  <div className="alert-header">
+                    <h4>{alert.title}</h4>
+                    <span className="alert-time">{alert.time}</span>
+                  </div>
+                  <p className="alert-description">{alert.description}</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </aside>
 
       {/* Coluna Direita - Lista de Chegadas */}
@@ -309,22 +379,45 @@ export default function ArrivalsList() {
         )}
 
         {/* Estatísticas (Clickable Filters) */}
+        {/* Estatísticas — compact 2×3 pill grid */}
         <div className="stats-grid">
+          {/* Row 1: Total · Delayed · Infractions */}
           <div
             className={`stat-card ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter("all")}
           >
-            <div className="stat-icon"><FileText size={24} /></div>
+            <div className="stat-icon"><FileText size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.total}</span>
               <span className="stat-label">Total Arrivals</span>
             </div>
           </div>
           <div
+            className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Delayed")}
+          >
+            <div className="stat-icon"><AlertTriangle size={20} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.inProgress}</span>
+              <span className="stat-label">Delayed</span>
+            </div>
+          </div>
+          <div
+            className={`stat-card violators ${statusFilter === 'Violators' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Violators")}
+          >
+            <div className="stat-icon"><ShieldAlert size={20} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.infractions}</span>
+              <span className="stat-label">Infractions</span>
+            </div>
+          </div>
+          {/* Row 2: In Transit · In Process · Completed */}
+          <div
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
           >
-            <div className="stat-icon"><Clock size={24} /></div>
+            <div className="stat-icon"><Clock size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
               <span className="stat-label">In Transit</span>
@@ -334,89 +427,69 @@ export default function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Process")}
           >
-            <div className="stat-icon"><Truck size={24} /></div>
+            <div className="stat-icon"><Truck size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Delayed")}
-          >
-            <div className="stat-icon"><AlertTriangle size={24} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{dynamicStats.inProgress}</span>
-              <span className="stat-label">Delayed</span>
-            </div>
-          </div>
-          <div
             className={`stat-card ${statusFilter === 'Completed' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Completed")}
           >
-            <div className="stat-icon"><CheckCircle size={24} /></div>
+            <div className="stat-icon"><CheckCircle size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.completed}</span>
-              <span className="stat-label">Completed Today</span>
+              <span className="stat-label">Completed</span>
             </div>
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="filters-section">
-          <h3 className="filters-title">
-            <Search className="inline-icon" size={20} style={{ marginRight: '8px' }} />
-            Filters & Search
-          </h3>
-          <div className="filters-grid">
-            <div className="filter-group">
-              <label htmlFor="dock-filter">Dock</label>
-              <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
-                <option value="all">All Docks</option>
-                {availableDocks.map((dock) => (
-                  <option key={dock} value={dock}>Dock {dock}</option>
-                ))}
-              </select>
-            </div>
-            <div className="filter-group">
-              <label htmlFor="status-filter">Status</label>
-              <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All Statuses</option>
-                <option value="In Transit">In Transit</option>
-                <option value="In Process">In Process</option>
-                <option value="Delayed">Delayed</option>
-                <option value="Completed">Completed</option>
-                <option value="Canceled">Canceled</option>
-              </select>
-            </div>
-            <div className="filter-group">
-              <label htmlFor="search-input">Search</label>
-              <input
-                id="search-input"
-                type="text"
-                placeholder="License plate..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="filter-group filter-actions-inline">
-              <label>&nbsp;</label>
-              <div className="filter-buttons">
-                <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
-                  <Trash2 size={18} />
-                </button>
-                <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
-                  {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
-                </button>
+        {/* Tabela/Cards e Filtros Integrados */}
+        <div className="arrivals-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Table header row */}
+          <div className="content-header" style={{ marginBottom: 0 }}>
+            <h3 className="content-title">Arrivals List</h3>
+            <span className="content-count">
+              {displayArrivals.length} {displayArrivals.length === 1 ? 'arrival' : 'arrivals'}
+            </span>
+          </div>
+
+          {/* Filtros Integrados */}
+          <div className="filters-section" style={{ margin: 0, padding: 0, background: 'transparent', border: 'none' }}>
+            <div className="filters-grid" style={{ marginBottom: 0 }}>
+              <div className="filter-group">
+                <label htmlFor="dock-filter">Dock</label>
+                <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
+                  <option value="all">All Docks</option>
+                  {availableDocks.map((dock) => (
+                    <option key={dock} value={dock}>Dock {dock}</option>
+                  ))}
+                </select>
+              </div>
+              {/* O filtro de status foi removido daqui pois está sendo controlado pelos cards acima */}
+              <div className="filter-group">
+                <label htmlFor="search-input">Search</label>
+                <input
+                  id="search-input"
+                  type="text"
+                  placeholder="License plate..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="filter-group filter-actions-inline">
+                <label>&nbsp;</label>
+                <div className="filter-buttons">
+                  <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
+                    <Trash2 size={18} />
+                  </button>
+                  <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
+                    {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Tabela/Cards */}
-        <div className="arrivals-content">
-          <div className="content-header">
-            <h3 className="content-title">Arrivals List</h3>
           </div>
 
           {isLoading && arrivals.length === 0 ? (
@@ -424,7 +497,7 @@ export default function ArrivalsList() {
               <Loader2 size={32} className="spin" />
               <span>Loading arrivals...</span>
             </div>
-          ) : filteredArrivals.length === 0 ? (
+          ) : displayArrivals.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><Inbox size={48} /></div>
               <p className="empty-message">
@@ -434,42 +507,80 @@ export default function ArrivalsList() {
               </p>
             </div>
           ) : (
-            <div className="arrivals-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>License Plate</th>
-                    <th>Dock</th>
-                    <th>Arrival Time</th>
-                    <th>Reference</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredArrivals.map((arrival) => (
-                    <tr key={arrival.id}>
-                      <td>{arrival.plate}</td>
-                      <td>{arrival.dock}</td>
-                      <td>{arrival.arrivalTime}</td>
-                      <td>{arrival.cargo}</td>
-                      <td>
-                        <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                          {arrival.status}
-                        </span>
-                      </td>
-                      <td>
-                        <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
-                          <Eye size={18} />
-                        </button>
-                        <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
-                          <Edit size={18} />
-                        </button>
-                      </td>
+            <div className="table-pagination-wrapper">
+              <div className="arrivals-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>License Plate</th>
+                      <th>Dock</th>
+                      <th>Arrival Time</th>
+                      <th>Reference</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {displayArrivals.map((arrival) => (
+                      <tr
+                        key={arrival.id}
+                        className={[
+                          arrival.highwayInfraction ? 'row-violation' : '',
+                          arrival.apiStatus === 'delayed' ? 'row-delayed' : '',
+                        ].filter(Boolean).join(' ')}
+                      >
+                        <td>{arrival.plate}</td>
+                        <td>{arrival.dock}</td>
+                        <td>{arrival.arrivalTime}</td>
+                        <td>{arrival.cargo}</td>
+                        <td>
+                          <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
+                            {arrival.status}
+                          </span>
+                          {arrival.highwayInfraction && (
+                            <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
+                              Infraction
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
+                            <Eye size={18} />
+                          </button>
+                          <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
+                            <Edit size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {(displayArrivals.length >= ITEMS_PER_PAGE || currentPage > 1) && (
+                <div className="pagination-controls">
+                  <button
+                    className="pagination-btn"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronLeft size={16} />
+                    Prev
+                  </button>
+                  <span className="pagination-info">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    className="pagination-btn"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -514,10 +625,15 @@ export default function ArrivalsList() {
                   </div>
                   <div className="detail-row">
                     <span className="detail-label">Status</span>
-                    <span className="status-badge-wrapper" style={{ marginTop: '0.5rem' }}>
+                    <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
                       <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
                         {selectedArrival.status}
                       </span>
+                      {selectedArrival.highwayInfraction && (
+                        <span className="status-badge status-highway-infraction">
+                          Infraction
+                        </span>
+                      )}
                     </span>
                   </div>
                 </>
@@ -590,3 +706,4 @@ export default function ArrivalsList() {
     </div>
   );
 }
+export default ArrivalsList;

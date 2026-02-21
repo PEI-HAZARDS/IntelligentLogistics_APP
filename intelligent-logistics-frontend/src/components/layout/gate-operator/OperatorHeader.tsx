@@ -43,36 +43,51 @@ export default function OperatorHeader() {
             const saved = localStorage.getItem('ws_payloads');
             if (!saved) return;
 
-            const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: any }>; // type 'any' to avoid import issues or need for full type here
+            const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: any }>;
             if (messages.length === 0) return;
 
-            // Get the latest payload (last in the array is usually newest, but sorting by timestamp is safer)
-            const latest = messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-            // Fix: Access the nested 'payload' property from the WebSocket message
-            const payload = latest.data?.payload;
+            // Sort messages by timestamp (newest first)
+            const sortedMessages = messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-            if (payload && payload.alerts && Array.isArray(payload.alerts)) {
-                const newNotifications: Notification[] = payload.alerts
-                    .filter((msg: any) => typeof msg === 'string' && msg.trim().length > 0)
-                    .map((msg: string, index: number) => {
-                        // Determine severity
-                        let type: "info" | "warning" | "danger" = "danger";
-                        if (msg.toLowerCase().includes('approved') || msg.toLowerCase().includes('success')) type = "info";
-                        else if (msg.toLowerCase().includes('review') || msg.toLowerCase().includes('pending')) type = "warning";
+            const newNotifications: Notification[] = [];
 
-                        return {
-                            id: `alert-${latest.id}-${index}`,
-                            type,
-                            title: "Safety Alert", // Generic title as per recent simplified design
-                            message: msg,
-                            time: new Date(latest.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            read: false // New alerts are always unread until opened/marked
-                        };
+            // Process all messages in the history
+            for (const msg of sortedMessages) {
+                // Determine whether the data is nested under payload or direct
+                const payload = msg.data?.payload || msg.data;
+
+                if (payload && payload.alerts && Array.isArray(payload.alerts)) {
+                    payload.alerts.forEach((alertMsg: any, index: number) => {
+                        if (typeof alertMsg === 'string' && alertMsg.trim().length > 0) {
+                            let type: "info" | "warning" | "danger" = "danger";
+                            if (alertMsg.toLowerCase().includes('approved') || alertMsg.toLowerCase().includes('success') || alertMsg.toLowerCase().includes('accepted')) {
+                                type = "info";
+                            } else if (alertMsg.toLowerCase().includes('review') || alertMsg.toLowerCase().includes('pending')) {
+                                type = "warning";
+                            }
+
+                            newNotifications.push({
+                                id: `alert-${msg.id}-${index}`,
+                                type,
+                                title: "Safety Alert",
+                                message: alertMsg,
+                                time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                // Check if already exist to preserve read status later, for now mark as false
+                                read: false
+                            });
+                        }
                     });
-
-                // Overwrite notifications with the latest batch
-                setNotifications(newNotifications);
+                }
             }
+
+            // Restore read status from current state if it exists
+            setNotifications(prev => {
+                const updatedNotifications = newNotifications.map(newNotif => {
+                    const existing = prev.find(p => p.id === newNotif.id);
+                    return existing ? { ...newNotif, read: existing.read } : newNotif;
+                });
+                return updatedNotifications;
+            });
         } catch (e) {
             console.error("Failed to parse notifications from storage", e);
         }
