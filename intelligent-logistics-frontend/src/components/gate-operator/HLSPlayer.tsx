@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 type HLSPlayerProps = {
   streamUrl: string;
@@ -14,15 +15,17 @@ export default function HLSPlayer({
 }: HLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">(() => "loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const startPlayback = async () => {
+  // Remove effect that sets state synchronously
+
+  const startPlayback = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
 
     try {
-      video.muted = true; // Garantir que está muted para autoplay
+      video.muted = true; // Ensure it is muted for autoplay
       await video.play();
       setStatus("playing");
       console.log(`[${quality.toUpperCase()}] Playback started`);
@@ -30,27 +33,28 @@ export default function HLSPlayer({
       console.warn("Play failed:", err);
       setStatus("ready");
     }
-  };
+  }, [quality]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    // Limpar instância anterior se existir
+    // Clear previous instance if it exists
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
 
-    setStatus("loading");
-    setErrorMessage("");
+    // Avoid calling setState synchronously in effect
+    // Instead, set loading state before effect runs
+    // This can be handled by another useEffect or by updating state when streamUrl/quality changes
 
     console.log(`[${quality.toUpperCase()}] Connecting to:`, streamUrl);
 
-    // Verificar suporte HLS.js
+    // Check HLS.js support
     if (Hls.isSupported()) {
       const hls = new Hls({
-        debug: true,
+        debug: false,
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 10,
@@ -59,13 +63,30 @@ export default function HLSPlayer({
         liveSyncDuration: 3,
         liveMaxLatencyDuration: 10,
         maxFragLookUpTolerance: 0.2,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingTimeOut: 10000,
-        levelLoadingMaxRetry: 4,
-        fragLoadingTimeOut: 20000,
-        fragLoadingMaxRetry: 6,
+        manifestLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10000,
+            maxLoadTimeMs: 10000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
+        playlistLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10000,
+            maxLoadTimeMs: 10000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 20000,
+            maxLoadTimeMs: 20000,
+            timeoutRetry: { maxNumRetry: 6, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
       });
 
       hlsRef.current = hls;
@@ -77,7 +98,7 @@ export default function HLSPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setStatus("ready");
         console.log(`[${quality.toUpperCase()}] Manifest parsed, stream ready`);
-        
+
         if (autoPlay) {
           setTimeout(() => startPlayback(), 500);
         }
@@ -89,7 +110,7 @@ export default function HLSPlayer({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              setErrorMessage("Erro de rede - Stream não disponível");
+              setErrorMessage("Network Error - Stream unavailable");
               setStatus("error");
               console.log("Attempting to recover from network error...");
               setTimeout(() => {
@@ -100,14 +121,14 @@ export default function HLSPlayer({
               break;
 
             case Hls.ErrorTypes.MEDIA_ERROR:
-              setErrorMessage("Erro de mídia - A recuperar...");
+              setErrorMessage("Media Error - Recovering...");
               console.log("Attempting to recover from media error...");
               hls.recoverMediaError();
               break;
 
             default:
               setStatus("error");
-              setErrorMessage(`Stream indisponível: ${data.details}`);
+              setErrorMessage(`Stream unavailable: ${data.details}`);
               break;
           }
         }
@@ -124,20 +145,27 @@ export default function HLSPlayer({
       hls.attachMedia(video);
 
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Suporte nativo (Safari)
+      // Native support (Safari)
       console.log(`[${quality.toUpperCase()}] Using native HLS`);
       video.src = streamUrl;
-      setStatus("ready");
-      
-      if (autoPlay) {
-        setTimeout(() => startPlayback(), 500);
-      }
+
+      // Set status to "ready" when video data is loaded
+      const handleNativeLoadedData = () => {
+        setStatus("ready");
+        video.removeEventListener("loadeddata", handleNativeLoadedData);
+        if (autoPlay) {
+          setTimeout(() => startPlayback(), 500);
+        }
+      };
+      video.addEventListener("loadeddata", handleNativeLoadedData);
     } else {
-      setStatus("error");
-      setErrorMessage("Browser não suporta streaming HLS");
+      setTimeout(() => {
+        setStatus("error");
+        setErrorMessage("Browser does not support HLS streaming");
+      }, 0);
     }
 
-    // Event listeners do vídeo
+    // Video event listeners
     const handleLoadedData = () => {
       console.log(`[${quality.toUpperCase()}] Video loaded`);
     };
@@ -145,7 +173,7 @@ export default function HLSPlayer({
     const handleError = (e: Event) => {
       console.error(`[${quality.toUpperCase()}] Video error:`, e);
       setStatus("error");
-      setErrorMessage("Erro ao carregar stream");
+      setErrorMessage("Error loading stream");
     };
 
     video.addEventListener("loadeddata", handleLoadedData);
@@ -155,13 +183,13 @@ export default function HLSPlayer({
     return () => {
       video.removeEventListener("loadeddata", handleLoadedData);
       video.removeEventListener("error", handleError);
-      
+
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [streamUrl, quality]);
+  }, [streamUrl, quality, autoPlay, startPlayback]);
 
   return (
     <div className="hls-player-container">
@@ -174,15 +202,19 @@ export default function HLSPlayer({
       />
       {status === "loading" && (
         <div className="stream-overlay loading">
-          <span>⏳ A conectar à stream...</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Loader2 size={20} className="animate-spin" /> Connecting to stream...
+          </span>
         </div>
       )}
 
       {status === "error" && (
         <div className="stream-overlay error">
-          <div>❌ {errorMessage}</div>
-          <button className="retry-button" onClick={() => window.location.reload()}>
-            🔄 Tentar Novamente
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+            <AlertCircle size={20} /> {errorMessage}
+          </div>
+          <button className="retry-button" onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={16} /> Try Again
           </button>
         </div>
       )}

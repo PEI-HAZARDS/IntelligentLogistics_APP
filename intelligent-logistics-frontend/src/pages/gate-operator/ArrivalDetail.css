@@ -1,0 +1,154 @@
+/* ─── ArrivalDetail page ─────────────────────────────────────────────── */
+
+.ad-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 32px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Header */
+.ad-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Loading / error centre states */
+.ad-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.95rem;
+}
+
+/* Content stack */
+.ad-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Highway infraction banner ── */
+.ad-infraction-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 10px;
+  padding: 16px 20px;
+  color: #fca5a5;
+}
+
+.ad-infraction-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #f87171;
+}
+
+.ad-infraction-banner strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f87171;
+  margin-bottom: 4px;
+}
+
+.ad-infraction-notes {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+
+/* ── Section card ── */
+.ad-section {
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ad-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ad-section-header svg {
+  color: var(--accent, #60a5fa);
+  flex-shrink: 0;
+}
+
+.ad-section-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.ad-section-body {
+  padding: 4px 0;
+}
+
+/* ── Data row ── */
+.ad-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ad-row:last-child {
+  border-bottom: none;
+}
+
+.ad-row-label {
+  flex: 0 0 160px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ad-row-value {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-primary, #f3f4f6);
+  word-break: break-word;
+}
+
+/* ── Cargo ── */
+.ad-cargo-item {
+  padding: 4px 0;
+}
+
+.ad-cargo-divider {
+  margin: 4px 20px;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Spin animation (reuse existing if already defined) ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
