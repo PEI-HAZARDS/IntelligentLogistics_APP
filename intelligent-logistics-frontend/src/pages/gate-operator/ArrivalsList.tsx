@@ -16,9 +16,7 @@ import {
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
-  ShieldAlert,
-  Pin,
-  PinOff
+  ShieldAlert
 } from "lucide-react";
 import { getArrivals, getArrivalsStats } from "@/services/arrivals";
 import { getActiveAlerts } from "@/services/alerts";
@@ -230,18 +228,9 @@ function ArrivalsList() {
   }, [fetchData]);
 
   // Filter Logic — dock is the only remaining client-side dimension
-  const filteredArrivals = dockFilter !== "all"
+  const displayArrivals = dockFilter !== "all"
     ? arrivals.filter(a => a.dock === dockFilter)
     : arrivals;
-
-  // Sort so pinned items always appear at the top
-  const displayArrivals = [...filteredArrivals].sort((a, b) => {
-    const aPinned = pinnedArrivals.includes(a.id);
-    const bPinned = pinnedArrivals.includes(b.id);
-    if (aPinned && !bPinned) return -1;
-    if (!aPinned && bPinned) return 1;
-    return 0;
-  });
   const totalPages = serverPages;
 
   // Reset page when server-side filter status changes
@@ -508,49 +497,38 @@ function ArrivalsList() {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayArrivals.map((arrival) => {
-                      const isPinned = pinnedArrivals.includes(arrival.id);
-                      return (
-                        <tr
-                          key={arrival.id}
-                          className={[
-                            arrival.highwayInfraction ? 'row-violation' : '',
-                            arrival.apiStatus === 'delayed' ? 'row-delayed' : '',
-                            isPinned ? 'row-pinned' : '',
-                          ].filter(Boolean).join(' ')}
-                        >
-                          <td>
-                            {arrival.plate}
-                            {isPinned && <Pin fill="currentColor" size={14} style={{ marginLeft: '8px', verticalAlign: '-2px', opacity: 0.6 }} />}
-                          </td>
-                          <td>{arrival.dock}</td>
-                          <td>{arrival.arrivalTime}</td>
-                          <td>{arrival.cargo}</td>
-                          <td>
-                            <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                              {arrival.status}
+                    {displayArrivals.map((arrival) => (
+                      <tr
+                        key={arrival.id}
+                        className={[
+                          arrival.highwayInfraction ? 'row-violation' : '',
+                          arrival.apiStatus === 'delayed' ? 'row-delayed' : '',
+                        ].filter(Boolean).join(' ')}
+                      >
+                        <td>{arrival.plate}</td>
+                        <td>{arrival.dock}</td>
+                        <td>{arrival.arrivalTime}</td>
+                        <td>{arrival.cargo}</td>
+                        <td>
+                          <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
+                            {arrival.status}
+                          </span>
+                          {arrival.highwayInfraction && (
+                            <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
+                              Infraction
                             </span>
-                            {arrival.highwayInfraction && (
-                              <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
-                                Infraction
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <button
-                              className="btn-icon"
-                              onClick={() => togglePin(arrival.id)}
-                              title={isPinned ? "Unpin Arrival" : "Pin Arrival"}
-                            >
-                              {isPinned ? <PinOff size={18} /> : <Pin size={18} />}
-                            </button>
-                            <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
-                              <Eye size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                          )}
+                        </td>
+                        <td>
+                          <button className="btn-icon" onClick={() => handleView(arrival)} title="View Details">
+                            <Eye size={18} />
+                          </button>
+                          <button className="btn-icon" onClick={() => handleEdit(arrival)} title="Edit">
+                            <Edit size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -611,23 +589,27 @@ function ArrivalsList() {
                 <span className="detail-value">{selectedArrival.arrivalTime}</span>
               </div>
 
-              <div className="detail-row">
-                <span className="detail-label">Dock</span>
-                <span className="detail-value">{selectedArrival.dock}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Reference</span>
-                <span className="detail-value">{selectedArrival.cargo}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Status</span>
-                <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                  <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                    {selectedArrival.status}
-                  </span>
-                  {selectedArrival.highwayInfraction && (
-                    <span className="status-badge status-highway-infraction">
-                      Infraction
+              {modalMode === "view" ? (
+                <>
+                  <div className="detail-row">
+                    <span className="detail-label">Dock</span>
+                    <span className="detail-value">{selectedArrival.dock}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Reference</span>
+                    <span className="detail-value">{selectedArrival.cargo}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Status</span>
+                    <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
+                        {selectedArrival.status}
+                      </span>
+                      {selectedArrival.highwayInfraction && (
+                        <span className="status-badge status-highway-infraction">
+                          Infraction
+                        </span>
+                      )}
                     </span>
                   )}
                 </span>
