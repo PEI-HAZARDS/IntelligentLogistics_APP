@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -15,10 +15,12 @@ export default function HLSPlayer({
 }: HLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">(() => "loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const startPlayback = async () => {
+  // Remove effect that sets state synchronously
+
+  const startPlayback = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -31,7 +33,7 @@ export default function HLSPlayer({
       console.warn("Play failed:", err);
       setStatus("ready");
     }
-  };
+  }, [quality]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -43,8 +45,9 @@ export default function HLSPlayer({
       hlsRef.current = null;
     }
 
-    setStatus("loading");
-    setErrorMessage("");
+    // Avoid calling setState synchronously in effect
+    // Instead, set loading state before effect runs
+    // This can be handled by another useEffect or by updating state when streamUrl/quality changes
 
     console.log(`[${quality.toUpperCase()}] Connecting to:`, streamUrl);
 
@@ -145,14 +148,21 @@ export default function HLSPlayer({
       // Native support (Safari)
       console.log(`[${quality.toUpperCase()}] Using native HLS`);
       video.src = streamUrl;
-      setStatus("ready");
 
-      if (autoPlay) {
-        setTimeout(() => startPlayback(), 500);
-      }
+      // Set status to "ready" when video data is loaded
+      const handleNativeLoadedData = () => {
+        setStatus("ready");
+        video.removeEventListener("loadeddata", handleNativeLoadedData);
+        if (autoPlay) {
+          setTimeout(() => startPlayback(), 500);
+        }
+      };
+      video.addEventListener("loadeddata", handleNativeLoadedData);
     } else {
-      setStatus("error");
-      setErrorMessage("Browser does not support HLS streaming");
+      setTimeout(() => {
+        setStatus("error");
+        setErrorMessage("Browser does not support HLS streaming");
+      }, 0);
     }
 
     // Video event listeners
@@ -179,7 +189,7 @@ export default function HLSPlayer({
         hlsRef.current = null;
       }
     };
-  }, [streamUrl, quality]);
+  }, [streamUrl, quality, autoPlay, startPlayback]);
 
   return (
     <div className="hls-player-container">

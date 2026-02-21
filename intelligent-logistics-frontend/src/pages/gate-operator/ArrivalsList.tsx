@@ -20,7 +20,7 @@ import {
   Pin,
   PinOff
 } from "lucide-react";
-import { getArrivals, getArrivalsStats } from "@/services/arrivals";
+import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
 import { getActiveAlerts } from "@/services/alerts";
 import type { Appointment, AppointmentStatusEnum, Alert, ArrivalsQueryParams } from "@/types/types";
 
@@ -103,19 +103,26 @@ function ArrivalsList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Pinned state
-  const [pinnedArrivals, setPinnedArrivals] = useState<number[]>(() => {
+  // Pinned state caching full objects
+  const [pinnedArrivals, setPinnedArrivals] = useState<UIArrival[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem("pinned_arrivals") || "[]");
+      const stored = JSON.parse(localStorage.getItem("pinned_arrivals") || "[]");
+      // Handle legacy string/number array migration or nulls
+      const validStored = (stored || []).filter(Boolean);
+      if (validStored.length > 0 && typeof validStored[0] !== 'object') {
+        localStorage.removeItem("pinned_arrivals");
+        return [];
+      }
+      return validStored;
     } catch {
       return [];
     }
   });
 
-  const togglePin = (id: number) => {
+  const togglePin = (arrival: UIArrival) => {
     setPinnedArrivals((prev) => {
-      const isPinned = prev.includes(id);
-      const next = isPinned ? prev.filter((p) => p !== id) : [...prev, id];
+      const isPinned = prev.some(p => p.id === arrival.id);
+      const next = isPinned ? prev.filter((p) => p.id !== arrival.id) : [...prev, arrival];
       localStorage.setItem("pinned_arrivals", JSON.stringify(next));
       return next;
     });
@@ -161,9 +168,9 @@ function ArrivalsList() {
       ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
-    status: mapStatusToLabel(arrival.status),
-    apiStatus: arrival.status,
-    highwayInfraction: (arrival as any).highway_infraction || false,
+    status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
+    apiStatus: arrival.status || "unknown" as any,
+    highwayInfraction: arrival.highway_infraction || false,
   });
 
   // Map API alert to UI
@@ -198,7 +205,35 @@ function ArrivalsList() {
       ]);
 
       let mapped = arrivalsData.items.map(mapArrivalToUI);
-      if (statusFilter === "Violators") mapped = mapped.filter(a => a.highwayInfraction);
+
+      // Merge cached pinned items that are not in the current page
+      const missingPinned = pinnedArrivals.filter(p => !mapped.some(a => a.id === p.id));
+      if (missingPinned.length > 0) {
+        // Fetch them individually to update live status, but use cached object as foundation
+        const missingArrivalPromises = missingPinned.map(async (cached) => {
+          try {
+            const liveData = await getArrival(cached.id);
+            if (liveData) {
+              return {
+                ...cached,
+                status: liveData.status ? mapStatusToLabel(liveData.status) : cached.status,
+                apiStatus: liveData.status || cached.apiStatus,
+                highwayInfraction: liveData.highway_infraction ?? cached.highwayInfraction
+              };
+            }
+          } catch (e) {
+            // Ignore error
+          }
+          return cached;
+        });
+
+        const mappedMissing = await Promise.all(missingArrivalPromises);
+        mapped = [...mapped, ...mappedMissing];
+      }
+
+      if (statusFilter === "Violators") {
+        mapped = mapped.filter(a => a.highwayInfraction || pinnedArrivals.some(p => p.id === a.id));
+      }
 
       setArrivals(mapped);
       setServerPages(arrivalsData.pages);
@@ -211,7 +246,7 @@ function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
-  }, [gateId, currentPage, debouncedSearch, statusFilter]);
+  }, [gateId, currentPage, debouncedSearch, statusFilter, pinnedArrivals]);
 
   // Time update effect
   useEffect(() => {
@@ -230,14 +265,15 @@ function ArrivalsList() {
   }, [fetchData]);
 
   // Filter Logic — dock is the only remaining client-side dimension
+  // Pinned items always bypass client-side filters
   const filteredArrivals = dockFilter !== "all"
-    ? arrivals.filter(a => a.dock === dockFilter)
+    ? arrivals.filter(a => a.dock === dockFilter || pinnedArrivals.some(p => p.id === a.id))
     : arrivals;
 
   // Sort so pinned items always appear at the top
   const displayArrivals = [...filteredArrivals].sort((a, b) => {
-    const aPinned = pinnedArrivals.includes(a.id);
-    const bPinned = pinnedArrivals.includes(b.id);
+    const aPinned = pinnedArrivals.some(p => p.id === a.id);
+    const bPinned = pinnedArrivals.some(p => p.id === b.id);
     if (aPinned && !bPinned) return -1;
     if (!aPinned && bPinned) return 1;
     return 0;
@@ -509,7 +545,7 @@ function ArrivalsList() {
                   </thead>
                   <tbody>
                     {displayArrivals.map((arrival) => {
-                      const isPinned = pinnedArrivals.includes(arrival.id);
+                      const isPinned = pinnedArrivals.some(p => p.id === arrival.id);
                       return (
                         <tr
                           key={arrival.id}
@@ -520,15 +556,17 @@ function ArrivalsList() {
                           ].filter(Boolean).join(' ')}
                         >
                           <td>
-                            {arrival.plate}
-                            {isPinned && <Pin fill="currentColor" size={14} style={{ marginLeft: '8px', verticalAlign: '-2px', opacity: 0.6 }} />}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {isPinned && <Pin fill="currentColor" size={14} style={{ opacity: 0.6 }} />}
+                              <span>{arrival.plate}</span>
+                            </div>
                           </td>
                           <td>{arrival.dock}</td>
                           <td>{arrival.arrivalTime}</td>
                           <td>{arrival.cargo}</td>
                           <td>
-                            <span className={`status-badge status-${arrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                              {arrival.status}
+                            <span className={`status-badge status-${(arrival.status || 'unknown').toLowerCase().replace(/\s/g, "-")}`}>
+                              {arrival.status || 'Unknown'}
                             </span>
                             {arrival.highwayInfraction && (
                               <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
@@ -539,7 +577,7 @@ function ArrivalsList() {
                           <td>
                             <button
                               className="btn-icon"
-                              onClick={() => togglePin(arrival.id)}
+                              onClick={() => togglePin(arrival)}
                               title={isPinned ? "Unpin Arrival" : "Pin Arrival"}
                             >
                               {isPinned ? <PinOff size={18} /> : <Pin size={18} />}
