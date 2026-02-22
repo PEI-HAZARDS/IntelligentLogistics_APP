@@ -19,10 +19,14 @@ const TransportPage = React.lazy(() => import('@/pages/logistics-manager/Transpo
 const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
 const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
+// Componentes Partilhados
+const WarningSign = React.lazy(() => import('@/pages/shared/WarningSign'));
+
 // Rotas Comuns (Login)
 const commonRoutes = [
   { path: '/', element: <Login /> },
   { path: '/login', element: <Login /> },
+  { path: '/warning-sign', element: <WarningSign /> },
 ];
 
 // Rotas do Operador de Portaria
