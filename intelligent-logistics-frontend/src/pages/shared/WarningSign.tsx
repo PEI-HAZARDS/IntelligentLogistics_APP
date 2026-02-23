@@ -28,10 +28,10 @@ export default function WarningSign() {
                 <div className="flex flex-col gap-6 w-full">
                     <div className="flex flex-col">
                         <h1 className="text-4xl xl:text-5xl font-extrabold text-white mb-2 tracking-tight">
-                            Monitorização de via
+                            Road Monitoring
                         </h1>
                         <p className="text-neutral-400 text-lg">
-                            Controlo de via proibida a camiões de materias perigosas (C3p).
+                            Hazmat material access control (C3p).
                         </p>
                     </div>
 
@@ -44,7 +44,7 @@ export default function WarningSign() {
                             .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
                         `}</style>
                         <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
-                            <HLSPlayer streamUrl={getStreamUrl('gate02', 'high')} autoPlay={true} />
+                            <HLSPlayer streamUrl={getStreamUrl('gate01', 'high')} autoPlay={true} />
                         </div>
 
                         {/* Overlay Grid */}
@@ -55,12 +55,12 @@ export default function WarningSign() {
                             {isActive ? (
                                 <div className="bg-red-500/20 text-red-500 border border-red-500/50 px-4 py-2 rounded font-bold animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.3)] backdrop-blur-sm flex items-center gap-2 text-sm">
                                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"></span>
-                                    POSSÍVEL INFRAÇÃO DETETADA
+                                    POSSIBLE VIOLATION DETECTED
                                 </div>
                             ) : (
                                 <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-4 py-2 rounded font-bold backdrop-blur-sm flex items-center gap-2 text-sm">
                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                                    TRÂNSITO REGULAR
+                                    REGULAR TRAFFIC
                                 </div>
                             )}
                         </div>
@@ -74,7 +74,7 @@ export default function WarningSign() {
                             : 'bg-orange-600 hover:bg-orange-500 hover:shadow-[0_0_25px_rgba(2ea,88,12,0.4)] text-white border border-orange-500/50 active:scale-[0.98]'
                             }`}
                     >
-                        {isActive ? 'Alerta em curso...' : 'Simular deteção de camião com carga perigosa na direção da via proibida'}
+                        {isActive ? 'Alert in progress...' : 'Truck detected with hazardous cargo'}
                     </button>
                 </div>
 
@@ -125,10 +125,10 @@ export default function WarningSign() {
                             {/* Text underneath the sign */}
                             <div className="mt-8 flex flex-col items-center gap-2 text-center">
                                 <span className="text-amber-500 font-mono text-3xl font-black tracking-widest drop-shadow-[0_0_15px_rgba(245,158,11,0.8)] leading-tight">
-                                    ROTA<br />PROIBIDA
+                                    RESTRICTED<br />ROAD
                                 </span>
                                 <span className="text-amber-500 font-mono text-xl font-bold tracking-wider drop-shadow-[0_0_15px_rgba(245,158,11,0.6)] mt-2">
-                                    VOLTE À<br />AUTOESTRADA
+                                    RETURN TO<br />HIGHWAY
                                 </span>
                             </div>
                         </div>
@@ -141,6 +141,17 @@ export default function WarningSign() {
                     </div>
                 </div>
 
+            </div>
+
+            {/* Grafana ML Agents Panel */}
+            <div className="w-full max-w-7xl mt-8 mx-auto">
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xl font-bold text-white tracking-tight">ML Agents — Live Detection Feed</h2>
+                    <p className="text-neutral-400 text-sm">Real-time inference metrics from the hazmat detection model.</p>
+                </div>
+                <div className="mt-4 rounded-xl overflow-hidden border border-neutral-800 shadow-2xl">
+                    <iframe src="http://10.255.32.132:3000/d-solo/il-ml-agents/intelligentlogistics-ml-agents?orgId=1&timezone=browser&refresh=30s&panelId=panel-22&__feature.dashboardSceneSolo=true" width="450" height="200" frameborder="0"></iframe>
+                </div>
             </div>
         </div>
     );
