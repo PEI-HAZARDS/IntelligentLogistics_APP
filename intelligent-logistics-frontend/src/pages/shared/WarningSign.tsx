@@ -5,7 +5,7 @@ import { getStreamUrl } from '@/config/streams';
 export default function WarningSign() {
     const [isActive, setIsActive] = useState(false);
 
-    // Auto-turn off the sign after 10 seconds to simulate a passing truck
+    // Auto-turn off the sign after 10 seconds to simulate a passing truck (simulates triggering the alert and then returning to normal)
     useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
         if (isActive) {
@@ -22,7 +22,7 @@ export default function WarningSign() {
 
     return (
         <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 xl:p-8 overflow-hidden">
-            <div className="w-full max-w-[1920px] grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mx-auto">
+            <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mx-auto">
 
                 {/* Stream Section */}
                 <div className="flex flex-col gap-6 w-full">
@@ -82,20 +82,20 @@ export default function WarningSign() {
                 <div className="flex flex-col gap-6 items-center w-full justify-center">
 
                     {/* Sign physical frame */}
-                    <div className="bg-[#0a0a0a] p-4 rounded-2xl border-4 border-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-[420px] h-[600px] relative">
+                    <div className="bg-[#0a0a0a] p-4 rounded-2xl border-4 border-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-105 h-150 relative">
 
                         {/* LED flashing corner lights (often seen on these signs) */}
                         <div className={`absolute top-8 left-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? 'bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping' : 'bg-amber-900/40'} `}></div>
                         <div className={`absolute top-8 right-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? 'bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150' : 'bg-amber-900/40'} `}></div>
 
                         <div className={`absolute bottom-8 left-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? 'bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75' : 'bg-amber-900/40'} `}></div>
-                        <div className={`absolute bottom-8 right-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? 'bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-[225ms]' : 'bg-amber-900/40'} `}></div>
+                        <div className={`absolute bottom-8 right-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? 'bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225' : 'bg-amber-900/40'} `}></div>
 
                         {/* The actual display area */}
                         <div className={`transition-all duration-500 w-full flex-1 flex flex-col items-center justify-center mt-8 mb-4 ${isActive ? 'opacity-100' : 'opacity-[0.03] grayscale'}`}>
 
                             {/* C3p SVG */}
-                            <div className="w-[200px] h-[200px] relative drop-shadow-[0_0_35px_rgba(255,255,255,0.2)]">
+                            <div className="w-50 h-50 relative drop-shadow-[0_0_35px_rgba(255,255,255,0.2)]">
                                 <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_20px_rgba(227,0,15,0.9)]">
                                     {/* Red Border */}
                                     <circle cx="50" cy="50" r="46" fill="#ffffff" stroke="#E3000F" strokeWidth="8" />
@@ -137,7 +137,7 @@ export default function WarningSign() {
                         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyIiBjeT0iMiIgcj0iMSIgZmlsbD0icmdiYSgwLDAsMCwwLjgpIi8+Cjwvc3ZnPg==')] opacity-60 pointer-events-none rounded-2xl mix-blend-multiply"></div>
 
                         {/* Pole (for realism) */}
-                        <div className="absolute -bottom-[80px] w-12 h-[80px] bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-900 rounded-b border-x-2 border-b-2 border-neutral-900 -z-10 shadow-2xl shadow-black"></div>
+                        <div className="absolute -bottom-20 w-12 h-20 bg-linear-to-r from-neutral-800 via-neutral-700 to-neutral-900 rounded-b border-x-2 border-b-2 border-neutral-900 -z-10 shadow-2xl shadow-black"></div>
                     </div>
                 </div>
 
