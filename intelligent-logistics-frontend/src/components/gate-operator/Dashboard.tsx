@@ -38,6 +38,9 @@ interface UIDetection {
   UN?: string;
   unDescription?: string;
   imageUrl?: string;
+  truckId?: string;
+  /** Full original WS payload — forwarded as-is on manual review submission */
+  originalPayload?: DecisionUpdatePayload;
 }
 
 // Crop image type
@@ -153,7 +156,7 @@ export default function Dashboard() {
     const lp_crop = data.license_crop_url;
     const hz_crop = data.hazard_crop_url;
     const lp_result = data.license_plate;
-    const decision = data.decision;
+    const decision = data.decision?.toUpperCase();
     const decision_source = data.decision_source;
 
 
@@ -245,6 +248,8 @@ export default function Dashboard() {
       UN: unParsed.code,
       unDescription: unParsed.description,
       imageUrl: lp_crop || hz_crop,
+      truckId: data.truck_id as string | undefined,
+      originalPayload: data as DecisionUpdatePayload,
     };
     setDetections(prev => [newDetection, ...prev].slice(0, 10));
 
@@ -258,6 +263,8 @@ export default function Dashboard() {
         UN: data.un,
         kemler: data.kemler,
         timestamp: now,
+        truckId: data.truck_id as string | undefined,
+        originalPayload: data as DecisionUpdatePayload,
       });
     }
 
@@ -465,9 +472,9 @@ export default function Dashboard() {
   };
 
   // Handle manual review completion
-  const handleManualReviewComplete = (licensePlate: string, decision: 'approved' | 'rejected') => {
+  const handleManualReviewComplete = (licensePlate: string, decision: 'accepted' | 'rejected') => {
     addToast({
-      type: decision === 'approved' ? 'success' : 'warning',
+      type: decision === 'accepted' ? 'success' : 'warning',
       title: 'Manual Review',
       message: `${licensePlate} ${decision}`,
     });
@@ -646,9 +653,15 @@ export default function Dashboard() {
                       setManualReviewData({
                         id: detection.id,
                         licensePlate: detection.licensePlate,
-                        UN: detection.UN,
-                        kemler: detection.kemler,
+                        UN: detection.UN && detection.unDescription
+                          ? `${detection.UN}: ${detection.unDescription}`
+                          : detection.UN,
+                        kemler: detection.kemler && detection.kemlerDescription
+                          ? `${detection.kemler}: ${detection.kemlerDescription}`
+                          : detection.kemler,
                         timestamp: detection.time,
+                        truckId: detection.truckId,
+                        originalPayload: detection.originalPayload,
                       });
                     } else {
                       setSelectedDetection(detection);

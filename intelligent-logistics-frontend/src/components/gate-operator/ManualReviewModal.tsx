@@ -4,6 +4,7 @@ import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock }
 import { getArrivals } from '@/services/arrivals';
 import { submitManualReview } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
+import type { DecisionUpdatePayload } from '@/lib/websocket';
 
 // Props passed from Dashboard
 export interface ManualReviewData {
@@ -14,6 +15,9 @@ export interface ManualReviewData {
     UN?: string;
     kemler?: string;
     timestamp: string;
+    truckId?: string;
+    /** Full original WS payload — used to forward all fields on submission */
+    originalPayload?: DecisionUpdatePayload;
 }
 
 interface ManualReviewModalProps {
@@ -21,7 +25,7 @@ interface ManualReviewModalProps {
     reviewData: ManualReviewData | null;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
-    onDecisionComplete: (licensePlate: string, decision: 'approved' | 'rejected') => void;
+    onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
 }
 
 export default function ManualReviewModal({
@@ -111,27 +115,25 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-            const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
-
-            if (!lp) {
-                setError('No license plate detected or manually associated.');
-                setIsSubmitting(false);
-                return;
-            }
+.toUpperCase()            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
+            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                // Preserve every field from the original agent-decision payload
                 license_plate: lp,
-                decision: 'approved',
-                decision_reason: selectedAppointment
-                    ? `Operator approved for appointment ${selectedAppointment.id}`
-                    : 'Operator approved manually without appointment matching',
+.toUpperCase().toUpperCase()                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+                un: orig?.un || reviewData?.UN || '',
+                kemler: orig?.kemler || reviewData?.kemler || '',
+                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
+                alerts: orig?.alerts,
+                route: orig?.route || '',
+                truck_id: reviewData?.truckId,
+                // Override only the decision fields
+                decision: 'ACCEPTED',
+                decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
                 decision_source: 'operator',
-                license_crop_url: reviewData?.lpCropUrl || '',
-                un: reviewData?.UN || '',
-                kemler: reviewData?.kemler || '',
-                hazard_crop_url: reviewData?.hzCropUrl || '',
             });
-            onDecisionComplete(lp, 'approved');
+            onDecisionComplete(lp, 'accepted');
             onClose();
         } catch (err) {
             console.error('Failed to approve:', err);
@@ -147,18 +149,24 @@ export default function ManualReviewModal({
         try {
             const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
             const reason = selectedAppointment
-                ? `Operator rejected for appointment ${selectedAppointment.id}`
-                : 'Entry denied by operator';
+                ? `OPERATOR_REJECTED_FOR_APPOINTMENT_${selectedAppointment.id}`
+                : 'OPERATOR_REJECTED';
+            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                // Preserve every field from the original agent-decision payload
                 license_plate: lp,
-                decision: 'rejected',
+                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+                un: orig?.un || reviewData?.UN || '',
+                kemler: orig?.kemler || reviewData?.kemler || '',
+                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
+                alerts: orig?.alerts,
+                route: orig?.route || '',
+                truck_id: reviewData?.truckId,
+                // Override only the decision fields
+                decision: 'REJECTED',
                 decision_reason: reason,
                 decision_source: 'operator',
-                license_crop_url: reviewData?.lpCropUrl || '',
-                un: reviewData?.UN || '',
-                kemler: reviewData?.kemler || '',
-                hazard_crop_url: reviewData?.hzCropUrl || '',
             });
             onDecisionComplete(lp, 'rejected');
             onClose();

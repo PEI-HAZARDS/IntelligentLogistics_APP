@@ -84,6 +84,7 @@ export async function submitManualReview(params: {
     hazard_crop_url?: string;
     alerts?: string[];
     route?: string;
+    truck_id?: string;
 }): Promise<void> {
     const queryParams: Record<string, unknown> = {
         license_plate: params.license_plate,
@@ -95,6 +96,7 @@ export async function submitManualReview(params: {
         kemler: params.kemler || '',
         hazard_crop_url: params.hazard_crop_url || '',
         route: params.route || '',
+        ...(params.truck_id ? { truck_id: params.truck_id } : {}),
     };
 
     // FastAPI expects repeated query params for lists
