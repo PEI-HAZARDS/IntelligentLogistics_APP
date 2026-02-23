@@ -84,17 +84,18 @@ export default function ManualReviewModal({
         try {
             // Fetch all in_transit arrivals (like ArrivalsList does)
             const results = await getArrivals({ status: 'in_transit', limit: 100 });
-            setAllCandidates(results);
+            const appointments = results.items || [];
+            setAllCandidates(appointments);
 
             // Apply initial filter if there's a detected plate
             const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
-                const filtered = results.filter(apt =>
+                const filtered = appointments.filter(apt =>
                     apt.truck_license_plate.toLowerCase().includes(plate.toLowerCase())
                 );
-                setCandidates(filtered.length > 0 ? filtered : results);
+                setCandidates(filtered.length > 0 ? filtered : appointments);
             } else {
-                setCandidates(results);
+                setCandidates(appointments);
             }
         } catch (err) {
             console.error('Failed to fetch candidates:', err);
@@ -111,21 +112,16 @@ export default function ManualReviewModal({
     };
 
     const handleApprove = async () => {
-        if (!selectedAppointment) {
-            setError('Please select an appointment first.');
-            return;
-        }
-
         setIsSubmitting(true);
         setError(null);
         try {
-            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
+.toUpperCase()            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
-                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+.toUpperCase().toUpperCase()                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
                 un: orig?.un || reviewData?.UN || '',
                 kemler: orig?.kemler || reviewData?.kemler || '',
                 hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',

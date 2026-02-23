@@ -7,6 +7,7 @@ import type {
     Appointment,
     AppointmentStatusUpdate,
     ArrivalsQueryParams,
+    PaginatedResponse,
     Visit,
     CreateVisitRequest,
     VisitStatusUpdate
@@ -15,11 +16,26 @@ import type {
 const BASE_PATH = '/arrivals';
 
 /**
- * List arrivals with optional filters
+ * List arrivals with server-side pagination, filtering and search.
+ * Normalizes both legacy flat-array responses and the new PaginatedResponse envelope
+ * so callers always receive { items, total, page, limit, pages }.
  */
-export async function getArrivals(params?: ArrivalsQueryParams): Promise<Appointment[]> {
-    const response = await api.get<Appointment[]>(BASE_PATH, { params });
-    return response.data;
+export async function getArrivals(params?: ArrivalsQueryParams): Promise<PaginatedResponse<Appointment>> {
+    const response = await api.get<PaginatedResponse<Appointment> | Appointment[]>(BASE_PATH, { params });
+    const data = response.data;
+
+    // Backend not yet updated — flat array returned
+    if (Array.isArray(data)) {
+        return {
+            items: data,
+            total: data.length,
+            page: params?.page ?? 1,
+            limit: params?.limit ?? data.length,
+            pages: 1,
+        };
+    }
+
+    return data;
 }
 
 /**
@@ -40,10 +56,11 @@ export async function getArrivalsStats(
  */
 export async function getUpcomingArrivals(
     gateId: number,
-    limit: number = 5
+    limit: number = 5,
+    status?: Appointment['status']
 ): Promise<Appointment[]> {
     const response = await api.get<Appointment[]>(`${BASE_PATH}/next/${gateId}`, {
-        params: { limit }
+        params: { limit, status }
     });
     return response.data;
 }

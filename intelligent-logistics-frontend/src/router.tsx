@@ -7,12 +7,17 @@ const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operat
 const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
 const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
 const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList'));
+const ArrivalDetail = React.lazy(() => import('@/pages/gate-operator/ArrivalDetail'));
 const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 
 // Componentes do Gestor Logístico
 const ManagerLayout = React.lazy(() => import('@/components/layout/logistics-manager/ManagerLayout'));
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
 const ShiftsPage = React.lazy(() => import('@/pages/logistics-manager/ShiftsPage'));
+const AnalyticsPage = React.lazy(() => import('@/pages/logistics-manager/AnalyticsPage'));
+const TransportPage = React.lazy(() => import('@/pages/logistics-manager/TransportPage'));
+const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
+const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
 // Rotas Comuns (Login)
 const commonRoutes = [
@@ -38,6 +43,13 @@ const gateRoutes = [
     ],
   },
   {
+    path: '/gate/arrival/:id',
+    element: <GateDetailLayout />,
+    children: [
+      { index: true, element: <ArrivalDetail /> },
+    ],
+  },
+  {
     path: '/gate/alerts',
     element: <GateDetailLayout />,
     children: [
@@ -57,11 +69,10 @@ const managerRoutes = [
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'shifts', element: <ShiftsPage /> },
-      // Placeholder routes - redirect to dashboard for now
-      { path: 'analytics', element: <ManagerDashboard /> },
-      { path: 'transport', element: <ManagerDashboard /> },
-      { path: 'reports', element: <ManagerDashboard /> },
-      { path: 'settings', element: <ManagerDashboard /> },
+      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'transport', element: <TransportPage /> },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
   // Redireciona qualquer rota desconhecida para /manager

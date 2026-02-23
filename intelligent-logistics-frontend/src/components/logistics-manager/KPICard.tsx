@@ -1,6 +1,7 @@
 /**
  * KPI Card Component
- * Displays a single metric with optional trend indicator
+ * Displays a single metric with optional status badge
+ * Change trend is only shown when real data is provided
  */
 import { ArrowUp, ArrowDown } from "lucide-react";
 
@@ -11,7 +12,7 @@ interface KPICardProps {
     value: string | number;
     /** Unit suffix (optional, e.g., "min", "%") */
     unit?: string;
-    /** Change percentage (positive = increase) */
+    /** Change percentage vs previous period (only show if provided from API) */
     change?: number;
     /** Status badge: 'ok' | 'warning' | 'danger' */
     status?: "ok" | "warning" | "danger";
@@ -30,18 +31,13 @@ export default function KPICard({
     statusLabel,
     isLoading = false,
 }: KPICardProps) {
-    const formatChange = (val: number) => {
-        const sign = val >= 0 ? "+" : "";
-        return `${sign}${val.toFixed(1)}%`;
-    };
-
     if (isLoading) {
         return (
-            <div className="kpi-card">
+            <div className="kpi-card kpi-card-loading">
                 <div className="kpi-header">
                     <span className="kpi-title">{title}</span>
                 </div>
-                <div className="kpi-value" style={{ opacity: 0.3 }}>--</div>
+                <div className="kpi-value kpi-value-placeholder">--</div>
             </div>
         );
     }
@@ -56,12 +52,12 @@ export default function KPICard({
             </div>
             <div className="kpi-value">
                 {value}
-                {unit && <span style={{ fontSize: '0.6em', marginLeft: '0.25rem' }}>{unit}</span>}
+                {unit && <span className="kpi-unit">{unit}</span>}
             </div>
-            {change !== undefined && (
+            {change !== undefined && change !== null && (
                 <div className={`kpi-change ${change >= 0 ? "positive" : "negative"}`}>
                     {change >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                    <span>{formatChange(change)} vs. last period</span>
+                    <span>{change >= 0 ? "+" : ""}{change.toFixed(1)}% vs. período anterior</span>
                 </div>
             )}
         </div>

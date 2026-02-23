@@ -12,6 +12,16 @@ export type DirectionEnum = 'inbound' | 'outbound';
 export type AlertTypeEnum = 'generic' | 'safety' | 'problem' | 'operational';
 export type PhysicalStateEnum = 'liquid' | 'solid' | 'gaseous' | 'hybrid';
 
+// ==================== PAGINATION ====================
+
+export interface PaginatedResponse<T> {
+    items: T[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+}
+
 // ==================== CORE ENTITIES ====================
 
 export interface Cargo {
@@ -84,6 +94,7 @@ export interface Appointment {
     expected_duration?: number | null;
     status: AppointmentStatusEnum;
     notes?: string | null;
+    highway_infraction?: boolean;
     booking?: Booking | null;
     driver?: Driver | null;
     truck?: Truck | null;
@@ -118,6 +129,15 @@ export interface VisitStatusUpdate {
     entry_time?: string | null;
     out_time?: string | null;
     notes?: string | null;
+}
+
+// Query params for arrivals endpoint (server-side pagination)
+export interface ArrivalsQueryParams {
+    gate_id?: number;
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
 }
 
 // ==================== ALERTS ====================

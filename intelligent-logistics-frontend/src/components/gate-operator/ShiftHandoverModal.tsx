@@ -51,7 +51,7 @@ export default function ShiftHandoverModal({
             // Also get in_transit arrivals
             const inTransit = await getArrivals({ status: 'in_transit' });
 
-            setPendingArrivals([...arrivals, ...inTransit]);
+            setPendingArrivals([...arrivals.items, ...inTransit.items]);
             setStats(statsData);
         } catch (err) {
             console.error('Failed to fetch handover data:', err);
