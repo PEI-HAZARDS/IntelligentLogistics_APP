@@ -21,12 +21,14 @@ const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/Settings
 
 // Componentes Partilhados
 const WarningSign = React.lazy(() => import('@/pages/shared/WarningSign'));
+const EnergyMetrics = React.lazy(() => import('@/pages/shared/EnergyMetrics'));
 
 // Rotas Comuns (Login)
 const commonRoutes = [
   { path: '/', element: <Login /> },
   { path: '/login', element: <Login /> },
   { path: '/warning-sign', element: <WarningSign /> },
+  { path: '/energy-metrics', element: <EnergyMetrics /> },
 ];
 
 // Rotas do Operador de Portaria
