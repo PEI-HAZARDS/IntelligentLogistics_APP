@@ -115,13 +115,13 @@ export default function ManualReviewModal({
         setIsSubmitting(true);
         setError(null);
         try {
-.toUpperCase()            const lp = selectedAppointment.truck_license_plate || reviewData?.licensePlate || '';
+            const lp = (selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '').toUpperCase();
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
-.toUpperCase().toUpperCase()                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
+                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
                 un: orig?.un || reviewData?.UN || '',
                 kemler: orig?.kemler || reviewData?.kemler || '',
                 hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
