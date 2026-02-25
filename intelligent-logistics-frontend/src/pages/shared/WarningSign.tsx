@@ -6,7 +6,7 @@ export default function WarningSign() {
   const [isActive, setIsActive] = useState(false);
 
   // Stream quality switching via dedicated WebSocket — gate01 camera
-  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId: 'gate01' });
+  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId: 1 });
 
   // Auto-turn off the sign after 10 seconds to simulate a passing truck (simulates triggering the alert and then returning to normal)
   useEffect(() => {
