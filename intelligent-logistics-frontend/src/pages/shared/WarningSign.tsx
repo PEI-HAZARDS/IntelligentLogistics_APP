@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import HLSPlayer from '@/components/gate-operator/HLSPlayer';
-import { getStreamUrl } from '@/config/streams';
+import { useStreamScale } from '@/hooks/useStreamScale';
 
 export default function WarningSign() {
   const [isActive, setIsActive] = useState(false);
+
+  // Stream quality switching via dedicated WebSocket — gate01 camera
+  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId: 'gate01' });
 
   // Auto-turn off the sign after 10 seconds to simulate a passing truck (simulates triggering the alert and then returning to normal)
   useEffect(() => {
@@ -43,10 +46,17 @@ export default function WarningSign() {
                             .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
                         `}</style>
             <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
-              <HLSPlayer
-                streamUrl={getStreamUrl("gate01", "high")}
-                autoPlay={true}
-              />
+              {streamUrl ? (
+                <HLSPlayer
+                  streamUrl={streamUrl}
+                  quality={streamQuality}
+                  autoPlay={true}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>
+                  Loading stream...
+                </div>
+              )}
             </div>
 
             {/* Overlay Grid */}

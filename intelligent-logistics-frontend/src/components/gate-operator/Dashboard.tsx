@@ -5,7 +5,7 @@ import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
 import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
-import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
+import { useStreamScale } from "@/hooks/useStreamScale";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import type { Appointment } from "@/types/types";
@@ -91,7 +91,6 @@ export default function Dashboard() {
   // WebSocket states
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [crops, setCrops] = useState<CropImage[]>([]);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   // Load saved payloads from localStorage on mount
   const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>(() => {
     try {
@@ -123,6 +122,9 @@ export default function Dashboard() {
   const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
   const gateId = userInfo.gate_id || 1;
 
+  // Stream quality switching via dedicated WebSocket (/ws/stream/{gate_id})
+  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId });
+
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
     setArrivalsError(null);
@@ -152,6 +154,8 @@ export default function Dashboard() {
       console.warn('[Dashboard] processPayload returning early - missing message_type', { data });
       return;
     }
+
+
 
     const lp_crop = data.license_crop_url;
     const hz_crop = data.hazard_crop_url;
@@ -445,22 +449,7 @@ export default function Dashboard() {
     };
   }, [fetchData]);
 
-  // Fetch stream URL from API Gateway on mount
-  useEffect(() => {
-    const loadStreamUrl = async () => {
-      try {
-        // Use gate1 format (not gate01) as expected by stream server
-        const gateKey = `gate${gateId}`;
-        const url = await fetchStreamUrl(gateKey, 'high');
-        setStreamUrl(url);
-      } catch (err) {
-        console.error('Failed to fetch stream URL:', err);
-        // Fallback to a default placeholder if API fails
-        setStreamUrl(null);
-      }
-    };
-    loadStreamUrl();
-  }, [gateId]);
+  // Stream URL is managed by useStreamScale hook
 
   const toggleAccordion = (id: string) => {
     setExpandedArrivalId(expandedArrivalId === id ? null : id);
@@ -528,7 +517,7 @@ export default function Dashboard() {
             {streamUrl ? (
               <HLSPlayer
                 streamUrl={streamUrl}
-                quality="high"
+                quality={streamQuality}
                 autoPlay={true}
               />
             ) : (
