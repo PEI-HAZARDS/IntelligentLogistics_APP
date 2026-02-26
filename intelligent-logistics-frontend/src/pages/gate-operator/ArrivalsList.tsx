@@ -18,7 +18,8 @@ import {
   ChevronRight,
   ShieldAlert,
   Pin,
-  PinOff
+  PinOff,
+  Container
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
 import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
@@ -411,7 +412,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Delayed")}
           >
-            <div className="stat-icon"><AlertTriangle size={20} /></div>
+            <div className="stat-icon"><Clock size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
               <span className="stat-label">Delayed</span>
@@ -432,7 +433,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
           >
-            <div className="stat-icon"><Clock size={20} /></div>
+            <div className="stat-icon"><Truck size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
               <span className="stat-label">In Transit</span>
@@ -442,7 +443,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Process")}
           >
-            <div className="stat-icon"><Truck size={20} /></div>
+            <div className="stat-icon"><Container size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
