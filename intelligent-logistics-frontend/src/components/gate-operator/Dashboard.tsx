@@ -521,10 +521,11 @@ export default function Dashboard() {
                 autoPlay={true}
               />
             ) : (
-              <div className="video-loading">
-                <Loader2 size={32} className="spin" />
-                <span>Loading stream...</span>
-              </div>
+              <HLSPlayer
+                streamUrl=""
+                quality="low"
+                autoPlay={false}
+              />
             )}
           </div>
 
@@ -590,11 +591,14 @@ export default function Dashboard() {
             {heldReviews.map((held) => (
               <div
                 key={`held-${held.id}`}
-                className="detection-card severity-warning held-review"
+                className="detection-card severity-warning decision-manual-review"
                 onClick={() => setManualReviewData(held)}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="detection-header">
+                  <span className="decision-badge decision-manual-review">
+                    MANUAL_REVIEW
+                  </span>
                   <span className="decision-badge decision-held">
                     HELD
                   </span>
