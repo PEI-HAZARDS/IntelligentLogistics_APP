@@ -16,10 +16,10 @@
   gap: 12px;
   padding: 14px 16px;
   border-radius: 10px;
-  background: rgba(30, 41, 59, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-surface-glass);
+  border: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   animation: slideIn 0.3s ease-out;
   pointer-events: auto;
 }
@@ -98,19 +98,19 @@
 .toast-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .toast-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-left: auto;
   white-space: nowrap;
 }
 
 .toast-message {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   line-height: 1.4;
   margin: 0;
 }
@@ -133,14 +133,14 @@
   flex-shrink: 0;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   transition: color 0.2s ease;
 }
 
 .toast-close:hover {
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 /* Notification bell icon with badge */

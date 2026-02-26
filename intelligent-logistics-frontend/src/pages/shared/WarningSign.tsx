@@ -6,7 +6,7 @@ export default function WarningSign() {
   const [isActive, setIsActive] = useState(false);
 
   // Stream quality switching via dedicated WebSocket — gate01 camera
-  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId: 1 });
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId: 1 });
 
   // Auto-turn off the sign after 10 seconds to simulate a passing truck (simulates triggering the alert and then returning to normal)
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function WarningSign() {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 xl:p-8 overflow-y-scroll">
-      <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mx-auto">
+      <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center justify-items-center mx-auto">
         {/* Stream Section */}
         <div className="flex flex-col gap-6 w-full">
           <div className="flex flex-col">
@@ -62,6 +62,40 @@ export default function WarningSign() {
             {/* Overlay Grid */}
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0gNDAgMCBMIDAgMCBMIDAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgc3Ryb2tlLXdpZHRoPSIxIi8+Cjwvc3ZnPg==')] opacity-30"></div>
 
+            {/* Stream Scaling Overlay */}
+            <div
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+              style={{
+                opacity: scalingDirection ? 1 : 0,
+                transition: 'opacity 0.4s ease-in-out',
+              }}
+            >
+              <div
+                className="px-6 py-3 rounded-xl font-bold text-lg tracking-wide flex items-center gap-3 backdrop-blur-md border shadow-2xl"
+                style={{
+                  background: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.2)'
+                    : 'rgba(245, 158, 11, 0.2)',
+                  borderColor: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.5)'
+                    : 'rgba(245, 158, 11, 0.5)',
+                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
+                  boxShadow: scalingDirection === 'up'
+                    ? '0 0 30px rgba(16, 185, 129, 0.3)'
+                    : '0 0 30px rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {scalingDirection === 'up' ? (
+                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                  ) : (
+                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                  )}
+                </svg>
+                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
+              </div>
+            </div>
+
             {/* Top Right Status (moved from center & replaced REC tracker) */}
             <div className="absolute top-4 right-4 z-20">
               {isActive ? (
@@ -76,7 +110,26 @@ export default function WarningSign() {
                 </div>
               )}
             </div>
+
+            {/* Top Left — Stream Quality Badge */}
+            <div className="absolute top-4 left-4 z-20">
+              <div
+                className="px-3 py-1.5 rounded font-mono text-xs font-bold backdrop-blur-sm flex items-center gap-2 border"
+                style={{
+                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
+                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
+                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: streamQuality === 'high' ? '#34d399' : '#94a3b8' }}
+                />
+                {streamQuality === 'high' ? 'HD' : 'SD'}
+              </div>
+            </div>
           </div>
+
 
           <button
             onClick={simulateTruck}

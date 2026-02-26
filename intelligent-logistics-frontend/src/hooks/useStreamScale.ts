@@ -20,7 +20,9 @@ export function useStreamScale({ gateId, wsBaseUrl }: UseStreamScaleOptions) {
     const [quality, setQuality] = useState<Quality>("low");
     const [streamUrl, setStreamUrl] = useState<string | null>(null);
     const [wsConnected, setWsConnected] = useState(false);
+    const [scalingDirection, setScalingDirection] = useState<"up" | "down" | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const scalingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 5;
@@ -58,7 +60,13 @@ export function useStreamScale({ gateId, wsBaseUrl }: UseStreamScaleOptions) {
 
                     if (msg.event === "stream_scale") {
                         const newQuality: Quality = msg.mode === "scale_up" ? "high" : "low";
+                        const direction = msg.mode === "scale_up" ? "up" : "down";
                         console.log(`[StreamScale] Switching to ${newQuality} (${msg.quality})`);
+
+                        // Show scaling direction overlay
+                        if (scalingTimerRef.current) clearTimeout(scalingTimerRef.current);
+                        setScalingDirection(direction);
+                        scalingTimerRef.current = setTimeout(() => setScalingDirection(null), 3500);
 
                         const gateKey = `gate${gateId}`;
                         const newUrl = await getStreamUrl(gateKey, newQuality);
@@ -105,5 +113,5 @@ export function useStreamScale({ gateId, wsBaseUrl }: UseStreamScaleOptions) {
         };
     }, [gateId, base]);
 
-    return { streamUrl, quality, wsConnected };
+    return { streamUrl, quality, wsConnected, scalingDirection };
 }

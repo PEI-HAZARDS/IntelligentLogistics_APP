@@ -176,12 +176,12 @@ export default function AlertsPage() {
             {/* Alerts List */}
             <div className="alerts-list">
                 {isLoading ? (
-                    <div className="empty-state" style={{ padding: "3rem", textAlign: "center" }}>
+                    <div className="empty-state">
                         <Loader2 size={32} className="spin" />
-                        <span style={{ marginLeft: "0.5rem" }}>Loading alerts...</span>
+                        <span>Loading alerts...</span>
                     </div>
                 ) : filteredAlerts.length === 0 ? (
-                    <div className="empty-state" style={{ padding: "3rem", textAlign: "center" }}>
+                    <div className="empty-state">
                         <Bell size={48} style={{ color: "var(--text-muted)", marginBottom: "1rem" }} />
                         <p>No alerts found.</p>
                     </div>

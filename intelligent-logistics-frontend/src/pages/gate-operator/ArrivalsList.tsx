@@ -18,25 +18,11 @@ import {
   ChevronRight,
   ShieldAlert,
   Pin,
-  PinOff
+  PinOff,
+  Container
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
-import { getActiveAlerts } from "@/services/alerts";
-import type { Appointment, AppointmentStatusEnum, Alert, ArrivalsQueryParams } from "@/types/types";
-
-// Map API severity to UI
-function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
-  if (type === "problem" || type === "safety") return "danger";
-  if (type === "operational") return "warning";
-  return "info";
-}
-
-// Map API alert type to UI type
-function mapAlertType(type: string): "plate" | "safety" | "adr" {
-  if (type === "safety" || type === "problem") return "adr";
-  if (type === "operational") return "safety";
-  return "plate";
-}
+import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
 
 // Map API status to English display
 function mapStatusToLabel(status: AppointmentStatusEnum): string {
@@ -63,17 +49,6 @@ function mapStatusToAPI(status: string): AppointmentStatusEnum {
   };
   return statusMap[status] || "in_transit";
 }
-
-// UI types for component state
-type UIAlert = {
-  id: string;
-  type: "plate" | "safety" | "adr";
-  title: string;
-  description: string;
-  time: string;
-  severity?: "warning" | "danger" | "info";
-};
-
 type UIArrival = {
   id: number;
   plate: string;
@@ -93,7 +68,6 @@ function ArrivalsList() {
 
   // API data states
   const [arrivals, setArrivals] = useState<UIArrival[]>([]);
-  const [alerts, setAlerts] = useState<UIAlert[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -173,16 +147,6 @@ function ArrivalsList() {
     highwayInfraction: arrival.highway_infraction || false,
   });
 
-  // Map API alert to UI
-  const mapAlertToUI = (alert: Alert): UIAlert => ({
-    id: String(alert.id),
-    type: mapAlertType(alert.type),
-    title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
-    description: alert.description || "Alert without description",
-    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-    severity: mapAlertSeverity(alert.type),
-  });
-
   // Fetch data function
   const fetchData = useCallback(async () => {
     setError(null);
@@ -198,9 +162,8 @@ function ArrivalsList() {
       }
       if (debouncedSearch) arrivalsParams.search = debouncedSearch;
 
-      const [arrivalsData, alertsData, statsData] = await Promise.all([
+      const [arrivalsData, statsData] = await Promise.all([
         getArrivals(arrivalsParams),
-        getActiveAlerts(20),
         getArrivalsStats(gateId),
       ]);
 
@@ -238,7 +201,6 @@ function ArrivalsList() {
       setArrivals(mapped);
       setServerPages(arrivalsData.pages);
       setServerTotal(arrivalsData.total);
-      setAlerts(alertsData.map(mapAlertToUI));
       setStats(statsData);
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -327,7 +289,7 @@ function ArrivalsList() {
 
   return (
     <div className="arrivals-list-page">
-      {/* Álerta Sidebar — collapsible */}
+      {/* Alerts Sidebar — collapsible, shows recent detections */}
       <aside className={`alerts-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="sidebar-header">
           {!sidebarCollapsed && <h2 className="sidebar-title">Latest Alerts</h2>}
@@ -340,28 +302,59 @@ function ArrivalsList() {
           </button>
         </div>
         {!sidebarCollapsed && (
-          <div className="alerts-list">
-            {isLoading && alerts.length === 0 ? (
-              <div className="loading-state">
-                <Loader2 size={20} className="spin" />
-                <span>Loading...</span>
-              </div>
-            ) : alerts.length === 0 ? (
-              <div className="empty-state">
-                <span>No recent alerts.</span>
-              </div>
-            ) : (
-              alerts.map((alert) => (
-                <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
-                  <div className="alert-header">
-                    <h4>{alert.title}</h4>
-                    <span className="alert-time">{alert.time}</span>
-                  </div>
-                  <p className="alert-description">{alert.description}</p>
-                </div>
-              ))
-            )}
-          </div>
+          <>
+            <div className="alerts-list">
+              {(() => {
+                try {
+                  const saved = localStorage.getItem('ws_payloads');
+                  if (!saved) return (
+                    <div className="empty-state">
+                      <span>No recent alerts.</span>
+                    </div>
+                  );
+                  const messages = JSON.parse(saved) as Array<{ id: string; timestamp: string; data: any }>;
+                  if (messages.length === 0) return (
+                    <div className="empty-state">
+                      <span>No recent alerts.</span>
+                    </div>
+                  );
+                  // Sort newest first, take last 10
+                  const sorted = [...messages]
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .slice(0, 10);
+                  return sorted.map((msg) => {
+                    const payload = msg.data?.payload || msg.data;
+                    const decision = payload?.decision || "UNKNOWN";
+                    const plate = payload?.licensePlate || "N/A";
+                    const time = new Date(msg.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+                    const severity = decision === "REJECTED" ? "danger" : decision === "MANUAL_REVIEW" ? "warning" : "info";
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`alert-card severity-${severity}`}
+                        onClick={() => navigate('/gate')}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="alert-header">
+                          <h4>{plate}</h4>
+                          <span className="alert-time">{time}</span>
+                        </div>
+                        <span className={`decision-badge decision-${decision.toLowerCase().replace("_", "-")}`}>
+                          {decision}
+                        </span>
+                      </div>
+                    );
+                  });
+                } catch {
+                  return (
+                    <div className="empty-state">
+                      <span>No recent alerts.</span>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          </>
         )}
       </aside>
 
@@ -419,7 +412,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Delayed")}
           >
-            <div className="stat-icon"><AlertTriangle size={20} /></div>
+            <div className="stat-icon"><Clock size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
               <span className="stat-label">Delayed</span>
@@ -440,7 +433,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
           >
-            <div className="stat-icon"><Clock size={20} /></div>
+            <div className="stat-icon"><Truck size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
               <span className="stat-label">In Transit</span>
@@ -450,7 +443,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Process")}
           >
-            <div className="stat-icon"><Truck size={20} /></div>
+            <div className="stat-icon"><Container size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
@@ -468,51 +461,40 @@ function ArrivalsList() {
           </div>
         </div>
 
-        {/* Tabela/Cards e Filtros Integrados */}
+        {/* Tabela/Cards — unified filter bar */}
         <div className="arrivals-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Table header row */}
-          <div className="content-header" style={{ marginBottom: 0 }}>
+          {/* Unified inline bar: title + filters + actions */}
+          <div className="arrivals-toolbar">
             <h3 className="content-title">Arrivals List</h3>
             <span className="content-count">
               {displayArrivals.length} {displayArrivals.length === 1 ? 'arrival' : 'arrivals'}
             </span>
-          </div>
-
-          {/* Filtros Integrados */}
-          <div className="filters-section" style={{ margin: 0, padding: 0, background: 'transparent', border: 'none' }}>
-            <div className="filters-grid" style={{ marginBottom: 0 }}>
-              <div className="filter-group">
-                <label htmlFor="dock-filter">Dock</label>
-                <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
-                  <option value="all">All Docks</option>
-                  {availableDocks.map((dock) => (
-                    <option key={dock} value={dock}>Dock {dock}</option>
-                  ))}
-                </select>
-              </div>
-              {/* O filtro de status foi removido daqui pois está sendo controlado pelos cards acima */}
-              <div className="filter-group">
-                <label htmlFor="search-input">Search</label>
-                <input
-                  id="search-input"
-                  type="text"
-                  placeholder="License plate..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="filter-group filter-actions-inline">
-                <label>&nbsp;</label>
-                <div className="filter-buttons">
-                  <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
-                    <Trash2 size={18} />
-                  </button>
-                  <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
-                    {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <div className="toolbar-spacer" />
+            <select
+              id="dock-filter"
+              className="toolbar-select"
+              value={dockFilter}
+              onChange={(e) => setDockFilter(e.target.value)}
+            >
+              <option value="all">All Docks</option>
+              {availableDocks.map((dock) => (
+                <option key={dock} value={dock}>Dock {dock}</option>
+              ))}
+            </select>
+            <input
+              id="search-input"
+              className="toolbar-search"
+              type="text"
+              placeholder="License plate..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
+              <Trash2 size={18} />
+            </button>
+            <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
+              {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
+            </button>
           </div>
 
           {isLoading && arrivals.length === 0 ? (
