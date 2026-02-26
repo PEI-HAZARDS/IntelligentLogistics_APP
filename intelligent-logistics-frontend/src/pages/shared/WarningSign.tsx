@@ -25,7 +25,7 @@ export default function WarningSign() {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 xl:p-8 overflow-y-scroll">
-      <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mx-auto">
+      <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center justify-items-center mx-auto">
         {/* Stream Section */}
         <div className="flex flex-col gap-6 w-full">
           <div className="flex flex-col">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw } from "lucide-react";
 
 type HLSPlayerProps = {
   streamUrl: string;
@@ -15,43 +15,43 @@ export default function HLSPlayer({
 }: HLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">(() => "loading");
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const retryCountRef = useRef(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">("loading");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Remove effect that sets state synchronously
-
-  const startPlayback = useCallback(async () => {
+  const connectStream = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    try {
-      video.muted = true; // Ensure it is muted for autoplay
-      await video.play();
-      setStatus("playing");
-      console.log(`[${quality.toUpperCase()}] Playback started`);
-    } catch (err) {
-      console.warn("Play failed:", err);
-      setStatus("ready");
-    }
-  }, [quality]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    // Clear previous instance if it exists
+    // Clear previous instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
 
-    // Avoid calling setState synchronously in effect
-    // Instead, set loading state before effect runs
-    // This can be handled by another useEffect or by updating state when streamUrl/quality changes
+    setStatus("loading");
+    setErrorMessage("");
+    retryCountRef.current = 0;
+
+    // No URL provided — show error immediately
+    if (!streamUrl) {
+      setStatus("error");
+      setErrorMessage("Stream not configured");
+      return;
+    }
 
     console.log(`[${quality.toUpperCase()}] Connecting to:`, streamUrl);
 
-    // Check HLS.js support
+    // Connection timeout — if not ready in 15s, show error
+    timeoutRef.current = setTimeout(() => {
+      setStatus("error");
+      setErrorMessage("Connection timed out");
+    }, 15000);
+
     if (Hls.isSupported()) {
       const hls = new Hls({
         debug: false,
@@ -67,129 +67,95 @@ export default function HLSPlayer({
           default: {
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
-            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 0 },
-            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 1000, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 2, retryDelayMs: 1000, maxRetryDelayMs: 4000 },
           },
         },
         playlistLoadPolicy: {
           default: {
             maxTimeToFirstByteMs: 10000,
             maxLoadTimeMs: 10000,
-            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 2, retryDelayMs: 1000, maxRetryDelayMs: 4000 },
           },
         },
         fragLoadPolicy: {
           default: {
-            maxTimeToFirstByteMs: 20000,
-            maxLoadTimeMs: 20000,
-            timeoutRetry: { maxNumRetry: 6, retryDelayMs: 0, maxRetryDelayMs: 0 },
-            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            maxTimeToFirstByteMs: 15000,
+            maxLoadTimeMs: 15000,
+            timeoutRetry: { maxNumRetry: 3, retryDelayMs: 0, maxRetryDelayMs: 0 },
+            errorRetry: { maxNumRetry: 3, retryDelayMs: 1000, maxRetryDelayMs: 4000 },
           },
         },
       });
 
       hlsRef.current = hls;
 
-      hls.on(Hls.Events.MANIFEST_LOADING, () => {
-        console.log(`[${quality.toUpperCase()}] Loading manifest...`);
-      });
-
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setStatus("ready");
-        console.log(`[${quality.toUpperCase()}] Manifest parsed, stream ready`);
-
         if (autoPlay) {
-          setTimeout(() => startPlayback(), 500);
+          setTimeout(async () => {
+            try {
+              video.muted = true;
+              await video.play();
+              setStatus("playing");
+            } catch {
+              setStatus("ready");
+            }
+          }, 500);
         }
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error(`[${quality.toUpperCase()}] HLS Error:`, data);
-
         if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              setErrorMessage("Network Error - Stream unavailable");
-              setStatus("error");
-              console.log("Attempting to recover from network error...");
-              setTimeout(() => {
-                if (hlsRef.current) {
-                  hlsRef.current.startLoad();
-                }
-              }, 3000);
-              break;
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          retryCountRef.current++;
 
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              setErrorMessage("Media Error - Recovering...");
-              console.log("Attempting to recover from media error...");
-              hls.recoverMediaError();
-              break;
-
-            default:
-              setStatus("error");
-              setErrorMessage(`Stream unavailable: ${data.details}`);
-              break;
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retryCountRef.current <= 2) {
+            hls.recoverMediaError();
+            return;
           }
+
+          setStatus("error");
+          setErrorMessage(
+            data.type === Hls.ErrorTypes.NETWORK_ERROR
+              ? "Stream unavailable"
+              : "Stream error"
+          );
         }
       });
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
-        if (status === "error") {
-          setStatus("ready");
-          setErrorMessage("");
-        }
+        retryCountRef.current = 0;
       });
 
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
-
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Native support (Safari)
-      console.log(`[${quality.toUpperCase()}] Using native HLS`);
       video.src = streamUrl;
-
-      // Set status to "ready" when video data is loaded
-      const handleNativeLoadedData = () => {
+      video.addEventListener("loadeddata", () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setStatus("ready");
-        video.removeEventListener("loadeddata", handleNativeLoadedData);
-        if (autoPlay) {
-          setTimeout(() => startPlayback(), 500);
-        }
-      };
-      video.addEventListener("loadeddata", handleNativeLoadedData);
+        if (autoPlay) video.play().catch(() => { });
+      }, { once: true });
     } else {
-      setTimeout(() => {
-        setStatus("error");
-        setErrorMessage("Browser does not support HLS streaming");
-      }, 0);
-    }
-
-    // Video event listeners
-    const handleLoadedData = () => {
-      console.log(`[${quality.toUpperCase()}] Video loaded`);
-    };
-
-    const handleError = (e: Event) => {
-      console.error(`[${quality.toUpperCase()}] Video error:`, e);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setStatus("error");
-      setErrorMessage("Error loading stream");
-    };
+      setErrorMessage("Browser does not support HLS");
+    }
+  }, [streamUrl, quality, autoPlay]);
 
-    video.addEventListener("loadeddata", handleLoadedData);
-    video.addEventListener("error", handleError);
-
-    // Cleanup
+  useEffect(() => {
+    connectStream();
     return () => {
-      video.removeEventListener("loadeddata", handleLoadedData);
-      video.removeEventListener("error", handleError);
-
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [streamUrl, quality, autoPlay, startPlayback]);
+  }, [connectStream]);
 
   return (
     <div className="hls-player-container">
@@ -202,19 +168,18 @@ export default function HLSPlayer({
       />
       {status === "loading" && (
         <div className="stream-overlay loading">
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Loader2 size={20} className="animate-spin" /> Connecting to stream...
-          </span>
+          <Loader2 size={24} className="animate-spin" />
+          <span>Connecting...</span>
         </div>
       )}
 
       {status === "error" && (
         <div className="stream-overlay error">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-            <AlertCircle size={20} /> {errorMessage}
-          </div>
-          <button className="retry-button" onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <RefreshCw size={16} /> Try Again
+          <WifiOff size={32} />
+          <span>{errorMessage}</span>
+          <button className="retry-button" onClick={connectStream}>
+            <RefreshCw size={16} />
+            Reconnect
           </button>
         </div>
       )}
