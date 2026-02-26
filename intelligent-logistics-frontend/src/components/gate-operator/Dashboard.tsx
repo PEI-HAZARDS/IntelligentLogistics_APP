@@ -123,7 +123,7 @@ export default function Dashboard() {
   const gateId = userInfo.gate_id || 1;
 
   // Stream quality switching via dedicated WebSocket (/ws/stream/{gate_id})
-  const { streamUrl, quality: streamQuality } = useStreamScale({ gateId });
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
@@ -527,6 +527,93 @@ export default function Dashboard() {
                 autoPlay={false}
               />
             )}
+
+            {/* Stream Scaling Overlay */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 30,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                opacity: scalingDirection ? 1 : 0,
+                transition: 'opacity 0.4s ease-in-out',
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '0.75rem',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  letterSpacing: '0.03em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid',
+                  background: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.2)'
+                    : 'rgba(245, 158, 11, 0.2)',
+                  borderColor: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.5)'
+                    : 'rgba(245, 158, 11, 0.5)',
+                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
+                  boxShadow: scalingDirection === 'up'
+                    ? '0 0 30px rgba(16, 185, 129, 0.3)'
+                    : '0 0 30px rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {scalingDirection === 'up' ? (
+                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                  ) : (
+                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                  )}
+                </svg>
+                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
+              </div>
+            </div>
+
+            {/* Top Left — Stream Quality Badge */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.5rem',
+                left: '0.5rem',
+                zIndex: 20,
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  border: '1px solid',
+                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
+                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
+                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                  }}
+                />
+                {streamQuality === 'high' ? 'HD' : 'SD'}
+              </div>
+            </div>
           </div>
 
           {/* Crops column - real-time images from WebSocket/MinIO */}
