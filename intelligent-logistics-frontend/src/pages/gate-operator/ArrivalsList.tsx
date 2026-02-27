@@ -208,6 +208,8 @@ function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
+      // Painel de debug removido
+      // console.log('Stats Data:', statsData);
   }, [gateId, currentPage, debouncedSearch, statusFilter, pinnedArrivals]);
 
   // Time update effect
