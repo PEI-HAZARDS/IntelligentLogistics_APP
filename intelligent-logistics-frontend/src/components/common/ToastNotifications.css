@@ -155,7 +155,9 @@
   min-width: 16px;
   height: 16px;
   background: #ef4444;
-  color: white;
+  color: #fff;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,0.08);
   font-size: 10px;
   font-weight: 600;
   border-radius: 8px;

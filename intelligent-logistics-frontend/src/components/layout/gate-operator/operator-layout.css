@@ -1,3 +1,15 @@
+/* Automated badge (light mode) */
+.status-badge.status-automated {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #6366f1;
+}
+
+.light-mode .status-badge.status-automated {
+  background: #c7d2fe;
+  color: #3730a3;
+  border: 1px solid #6366f1;
+}
 /* Theme Variables — Material Design Color System */
 :root {
   /* Dark Theme (Default) - Slate Blue Palette */
@@ -553,9 +565,15 @@
 }
 
 .decision-badge.decision-manual-review {
-  background: rgba(251, 191, 36, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.light-mode .decision-badge.decision-manual-review {
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 /* Source Badge - Shows if decision came from Engine or Operator */
@@ -569,15 +587,27 @@
 }
 
 .source-badge.source-automated {
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+}
+
+.light-mode .source-badge.source-automated {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
 }
 
 .source-badge.source-operator {
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.light-mode .source-badge.source-operator {
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 .detection-time {
@@ -636,6 +666,22 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+/* Light mode overrides for detection fields contrast */
+.light-mode .detection-field .field-label {
+  color: #475569;
+  /* darker slate gray */
+}
+
+.light-mode .detection-field .field-value {
+  color: #0f172a;
+  /* almost black */
+}
+
+.light-mode .detection-field .field-description {
+  color: #334155;
+  /* dark slate gray */
 }
 
 /* Coluna Direita - Próximas Chegadas */
@@ -1143,6 +1189,30 @@
 .stat-label {
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+/* Light Mode Overrides for Stats */
+.light-mode .stat-card {
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.light-mode .stat-card.violators {
+  background: #fff5f5;
+  /* Light red */
+  border-color: #fecaca;
+}
+
+.light-mode .stat-card.violators .stat-icon {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.light-mode .stat-value {
+  color: #000000;
+}
+
+.light-mode .stat-label {
+  color: #333333;
 }
 
 /* Filters */
@@ -1760,9 +1830,9 @@ html {
 }
 
 .status-badge.status-delayed {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  background: #fef08a;
+  color: #b45309;
+  border: 1px solid #fde047;
 }
 
 .status-badge.status-completed {
@@ -1788,6 +1858,21 @@ html {
   color: #ef4444 !important;
   border: 1px solid #ef4444 !important;
   font-weight: 700;
+}
+
+/* Light mode overrides for status badges */
+.light-mode .status-badge.status-delayed {
+  background: #fef08a;
+  color: #b45309;
+  border: 1px solid #fde047;
+}
+
+.light-mode .status-badge.status-highway-infraction {
+  background: rgba(239, 68, 68, 0.15) !important;
+  /* light red */
+  color: #991b1b !important;
+  /* dark red */
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
 }
 
 /* Portuguese status classes (legacy) */
@@ -2209,7 +2294,7 @@ html {
 .modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: 12px;
   width: 100%;
   max-width: 500px;
   box-shadow: var(--shadow-lg);
@@ -2226,6 +2311,9 @@ html {
   justify-content: space-between;
   align-items: center;
   background: var(--bg-card);
+  border-top-left-radius: 11px;
+  /* Inner radius to fit the modal content */
+  border-top-right-radius: 11px;
 }
 
 .modal-title {
@@ -2416,6 +2504,23 @@ html {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* Light Mode Overrides for WebSocket Badges */
+.light-mode .ws-badge.connected {
+  background: rgba(34, 197, 94, 0.15);
+  /* Light green */
+  color: #15803d;
+  /* Darker green */
+  border-color: rgba(21, 128, 61, 0.3);
+}
+
+.light-mode .ws-badge.disconnected {
+  background: rgba(239, 68, 68, 0.15);
+  /* Light red */
+  color: #b91c1c;
+  /* Darker red */
+  border-color: rgba(185, 28, 28, 0.3);
+}
+
 /* Refresh button */
 .refresh-btn {
   background: transparent;
@@ -2466,6 +2571,14 @@ html {
   padding: 2px 6px;
   border-radius: 4px;
   animation: pulse 1.5s infinite;
+}
+
+/* Light Mode Override for LIVE indicator */
+.light-mode .crop-thumb .live-badge {
+  background: #b91c1c;
+  /* Darker red */
+  box-shadow: 0 0 4px rgba(185, 28, 28, 0.5);
+  /* Stronger glow to stand out against light backgrounds */
 }
 
 @keyframes pulse {
@@ -2570,6 +2683,29 @@ html {
 
 .error-banner button:hover {
   color: #ef4444;
+}
+
+/* Light Mode Overrides for Error Banner */
+.light-mode .error-banner,
+.light-mode .error-message {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.light-mode .error-banner svg,
+.light-mode .error-message svg {
+  color: #b91c1c;
+}
+
+.light-mode .error-banner button,
+.light-mode .error-message button {
+  color: #991b1b;
+}
+
+.light-mode .error-banner button:hover,
+.light-mode .error-message button:hover {
+  color: #b91c1c;
 }
 
 /* ========== SHIFT HANDOVER MODAL ========== */
