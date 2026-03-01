@@ -1,105 +1,10 @@
-/* Automated badge (light mode) */
+@import '../shared/theme-base.css';
+
+/* Automated badge */
 .status-badge.status-automated {
-  background: #e0e7ff;
-  color: #3730a3;
-  border: 1px solid #6366f1;
-}
-
-.light-mode .status-badge.status-automated {
-  background: #c7d2fe;
-  color: #3730a3;
-  border: 1px solid #6366f1;
-}
-/* Theme Variables — Material Design Color System */
-:root {
-  /* Dark Theme (Default) - Slate Blue Palette */
-  --bg-primary: #0f172a;
-  --bg-gradient: radial-gradient(circle at 15% 25%, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.9) 90%);
-  --bg-surface: rgba(30, 41, 59, 0.6);
-  --bg-surface-glass: rgba(30, 41, 59, 0.85);
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-hover: rgba(51, 65, 85, 0.8);
-  --bg-dropdown: #1e293b;
-  --bg-header: #1e293b;
-  --bg-secondary: #1e293b;
-  --bg-hover: rgba(51, 65, 85, 0.6);
-  --accent-bg: rgba(2, 119, 189, 0.15);
-  --accent-hover: #0288D1;
-
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(41, 182, 246, 0.4);
-
-  --accent-color: #0277BD;
-  /* Material Light Blue 800 — aligned with logo */
-  --accent-gradient: linear-gradient(135deg, #29B6F6 0%, #0277BD 100%);
-
-  --icon-color: #cbd5e1;
-  --icon-color-hover: #f8fafc;
-
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
-
-  /* Semantic Status Colors — Dark mode */
-  --color-success: #4CAF50;
-  /* Material Green 500 */
-  --color-danger: #EF5350;
-  /* Material Red 400 */
-  --color-warning: #FFA726;
-  /* Material Orange 400 */
-  --color-info: #29B6F6;
-  /* Material Light Blue 400 */
-}
-
-/* Light Theme Overrides */
-.light-mode {
-  --bg-primary: #ECEFF1;
-  /* Material Blue Gray 50 — warm depth */
-  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #ECEFF1 100%);
-  --bg-surface: rgba(255, 255, 255, 0.85);
-  --bg-surface-glass: rgba(255, 255, 255, 0.92);
-  --bg-card: #ffffff;
-  --bg-card-hover: #F5F5F5;
-  --bg-dropdown: #ffffff;
-  --bg-header: #ffffff;
-  --bg-secondary: #FAFAFA;
-  --bg-hover: rgba(0, 0, 0, 0.06);
-  --accent-bg: rgba(1, 87, 155, 0.08);
-  --accent-hover: #004c8c;
-
-  --text-primary: #1e293b;
-  --text-secondary: #455A64;
-  /* Material Blue Gray 700 */
-  --text-muted: #607D8B;
-  /* Material Blue Gray 500 */
-
-  --border-color: rgba(0, 0, 0, 0.15);
-  /* More visible for industrial screens */
-  --border-hover: rgba(2, 119, 189, 0.4);
-
-  --accent-color: #01579B;
-  /* Material Light Blue 900 — high contrast on white */
-  --accent-gradient: linear-gradient(135deg, #0277BD 0%, #01579B 100%);
-
-  --icon-color: #455A64;
-  --icon-color-hover: #0f172a;
-
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
-  /* More visible elevation */
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
-
-  /* Semantic Status Colors — Light mode (darker for white bg WCAG) */
-  --color-success: #2E7D32;
-  /* Material Green 800 */
-  --color-danger: #C62828;
-  /* Material Red 800 */
-  --color-warning: #E65100;
-  /* Material Orange 900 */
-  --color-info: #01579B;
-  /* Material Light Blue 900 */
+  background: var(--badge-accent-bg);
+  color: var(--badge-accent-text);
+  border: 1px solid var(--badge-accent-border);
 }
 
 /* Layout Principal */
@@ -534,9 +439,9 @@
 .detection-header .decision-reason {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #FF7518;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--badge-reason-text);
+  background: var(--badge-reason-bg);
+  border: 1px solid var(--badge-reason-border);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   text-transform: uppercase;
@@ -553,27 +458,21 @@
 }
 
 .decision-badge.decision-accepted {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .decision-badge.decision-rejected {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .decision-badge.decision-manual-review {
-  background: #fef9c3;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
-.light-mode .decision-badge.decision-manual-review {
-  background: #fef9c3;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 /* Source Badge - Shows if decision came from Engine or Operator */
@@ -587,27 +486,15 @@
 }
 
 .source-badge.source-automated {
-  background: #e0e7ff;
-  color: #3730a3;
-  border: 1px solid #a5b4fc;
-}
-
-.light-mode .source-badge.source-automated {
-  background: #e0e7ff;
-  color: #3730a3;
-  border: 1px solid #a5b4fc;
+  background: var(--badge-accent-bg);
+  color: var(--badge-accent-text);
+  border: 1px solid var(--badge-accent-border);
 }
 
 .source-badge.source-operator {
-  background: #fef9c3;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
-.light-mode .source-badge.source-operator {
-  background: #fef9c3;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .detection-time {
@@ -1824,74 +1711,59 @@ html {
 
 /* English status classes */
 .status-badge.status-in-transit {
-  background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .status-badge.status-delayed {
-  background: #fef08a;
-  color: #b45309;
-  border: 1px solid #fde047;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .status-badge.status-completed {
-  background: rgba(52, 211, 153, 0.2);
-  color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .status-badge.status-canceled {
-  background: rgba(148, 163, 184, 0.2);
-  color: #94a3b8;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
 .status-badge.status-in-process {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: var(--badge-accent-bg);
+  color: var(--badge-accent-text);
+  border: 1px solid var(--badge-accent-border);
 }
 
 .status-badge.status-highway-infraction {
-  background: rgba(220, 38, 38, 0.2) !important;
-  color: #ef4444 !important;
-  border: 1px solid #ef4444 !important;
+  background: var(--badge-danger-bg) !important;
+  color: var(--badge-danger-text) !important;
+  border: 1px solid var(--badge-danger-border) !important;
   font-weight: 700;
-}
-
-/* Light mode overrides for status badges */
-.light-mode .status-badge.status-delayed {
-  background: #fef08a;
-  color: #b45309;
-  border: 1px solid #fde047;
-}
-
-.light-mode .status-badge.status-highway-infraction {
-  background: rgba(239, 68, 68, 0.15) !important;
-  /* light red */
-  color: #991b1b !important;
-  /* dark red */
-  border: 1px solid rgba(239, 68, 68, 0.4) !important;
 }
 
 /* Portuguese status classes (legacy) */
 .status-badge.status-pendente {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .status-badge.status-em-descarga {
-  background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .status-badge.status-concluído {
-  background: rgba(52, 211, 153, 0.2);
-  color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .btn-icon {
@@ -3644,9 +3516,9 @@ html {
 
 /* ========== HELD REVIEWS ========== */
 .decision-badge.decision-held {
-  background: rgba(245, 158, 11, 0.2);
-  border: 1px solid #f59e0b;
-  color: #f59e0b;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
+  color: var(--badge-warning-text);
 }
 
 .held-hint {
