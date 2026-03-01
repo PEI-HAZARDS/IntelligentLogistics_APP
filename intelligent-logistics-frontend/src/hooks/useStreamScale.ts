@@ -8,6 +8,33 @@ interface UseStreamScaleOptions {
     wsBaseUrl?: string;
 }
 
+function normalizeWsBaseUrl(rawBaseUrl?: string): string {
+    const fallback = "ws://10.255.32.70:8000/api";
+    const input = rawBaseUrl?.trim() || fallback;
+
+    if (/^wss?:\/\//i.test(input)) {
+        return input.replace(/\/+$/, "");
+    }
+
+    if (/^https?:\/\//i.test(input)) {
+        try {
+            const url = new URL(input);
+            url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+            return url.toString().replace(/\/+$/, "");
+        } catch {
+            return fallback;
+        }
+    }
+
+    const sanitized = input.replace(/^\/+/, "").replace(/\/+$/, "");
+    if (typeof window !== "undefined") {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${sanitized}`;
+    }
+
+    return `ws://${sanitized}`;
+}
+
 /**
  * Hook that manages stream quality switching via the dedicated
  * /ws/stream/{gate_id} WebSocket endpoint.
@@ -27,7 +54,7 @@ export function useStreamScale({ gateId, wsBaseUrl }: UseStreamScaleOptions) {
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 5;
 
-    const base = wsBaseUrl || import.meta.env.VITE_WS_URL || "ws://10.255.32.70:8000/api";
+    const base = normalizeWsBaseUrl(wsBaseUrl || import.meta.env.VITE_WS_URL);
 
     // Fetch initial stream URL (low quality by default)
     useEffect(() => {
@@ -78,15 +105,17 @@ export function useStreamScale({ gateId, wsBaseUrl }: UseStreamScaleOptions) {
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (event) => {
                 setWsConnected(false);
                 wsRef.current = null;
-                console.warn(`[StreamScale] Disconnected for gate ${gateId}`);
+                console.warn(
+                    `[StreamScale] Disconnected for gate ${gateId} (code=${event.code}, reason="${event.reason || "no-reason"}", clean=${event.wasClean})`
+                );
                 attemptReconnect();
             };
 
             ws.onerror = (err) => {
-                console.error("[StreamScale] WebSocket error:", err);
+                console.error("[StreamScale] WebSocket error:", err, "readyState=", ws.readyState);
             };
         }
 

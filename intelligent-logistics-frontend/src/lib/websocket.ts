@@ -53,6 +53,33 @@ export interface CropUpdate {
     timestamp: string;
 }
 
+function normalizeWsBaseUrl(rawBaseUrl?: string): string {
+    const fallback = 'ws://10.255.32.70:8000/api';
+    const input = rawBaseUrl?.trim() || fallback;
+
+    if (/^wss?:\/\//i.test(input)) {
+        return input.replace(/\/+$/, '');
+    }
+
+    if (/^https?:\/\//i.test(input)) {
+        try {
+            const url = new URL(input);
+            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+            return url.toString().replace(/\/+$/, '');
+        } catch {
+            return fallback;
+        }
+    }
+
+    const sanitized = input.replace(/^\/+/, '').replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${sanitized}`;
+    }
+
+    return `ws://${sanitized}`;
+}
+
 class GateWebSocket {
     private ws: WebSocket | null = null;
     private gateId: string | number;
@@ -68,7 +95,7 @@ class GateWebSocket {
     constructor(gateId: string | number, baseUrl?: string) {
         this.gateId = gateId;
         // Default to API Gateway WebSocket URL
-        this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://10.255.32.70:8000/api';
+        this.baseUrl = normalizeWsBaseUrl(baseUrl || import.meta.env.VITE_WS_URL);
     }
 
     /**
@@ -115,14 +142,16 @@ class GateWebSocket {
             };
 
             this.ws.onclose = (event) => {
-                console.log(`[WS] Connection closed: ${event.code} ${event.reason}`);
+                console.warn(
+                    `[WS] Connection closed (code=${event.code}, reason="${event.reason || 'no-reason'}", clean=${event.wasClean})`
+                );
                 this.ws = null;
                 this.disconnectHandlers.forEach(handler => handler());
                 this.attemptReconnect();
             };
 
             this.ws.onerror = (error) => {
-                console.error('[WS] Error:', error);
+                console.error('[WS] Error:', error, 'readyState=', this.ws?.readyState);
             };
         } catch (err) {
             console.error('[WS] Failed to create WebSocket:', err);
