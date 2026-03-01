@@ -43,6 +43,22 @@ export default function ManualReviewModal({
     const [error, setError] = useState<string | null>(null);
     const [searchPlate, setSearchPlate] = useState('');
 
+    // ESC key handler - Hold automatically
+    useEffect(() => {
+        if (!isOpen || !reviewData || isSubmitting) return;
+
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onHold(reviewData);
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, reviewData, isSubmitting, onHold, onClose]);
+
     // Load candidates when modal opens or reviewData changes
     useEffect(() => {
         if (isOpen && reviewData) {
