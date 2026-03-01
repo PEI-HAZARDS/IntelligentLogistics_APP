@@ -246,18 +246,18 @@
 }
 
 .kpi-badge.ok {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    background: #bbf7d0;
+    color: #166534;
 }
 
 .kpi-badge.warning {
-    background: rgba(234, 179, 8, 0.15);
-    color: #eab308;
+    background: #fef9c3;
+    color: #92400e;
 }
 
 .kpi-badge.danger {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background: #fecaca;
+    color: #991b1b;
 }
 
 .kpi-value {
@@ -685,18 +685,33 @@
 }
 
 .status-badge.active {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    background: #bbf7d0;
+    color: #166534;
+}
+
+.light-mode .status-badge.active {
+    background: #bbf7d0;
+    color: #166534;
 }
 
 .status-badge.pending {
-    background: rgba(234, 179, 8, 0.15);
-    color: #eab308;
+    background: #fef9c3;
+    color: #92400e;
+}
+
+.light-mode .status-badge.pending {
+    background: #fef9c3;
+    color: #92400e;
 }
 
 .status-badge.inactive {
-    background: rgba(107, 114, 128, 0.15);
-    color: #6b7280;
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.light-mode .status-badge.inactive {
+    background: #e5e7eb;
+    color: #374151;
 }
 
 /* ============================================================

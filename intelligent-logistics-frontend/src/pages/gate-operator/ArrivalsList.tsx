@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Loader2,
   AlertTriangle,
-  ChevronsLeft,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
@@ -71,6 +70,7 @@ function ArrivalsList() {
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Debug: apenas console.log para statsData
 
   // Filter states
   const [dockFilter, setDockFilter] = useState("all");
@@ -120,12 +120,6 @@ function ArrivalsList() {
     return () => clearTimeout(timer);
   }, [searchQuery, debouncedSearch]);
 
-  // Sidebar collapse state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('alerts_sidebar_collapsed');
-    return saved === 'true';
-  });
-
   // Modal states
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
 
@@ -143,7 +137,7 @@ function ArrivalsList() {
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
-    apiStatus: arrival.status || "unknown" as any,
+    apiStatus: (arrival.status ?? "in_transit"),
     highwayInfraction: arrival.highway_infraction || false,
   });
 
@@ -166,6 +160,7 @@ function ArrivalsList() {
         getArrivals(arrivalsParams),
         getArrivalsStats(gateId),
       ]);
+      console.log('Arrivals StatsData:', statsData);
 
       let mapped = arrivalsData.items.map(mapArrivalToUI);
 
@@ -184,8 +179,13 @@ function ArrivalsList() {
                 highwayInfraction: liveData.highway_infraction ?? cached.highwayInfraction
               };
             }
-          } catch (e) {
-            // Ignore error
+          } catch {
+            // display cached data if fetch fails (e.g. item was deleted or network error), but remove from pinned
+            setPinnedArrivals(prev => {
+              const next = prev.filter(p => p.id !== cached.id);
+              localStorage.setItem("pinned_arrivals", JSON.stringify(next));
+              return next;
+            });
           }
           return cached;
         });
@@ -208,6 +208,8 @@ function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
+      // Painel de debug removido
+      // console.log('Stats Data:', statsData);
   }, [gateId, currentPage, debouncedSearch, statusFilter, pinnedArrivals]);
 
   // Time update effect
@@ -276,88 +278,11 @@ function ArrivalsList() {
     fetchData();
   };
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('alerts_sidebar_collapsed', String(next));
-      return next;
-    });
-  };
-
   // Get unique docks from arrivals
   const availableDocks = [...new Set(arrivals.map(a => a.dock))].filter(d => d !== "N/A");
 
   return (
     <div className="arrivals-list-page">
-      {/* Alerts Sidebar — collapsible, shows recent detections */}
-      <aside className={`alerts-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
-        <div className="sidebar-header">
-          {!sidebarCollapsed && <h2 className="sidebar-title">Latest Alerts</h2>}
-          <button
-            className="sidebar-collapse-btn"
-            onClick={toggleSidebar}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <ChevronsLeft size={18} style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
-          </button>
-        </div>
-        {!sidebarCollapsed && (
-          <>
-            <div className="alerts-list">
-              {(() => {
-                try {
-                  const saved = localStorage.getItem('ws_payloads');
-                  if (!saved) return (
-                    <div className="empty-state">
-                      <span>No recent alerts.</span>
-                    </div>
-                  );
-                  const messages = JSON.parse(saved) as Array<{ id: string; timestamp: string; data: any }>;
-                  if (messages.length === 0) return (
-                    <div className="empty-state">
-                      <span>No recent alerts.</span>
-                    </div>
-                  );
-                  // Sort newest first, take last 10
-                  const sorted = [...messages]
-                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                    .slice(0, 10);
-                  return sorted.map((msg) => {
-                    const payload = msg.data?.payload || msg.data;
-                    const decision = payload?.decision || "UNKNOWN";
-                    const plate = payload?.licensePlate || "N/A";
-                    const time = new Date(msg.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-                    const severity = decision === "REJECTED" ? "danger" : decision === "MANUAL_REVIEW" ? "warning" : "info";
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`alert-card severity-${severity}`}
-                        onClick={() => navigate('/gate')}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="alert-header">
-                          <h4>{plate}</h4>
-                          <span className="alert-time">{time}</span>
-                        </div>
-                        <span className={`decision-badge decision-${decision.toLowerCase().replace("_", "-")}`}>
-                          {decision}
-                        </span>
-                      </div>
-                    );
-                  });
-                } catch {
-                  return (
-                    <div className="empty-state">
-                      <span>No recent alerts.</span>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </>
-        )}
-      </aside>
-
       {/* Coluna Direita - Lista de Chegadas */}
       <main className="arrivals-main">
         {/* Grid Header for alignment */}
@@ -467,7 +392,7 @@ function ArrivalsList() {
           <div className="arrivals-toolbar">
             <h3 className="content-title">Arrivals List</h3>
             <span className="content-count">
-              {displayArrivals.length} {displayArrivals.length === 1 ? 'arrival' : 'arrivals'}
+              {dynamicStats.total} {dynamicStats.total === 1 ? 'arrival' : 'arrivals'}
             </span>
             <div className="toolbar-spacer" />
             <select
