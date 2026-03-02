@@ -3515,10 +3515,33 @@ html {
 }
 
 /* ========== HELD REVIEWS ========== */
+/* Card styling for held reviews */
+.detection-card.decision-manual-review:has(.decision-badge.decision-held) {
+  border: 1px solid var(--badge-warning-border);
+  background: rgba(251, 191, 36, 0.08);
+  box-shadow: 0 0 0 1px var(--badge-warning-border);
+}
+
+.detection-card.decision-manual-review:has(.decision-badge.decision-held):hover {
+  border-color: var(--badge-warning-text);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+
 .decision-badge.decision-held {
   background: var(--badge-warning-bg);
   border: 1px solid var(--badge-warning-border);
   color: var(--badge-warning-text);
+  font-weight: 700;
+  animation: pulse-held 2s ease-in-out infinite;
+}
+
+@keyframes pulse-held {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .held-hint {
