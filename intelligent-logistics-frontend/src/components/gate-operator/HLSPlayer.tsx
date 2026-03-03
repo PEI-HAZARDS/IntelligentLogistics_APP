@@ -19,6 +19,7 @@ export default function HLSPlayer({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const connectStream = useCallback(() => {
     const video = videoRef.current;
@@ -35,6 +36,7 @@ export default function HLSPlayer({
 
     setStatus("loading");
     setErrorMessage("");
+    setIsRetrying(false);
     retryCountRef.current = 0;
 
     // No URL provided — show error immediately
@@ -177,9 +179,25 @@ export default function HLSPlayer({
         <div className="stream-overlay error">
           <WifiOff size={32} />
           <span>{errorMessage}</span>
-          <button className="retry-button" onClick={connectStream}>
-            <RefreshCw size={16} />
-            Reconnect
+          <button 
+            className="retry-button" 
+            onClick={() => {
+              setIsRetrying(true);
+              connectStream();
+            }}
+            disabled={isRetrying}
+          >
+            {isRetrying ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Reconnecting...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={16} />
+                Reconnect
+              </>
+            )}
           </button>
         </div>
       )}
