@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, WifiOff, RefreshCw } from "lucide-react";
 
@@ -19,8 +19,9 @@ export default function HLSPlayer({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "playing">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [reconnectKey, setReconnectKey] = useState(0);
 
-  const connectStream = useCallback(() => {
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -33,14 +34,15 @@ export default function HLSPlayer({
       clearTimeout(timeoutRef.current);
     }
 
-    setStatus("loading");
-    setErrorMessage("");
     retryCountRef.current = 0;
 
     // No URL provided — show error immediately
     if (!streamUrl) {
-      setStatus("error");
-      setErrorMessage("Stream not configured");
+      // Defer setState to avoid synchronous call
+      setTimeout(() => {
+        setStatus("error");
+        setErrorMessage("Stream not configured");
+      }, 0);
       return;
     }
 
@@ -141,13 +143,13 @@ export default function HLSPlayer({
       }, { once: true });
     } else {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      setStatus("error");
-      setErrorMessage("Browser does not support HLS");
+      // Defer setState to avoid synchronous call
+      setTimeout(() => {
+        setStatus("error");
+        setErrorMessage("Browser does not support HLS");
+      }, 0);
     }
-  }, [streamUrl, quality, autoPlay]);
 
-  useEffect(() => {
-    connectStream();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (hlsRef.current) {
@@ -155,7 +157,13 @@ export default function HLSPlayer({
         hlsRef.current = null;
       }
     };
-  }, [connectStream]);
+  }, [streamUrl, quality, autoPlay, reconnectKey]);
+
+  const handleReconnect = () => {
+    setStatus("loading");
+    setErrorMessage("");
+    setReconnectKey(prev => prev + 1);
+  };
 
   return (
     <div className="hls-player-container">
@@ -177,7 +185,10 @@ export default function HLSPlayer({
         <div className="stream-overlay error">
           <WifiOff size={32} />
           <span>{errorMessage}</span>
-          <button className="retry-button" onClick={connectStream}>
+          <button 
+            className="retry-button" 
+            onClick={handleReconnect}
+          >
             <RefreshCw size={16} />
             Reconnect
           </button>

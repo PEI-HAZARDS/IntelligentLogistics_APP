@@ -10,6 +10,11 @@ import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import type { Appointment } from "@/types/types";
 
+// Extended Appointment type with highway_infraction property
+interface ExtendedAppointment extends Appointment {
+  highway_infraction?: boolean;
+}
+
 // Map API status to English display
 function mapStatusToLabel(status: string): string {
   const statusMap: Record<string, string> = {
@@ -61,7 +66,7 @@ function generateUniqueId(prefix: string): string {
 
 
 // Map API arrival to UI format  
-function mapArrivalToUI(arrival: Appointment) {
+function mapArrivalToUI(arrival: ExtendedAppointment) {
   return {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
@@ -72,7 +77,7 @@ function mapArrivalToUI(arrival: Appointment) {
     cargoAmount: arrival.notes || "",
     status: mapStatusToLabel(arrival.status) as string,
     dock: arrival.gate_in?.label || "N/A",
-    highwayInfraction: (arrival as any).highway_infraction || false,
+    highwayInfraction: arrival.highway_infraction || false,
   };
 }
 
@@ -92,7 +97,7 @@ export default function Dashboard() {
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [crops, setCrops] = useState<CropImage[]>([]);
   // Load saved payloads from localStorage on mount
-  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>(() => {
+  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: DecisionUpdatePayload }>>(() => {
     try {
       const saved = localStorage.getItem('ws_payloads');
       return saved ? JSON.parse(saved) : [];
@@ -544,14 +549,14 @@ export default function Dashboard() {
             >
               <div
                 style={{
-                  padding: '0.5rem 1.25rem',
+                  padding: '0.6rem 1.5rem',
                   borderRadius: '0.75rem',
                   fontWeight: 700,
-                  fontSize: '0.95rem',
+                  fontSize: '1.1rem',
                   letterSpacing: '0.03em',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: '0.6rem',
                   backdropFilter: 'blur(12px)',
                   border: '1px solid',
                   background: scalingDirection === 'up'
@@ -561,12 +566,9 @@ export default function Dashboard() {
                     ? 'rgba(16, 185, 129, 0.5)'
                     : 'rgba(245, 158, 11, 0.5)',
                   color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
-                  boxShadow: scalingDirection === 'up'
-                    ? '0 0 30px rgba(16, 185, 129, 0.3)'
-                    : '0 0 30px rgba(245, 158, 11, 0.3)',
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   {scalingDirection === 'up' ? (
                     <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
                   ) : (
@@ -675,10 +677,24 @@ export default function Dashboard() {
 
           <div className="detections-list custom-scrollbar">
             {/* Held Reviews - displayed prominently at top */}
-            {heldReviews.map((held) => (
+            {heldReviews.map((held) => {
+              // Parse kemler and UN to separate code from description
+              const parseCodeWithDescription = (value?: string): { code?: string; description?: string } => {
+                if (!value) return {};
+                const parts = value.split(':');
+                return {
+                  code: parts[0]?.trim(),
+                  description: parts[1]?.trim()
+                };
+              };
+
+              const kemlerParsed = parseCodeWithDescription(held.kemler);
+              const unParsed = parseCodeWithDescription(held.UN);
+
+              return (
               <div
                 key={`held-${held.id}`}
-                className="detection-card severity-warning decision-manual-review"
+                className="detection-card decision-manual-review"
                 onClick={() => setManualReviewData(held)}
                 style={{ cursor: 'pointer' }}
               >
@@ -686,7 +702,7 @@ export default function Dashboard() {
                   <span className="decision-badge decision-manual-review">
                     MANUAL_REVIEW
                   </span>
-                  <span className="decision-badge decision-held">
+                  <span className="decision-badge decision-manual-review">
                     HELD
                   </span>
                   <span className="detection-time">{held.timestamp}</span>
@@ -696,22 +712,29 @@ export default function Dashboard() {
                     <span className="field-label">LICENSE</span>
                     <span className="field-value">{held.licensePlate || 'N/A'}</span>
                   </div>
-                  {held.kemler && (
+                  {kemlerParsed.code && (
                     <div className="detection-field">
                       <span className="field-label">KEMLER</span>
-                      <span className="field-value">{held.kemler}</span>
+                      <span className="field-value">{kemlerParsed.code}</span>
+                      {kemlerParsed.description && (
+                        <span className="field-description">{kemlerParsed.description}</span>
+                      )}
                     </div>
                   )}
-                  {held.UN && (
+                  {unParsed.code && (
                     <div className="detection-field">
                       <span className="field-label">UN</span>
-                      <span className="field-value">{held.UN}</span>
+                      <span className="field-value">{unParsed.code}</span>
+                      {unParsed.description && (
+                        <span className="field-description">{unParsed.description}</span>
+                      )}
                     </div>
                   )}
                 </div>
                 <div className="held-hint">Click to resume review</div>
               </div>
-            ))}
+              );
+            })}
 
             {isLoading && detections.length === 0 && heldReviews.length === 0 ? (
               <div className="loading-state">
@@ -1015,7 +1038,7 @@ export default function Dashboard() {
                 borderLeft: '3px solid #4ade80',
               }}>
                 <div style={{ color: '#9ca3af', marginBottom: '4px' }}>
-                  {new Date(msg.timestamp).toLocaleTimeString()} — {msg.data?.type || 'unknown'}
+                  {new Date(msg.timestamp).toLocaleTimeString()} — {(msg.data?.message_type as string) || 'unknown'}
                 </div>
                 <pre style={{
                   color: '#e5e7eb',

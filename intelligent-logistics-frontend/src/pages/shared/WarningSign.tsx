@@ -1,43 +1,70 @@
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
 import HLSPlayer from '@/components/gate-operator/HLSPlayer';
 import { useStreamScale } from '@/hooks/useStreamScale';
 
 export default function WarningSign() {
+  const { isDarkMode, toggleTheme } = useTheme();
   const [isActive, setIsActive] = useState(false);
 
-  // Stream quality switching via dedicated WebSocket — gate01 camera
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId: 1 });
+  // Stream quality switching via dedicated WebSocket — gate02 camera
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId: 2 });
 
-  // Auto-turn off the sign after 10 seconds to simulate a passing truck (simulates triggering the alert and then returning to normal)
+  // Auto cycle: 10s on, 5s off
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
     if (isActive) {
+      // Signal is active for 10 seconds, then turn off
       timeout = setTimeout(() => {
         setIsActive(false);
       }, 10000);
+    } else {
+      // Signal is off for 5 seconds, then turn on
+      timeout = setTimeout(() => {
+        setIsActive(true);
+      }, 5000);
     }
     return () => clearTimeout(timeout);
   }, [isActive]);
 
-  const simulateTruck = () => {
-    setIsActive(true);
-  };
-
   return (
-    <div className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4 xl:p-8 overflow-y-scroll">
-      <div className="w-full max-w-480 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center justify-items-center mx-auto">
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 xl:p-10 overflow-y-scroll ${
+      isDarkMode 
+        ? 'bg-neutral-900 text-white'
+        : 'bg-slate-50 text-slate-900'
+    }`}>
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-6 right-6 p-3 rounded-lg border transition-all ${
+          isDarkMode
+            ? 'bg-neutral-800 border-neutral-700 text-yellow-400 hover:bg-neutral-700'
+            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+        }`}
+        title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
+      </button>
+      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-start justify-items-center mx-auto">
         {/* Stream Section */}
-        <div className="flex flex-col gap-6 w-full">
-          <div className="flex flex-col">
-            <h1 className="text-4xl xl:text-5xl font-extrabold text-white mb-2 tracking-tight">
+        <div className="flex flex-col gap-6 w-full h-full">
+          <div className="flex flex-col gap-2">
+            <h1 className={`text-5xl xl:text-6xl font-extrabold tracking-tight ${
+              isDarkMode ? 'text-white' : 'text-slate-900'
+            }`}>
               Road Monitoring
             </h1>
-            <p className="text-neutral-400 text-lg">
+            <p className={isDarkMode ? 'text-neutral-400 text-xl' : 'text-slate-600 text-xl'}>
               Hazmat material access control (C3p).
             </p>
           </div>
 
-          <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-neutral-800 shadow-2xl flex items-center justify-center group">
+          <div className={`relative aspect-video bg-black rounded-xl overflow-hidden border shadow-2xl flex items-center justify-center group h-96 lg:h-full ${
+            isDarkMode
+              ? 'border-neutral-800'
+              : 'border-slate-300'
+          }`}>
             {/* Real HLS Stream */}
             <style>{`
                             .stream-wrapper .hls-player-container { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
@@ -71,7 +98,7 @@ export default function WarningSign() {
               }}
             >
               <div
-                className="px-6 py-3 rounded-xl font-bold text-lg tracking-wide flex items-center gap-3 backdrop-blur-md border shadow-2xl"
+                className="px-8 py-4 rounded-xl font-bold text-xl tracking-wide flex items-center gap-3 backdrop-blur-md border"
                 style={{
                   background: scalingDirection === 'up'
                     ? 'rgba(16, 185, 129, 0.2)'
@@ -80,12 +107,9 @@ export default function WarningSign() {
                     ? 'rgba(16, 185, 129, 0.5)'
                     : 'rgba(245, 158, 11, 0.5)',
                   color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
-                  boxShadow: scalingDirection === 'up'
-                    ? '0 0 30px rgba(16, 185, 129, 0.3)'
-                    : '0 0 30px rgba(245, 158, 11, 0.3)',
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   {scalingDirection === 'up' ? (
                     <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
                   ) : (
@@ -99,12 +123,12 @@ export default function WarningSign() {
             {/* Top Right Status (moved from center & replaced REC tracker) */}
             <div className="absolute top-4 right-4 z-20">
               {isActive ? (
-                <div className="bg-red-500/20 text-red-500 border border-red-500/50 px-4 py-2 rounded font-bold animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.3)] backdrop-blur-sm flex items-center gap-2 text-sm">
+                <div className="bg-red-500/20 text-red-500 border border-red-500/50 px-5 py-2.5 rounded-lg font-bold animate-pulse backdrop-blur-sm flex items-center gap-2.5 text-base">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"></span>
                   POSSIBLE VIOLATION DETECTED
                 </div>
               ) : (
-                <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-4 py-2 rounded font-bold backdrop-blur-sm flex items-center gap-2 text-sm">
+                <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-5 py-2.5 rounded-lg font-bold backdrop-blur-sm flex items-center gap-2.5 text-base">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                   REGULAR TRAFFIC
                 </div>
@@ -129,47 +153,44 @@ export default function WarningSign() {
               </div>
             </div>
           </div>
-
-
-          <button
-            onClick={simulateTruck}
-            disabled={isActive}
-            className={`mt-2 py-4 rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all duration-300 ${isActive
-              ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700"
-              : "bg-orange-600 hover:bg-orange-500 hover:shadow-[0_0_25px_rgba(239,68,68,0.4)] text-white border border-orange-500/50 active:scale-[0.98]"
-              }`}
-          >
-            {isActive
-              ? "Alert in progress..."
-              : "Truck detected with hazardous cargo"}
-          </button>
         </div>
 
         {/* Luminous Sign Section */}
-        <div className="flex flex-col gap-6 items-center w-full justify-center">
-          {/* Sign physical frame */}
-          <div className="bg-[#0a0a0a] p-4 rounded-2xl border-4 border-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-105 h-150 relative">
+        {/* Sign physical frame */}
+        <div className={`p-6 rounded-2xl border-4 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-full max-w-sm aspect-2/3 relative ${
+            isDarkMode
+              ? 'bg-[#0a0a0a] border-neutral-800'
+              : 'bg-slate-700 border-slate-600'
+          }`}>
             {/* LED flashing corner lights (often seen on these signs) */}
             <div
-              className={`absolute top-8 left-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : "bg-amber-900/40"} `}
+              className={`absolute top-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${
+                isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : "bg-amber-900/40"} `}
             ></div>
             <div
-              className={`absolute top-8 right-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : "bg-amber-900/40"} `}
+              className={`absolute top-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${
+                isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : "bg-amber-900/40"} `}
             ></div>
 
             <div
-              className={`absolute bottom-8 left-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : "bg-amber-900/40"} `}
+              className={`absolute bottom-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${
+                isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : "bg-amber-900/40"} `}
             ></div>
             <div
-              className={`absolute bottom-8 right-8 w-10 h-10 rounded-full border-4 border-[#1a1a1a] transition-colors duration-300 z-20 ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : "bg-amber-900/40"} `}
+              className={`absolute bottom-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${
+                isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : "bg-amber-900/40"} `}
             ></div>
 
             {/* The actual display area */}
             <div
-              className={`transition-all duration-500 w-full flex-1 flex flex-col items-center justify-center mt-8 mb-4 ${isActive ? "opacity-100" : "opacity-[0.03] grayscale"}`}
+              className={`transition-all duration-500 w-full flex-1 flex flex-col items-center justify-center px-6 ${isActive ? "opacity-100" : "opacity-[0.03] grayscale"}`}
             >
               {/* C3p SVG */}
-              <div className="w-50 h-50 relative drop-shadow-[0_0_35px_rgba(255,255,255,0.2)]">
+              <div className="w-64 h-64 relative drop-shadow-[0_0_35px_rgba(255,255,255,0.2)]">
                 <svg
                   viewBox="0 0 100 100"
                   className="w-full h-full drop-shadow-[0_0_20px_rgba(227,0,15,0.9)]"
@@ -246,13 +267,13 @@ export default function WarningSign() {
               </div>
 
               {/* Text underneath the sign */}
-              <div className="mt-8 flex flex-col items-center gap-2 text-center">
-                <span className="text-amber-500 font-mono text-3xl font-black tracking-widest drop-shadow-[0_0_15px_rgba(245,158,11,0.8)] leading-tight">
+              <div className="mt-6 flex flex-col items-center gap-3 text-center">
+                <span className="text-amber-500 font-mono text-4xl font-black tracking-widest drop-shadow-[0_0_15px_rgba(245,158,11,0.8)] leading-tight">
                   RESTRICTED
                   <br />
                   ROAD
                 </span>
-                <span className="text-amber-500 font-mono text-xl font-bold tracking-wider drop-shadow-[0_0_15px_rgba(245,158,11,0.6)] mt-2">
+                <span className="text-amber-500 font-mono text-2xl font-bold tracking-wider drop-shadow-[0_0_15px_rgba(245,158,11,0.6)] mt-2">
                   RETURN TO
                   <br />
                   HIGHWAY
@@ -264,9 +285,8 @@ export default function WarningSign() {
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyIiBjeT0iMiIgcj0iMSIgZmlsbD0icmdiYSgwLDAsMCwwLjgpIi8+Cjwvc3ZnPg==')] opacity-60 pointer-events-none rounded-2xl mix-blend-multiply"></div>
 
             {/* Pole (for realism) */}
-            <div className="absolute -bottom-20 w-12 h-20 bg-linear-to-r from-neutral-800 via-neutral-700 to-neutral-900 rounded-b border-x-2 border-b-2 border-neutral-900 -z-10 shadow-2xl shadow-black"></div>
+            <div className="absolute -bottom-24 w-16 h-24 bg-linear-to-r from-neutral-800 via-neutral-700 to-neutral-900 rounded-b border-x-2 border-b-2 border-neutral-900 -z-10 shadow-2xl shadow-black"></div>
           </div>
-        </div>
       </div>
     </div>
   );
