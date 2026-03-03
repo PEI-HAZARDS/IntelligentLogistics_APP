@@ -8,8 +8,8 @@ export default function WarningSign() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [isActive, setIsActive] = useState(false);
 
-  // Stream quality switching via dedicated WebSocket — gate01 camera
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId: 1 });
+  // Stream quality switching via dedicated WebSocket — gate02 camera
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId: 2 });
 
   // Auto cycle: 10s on, 5s off
   useEffect(() => {
