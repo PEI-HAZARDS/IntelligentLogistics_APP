@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Clock,
   Truck,
@@ -123,9 +123,9 @@ function ArrivalsList() {
   // Modal states
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
 
-  // Get gate ID from user info
-  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
-  const gateId = userInfo.gate_id || 1;
+  // Get gate ID from URL param (e.g. /gate/1/arrivals)
+  const { gateId: rawGateId } = useParams<{ gateId: string }>();
+  const gateId = rawGateId || "1";
 
   // Map API arrival to UI
   const mapArrivalToUI = (arrival: Appointment): UIArrival => ({
@@ -146,7 +146,7 @@ function ArrivalsList() {
     setError(null);
     try {
       const arrivalsParams: ArrivalsQueryParams = {
-        gate_id: gateId,
+        gate_id: Number(gateId),
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       };
@@ -158,7 +158,7 @@ function ArrivalsList() {
 
       const [arrivalsData, statsData] = await Promise.all([
         getArrivals(arrivalsParams),
-        getArrivalsStats(gateId),
+        getArrivalsStats(Number(gateId)),
       ]);
       console.log('Arrivals StatsData:', statsData);
 
@@ -208,8 +208,8 @@ function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
-      // Painel de debug removido
-      // console.log('Stats Data:', statsData);
+    // Painel de debug removido
+    // console.log('Stats Data:', statsData);
   }, [gateId, currentPage, debouncedSearch, statusFilter, pinnedArrivals]);
 
   // Time update effect
@@ -290,7 +290,7 @@ function ArrivalsList() {
           <div className="header-left">
             <button
               className="btn-secondary"
-              onClick={() => navigate('/gate')}
+              onClick={() => navigate(`/gate/${gateId}`)}
             >
               <ArrowLeft size={18} />
               Gate View

@@ -23,6 +23,7 @@ export interface ManualReviewData {
 interface ManualReviewModalProps {
     isOpen: boolean;
     reviewData: ManualReviewData | null;
+    gateId: string;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
     onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
@@ -31,6 +32,7 @@ interface ManualReviewModalProps {
 export default function ManualReviewModal({
     isOpen,
     reviewData,
+    gateId,
     onClose,
     onHold,
     onDecisionComplete,
@@ -135,6 +137,7 @@ export default function ManualReviewModal({
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                gate_id: gateId,
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
@@ -170,6 +173,7 @@ export default function ManualReviewModal({
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                gate_id: gateId,
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',

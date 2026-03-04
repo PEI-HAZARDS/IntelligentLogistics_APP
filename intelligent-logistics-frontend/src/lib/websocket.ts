@@ -119,7 +119,7 @@ class GateWebSocket {
             }
         }
 
-        const url = `${this.baseUrl}/ws/decisions/${this.gateId}`;
+        const url = `${this.baseUrl}/ws/gate/${this.gateId}`;
         console.log(`[WS] Connecting to ${url}...`);
 
         try {

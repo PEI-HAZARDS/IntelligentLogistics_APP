@@ -27,43 +27,45 @@ const EnergyMetrics = React.lazy(() => import('@/pages/shared/EnergyMetrics'));
 const commonRoutes = [
   { path: '/', element: <Login /> },
   { path: '/login', element: <Login /> },
-  { path: '/warning-sign', element: <WarningSign /> },
+  { path: '/warning-sign/:gateId', element: <WarningSign /> },
   { path: '/energy-metrics', element: <EnergyMetrics /> },
 ];
 
 // Rotas do Operador de Portaria
 const gateRoutes = [
   ...commonRoutes,
+  // Redirect bare /gate to /gate/1 for backwards compat
+  { path: '/gate', element: <Navigate to="/gate/1" replace /> },
   {
-    path: '/gate',
+    path: '/gate/:gateId',
     element: <GateQuickLayout />,
     children: [
       { index: true, element: <Dashboard /> },
     ],
   },
   {
-    path: '/gate/arrivals',
+    path: '/gate/:gateId/arrivals',
     element: <GateDetailLayout />,
     children: [
       { index: true, element: <ArrivalsList /> },
     ],
   },
   {
-    path: '/gate/arrival/:id',
+    path: '/gate/:gateId/arrival/:id',
     element: <GateDetailLayout />,
     children: [
       { index: true, element: <ArrivalDetail /> },
     ],
   },
   {
-    path: '/gate/alerts',
+    path: '/gate/:gateId/alerts',
     element: <GateDetailLayout />,
     children: [
       { index: true, element: <AlertsPage /> },
     ],
   },
-  // Redireciona qualquer rota desconhecida para /gate
-  { path: '*', element: <Navigate to="/gate" replace /> }
+  // Redireciona qualquer rota desconhecida para /gate/1
+  { path: '*', element: <Navigate to="/gate/1" replace /> }
 ];
 
 // Rotas do Gestor Logístico

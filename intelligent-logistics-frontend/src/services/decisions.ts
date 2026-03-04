@@ -74,6 +74,7 @@ export async function queryAppointments(
  * All fields are sent as query params matching the backend's FastAPI signature.
  */
 export async function submitManualReview(params: {
+    gate_id: string;
     license_plate: string;
     decision: string;
     decision_reason: string;
@@ -87,6 +88,7 @@ export async function submitManualReview(params: {
     truck_id?: string;
 }): Promise<void> {
     const queryParams: Record<string, unknown> = {
+        gate_id: params.gate_id,
         license_plate: params.license_plate,
         decision: params.decision,
         decision_reason: params.decision_reason,

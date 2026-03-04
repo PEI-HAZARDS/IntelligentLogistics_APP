@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HLSPlayer from "./HLSPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
@@ -123,11 +123,11 @@ export default function Dashboard() {
   // Toast notifications
   const { toasts, addToast, dismissToast } = useToasts();
 
-  // Get gate ID from user info (default to 1 if not set)
-  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
-  const gateId = userInfo.gate_id || 1;
+  // Get gate ID from URL param (e.g. /gate/1)
+  const { gateId: rawGateId } = useParams<{ gateId: string }>();
+  const gateId = rawGateId || "1";
 
-  // Stream quality switching via dedicated WebSocket (/ws/stream/{gate_id})
+  // Stream quality switching via unified gate WebSocket (/ws/gate/{gate_id})
   const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
@@ -137,7 +137,7 @@ export default function Dashboard() {
       const statusFilter = arrivalFilter === "delayed" ? "delayed" : "in_transit";
       const { getArrivals } = await import('@/services/arrivals');
       const arrivalsData = await getArrivals({
-        gate_id: gateId,
+        gate_id: Number(gateId),
         status: statusFilter,
         page: 1,
         limit: 10
@@ -159,6 +159,9 @@ export default function Dashboard() {
       console.warn('[Dashboard] processPayload returning early - missing message_type', { data });
       return;
     }
+
+    // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
+    if (data.message_type === "scale_network") return;
 
 
 
@@ -482,6 +485,7 @@ export default function Dashboard() {
       <ManualReviewModal
         isOpen={manualReviewData !== null}
         reviewData={manualReviewData}
+        gateId={gateId}
         onClose={() => setManualReviewData(null)}
         onHold={(data) => {
           // Add to held reviews if not already there
@@ -692,47 +696,47 @@ export default function Dashboard() {
               const unParsed = parseCodeWithDescription(held.UN);
 
               return (
-              <div
-                key={`held-${held.id}`}
-                className="detection-card decision-manual-review"
-                onClick={() => setManualReviewData(held)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="detection-header">
-                  <span className="decision-badge decision-manual-review">
-                    MANUAL_REVIEW
-                  </span>
-                  <span className="decision-badge decision-manual-review">
-                    HELD
-                  </span>
-                  <span className="detection-time">{held.timestamp}</span>
-                </div>
-                <div className="detection-fields">
-                  <div className="detection-field">
-                    <span className="field-label">LICENSE</span>
-                    <span className="field-value">{held.licensePlate || 'N/A'}</span>
+                <div
+                  key={`held-${held.id}`}
+                  className="detection-card decision-manual-review"
+                  onClick={() => setManualReviewData(held)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="detection-header">
+                    <span className="decision-badge decision-manual-review">
+                      MANUAL_REVIEW
+                    </span>
+                    <span className="decision-badge decision-manual-review">
+                      HELD
+                    </span>
+                    <span className="detection-time">{held.timestamp}</span>
                   </div>
-                  {kemlerParsed.code && (
+                  <div className="detection-fields">
                     <div className="detection-field">
-                      <span className="field-label">KEMLER</span>
-                      <span className="field-value">{kemlerParsed.code}</span>
-                      {kemlerParsed.description && (
-                        <span className="field-description">{kemlerParsed.description}</span>
-                      )}
+                      <span className="field-label">LICENSE</span>
+                      <span className="field-value">{held.licensePlate || 'N/A'}</span>
                     </div>
-                  )}
-                  {unParsed.code && (
-                    <div className="detection-field">
-                      <span className="field-label">UN</span>
-                      <span className="field-value">{unParsed.code}</span>
-                      {unParsed.description && (
-                        <span className="field-description">{unParsed.description}</span>
-                      )}
-                    </div>
-                  )}
+                    {kemlerParsed.code && (
+                      <div className="detection-field">
+                        <span className="field-label">KEMLER</span>
+                        <span className="field-value">{kemlerParsed.code}</span>
+                        {kemlerParsed.description && (
+                          <span className="field-description">{kemlerParsed.description}</span>
+                        )}
+                      </div>
+                    )}
+                    {unParsed.code && (
+                      <div className="detection-field">
+                        <span className="field-label">UN</span>
+                        <span className="field-value">{unParsed.code}</span>
+                        {unParsed.description && (
+                          <span className="field-description">{unParsed.description}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="held-hint">Click to resume review</div>
                 </div>
-                <div className="held-hint">Click to resume review</div>
-              </div>
               );
             })}
 
@@ -835,7 +839,7 @@ export default function Dashboard() {
 
         <button
           className="view-toggle-btn"
-          onClick={() => navigate("/gate/arrivals")}
+          onClick={() => navigate(`/gate/${gateId}/arrivals`)}
         >
           Arrivals List
         </button>
