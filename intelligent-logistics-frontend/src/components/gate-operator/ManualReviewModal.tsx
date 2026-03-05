@@ -23,7 +23,6 @@ export interface ManualReviewData {
 interface ManualReviewModalProps {
     isOpen: boolean;
     reviewData: ManualReviewData | null;
-    gateId: string;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
     onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
@@ -32,7 +31,6 @@ interface ManualReviewModalProps {
 export default function ManualReviewModal({
     isOpen,
     reviewData,
-    gateId,
     onClose,
     onHold,
     onDecisionComplete,
@@ -44,22 +42,6 @@ export default function ManualReviewModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchPlate, setSearchPlate] = useState('');
-
-    // ESC key handler - Hold automatically
-    useEffect(() => {
-        if (!isOpen || !reviewData || isSubmitting) return;
-
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                onHold(reviewData);
-                onClose();
-            }
-        };
-
-        window.addEventListener('keydown', handleEscape);
-        return () => window.removeEventListener('keydown', handleEscape);
-    }, [isOpen, reviewData, isSubmitting, onHold, onClose]);
 
     // Load candidates when modal opens or reviewData changes
     useEffect(() => {
@@ -137,7 +119,6 @@ export default function ManualReviewModal({
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
-                gate_id: gateId,
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
@@ -173,7 +154,6 @@ export default function ManualReviewModal({
             const orig = reviewData?.originalPayload;
 
             await submitManualReview({
-                gate_id: gateId,
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',

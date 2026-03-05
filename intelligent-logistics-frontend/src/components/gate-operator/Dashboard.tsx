@@ -1,6 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
-import HLSPlayer from "./HLSPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
@@ -524,17 +523,29 @@ export default function Dashboard() {
         <div className="camera-section">
           <div className="video-area">
             {streamUrl ? (
-              <HLSPlayer
-                streamUrl={streamUrl}
-                quality={streamQuality}
-                autoPlay={true}
+              <iframe
+                src={streamUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  background: '#000',
+                }}
+                allow="autoplay; fullscreen"
+                title={`Gate ${gateId} Stream (${streamQuality})`}
               />
             ) : (
-              <HLSPlayer
-                streamUrl=""
-                quality="low"
-                autoPlay={false}
-              />
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#000',
+                color: '#666',
+              }}>
+                Loading stream...
+              </div>
             )}
 
             {/* Stream Scaling Overlay */}

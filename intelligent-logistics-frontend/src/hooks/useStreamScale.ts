@@ -12,10 +12,10 @@ interface UseStreamScaleOptions {
  * Hook that manages stream quality switching via the unified
  * /ws/gate/{gate_id} WebSocket endpoint.
  *
- * - Starts in "low" quality (360p) to save bandwidth
+ * - Starts in "low" quality (720p) to save bandwidth
  * - Listens for {"message_type":"scale_network","mode":"scale_up"|"scale_down"} events
  *   on the shared GateWebSocket
- * - Fetches the new HLS URL from the API Gateway on each switch
+ * - Fetches the new WebRTC URL from the API Gateway on each switch
  */
 export function useStreamScale({ gateId }: UseStreamScaleOptions) {
     const [quality, setQuality] = useState<Quality>("low");

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Sun, Moon, Bug, ChevronDown, ChevronUp, Wifi } from 'lucide-react';
-import HLSPlayer from '@/components/gate-operator/HLSPlayer';
 import { useStreamScale } from '@/hooks/useStreamScale';
 import { getGateWebSocket, type DecisionUpdatePayload } from '@/lib/websocket';
 
@@ -99,19 +98,20 @@ export default function WarningSign() {
             ? 'border-neutral-800'
             : 'border-slate-300'
             }`}>
-            {/* Real HLS Stream */}
-            <style>{`
-                            .stream-wrapper .hls-player-container { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-                            .stream-wrapper video.camera-feed { width: 100%; height: 100%; object-fit: cover; }
-                            .stream-wrapper video::-webkit-media-controls { display: none !important; }
-                            .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
-                        `}</style>
-            <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
+            {/* WebRTC Stream via iframe */}
+            <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105">
               {streamUrl ? (
-                <HLSPlayer
-                  streamUrl={streamUrl}
-                  quality={streamQuality}
-                  autoPlay={true}
+                <iframe
+                  src={streamUrl}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    background: '#000',
+                    pointerEvents: 'auto',
+                  }}
+                  allow="autoplay; fullscreen"
+                  title={`Gate ${gateId} Stream (${streamQuality})`}
                 />
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>
