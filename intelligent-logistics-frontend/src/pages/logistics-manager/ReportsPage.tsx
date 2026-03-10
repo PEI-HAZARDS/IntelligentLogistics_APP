@@ -4,7 +4,7 @@
  * and access reference documents.
  */
 import { useState, useEffect } from "react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
     FileText,
     Download,
@@ -37,18 +37,21 @@ interface ExportHistoryEntry {
     date: Date;
 }
 
-// ───── Excel Parser ─────
-function parseExcelData(workbook: XLSX.WorkBook): TerminalData[] {
-    return workbook.SheetNames.map((sheetName) => {
-        const ws = workbook.Sheets[sheetName];
-        const raw = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as (string | number | null)[][];
-
+// ───── Excel Parser (exceljs) ─────
+async function parseExcelData(buffer: ArrayBuffer): Promise<TerminalData[]> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    return workbook.worksheets.map((ws) => {
+        // Read all rows as arrays
+        const raw: (string | number | null)[][] = [];
+        ws.eachRow({ includeEmpty: true }, (row) => {
+            raw.push(row.values.slice(1)); // row.values[0] is undefined
+        });
         // Header row with months is typically row index 4 (jan..dez)
         const monthRow = raw.find(r => r && r.some(c => typeof c === "string" && /^jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez$/i.test(String(c))));
         const months = monthRow
             ? monthRow.slice(1, 13).map(m => String(m || "").trim())
             : ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
         // Data rows start after the header (index ~6 onwards), where col 0 = day number
         const dataStartIdx = raw.findIndex(r => r && typeof r[0] === "number" && r[0] >= 1 && r[0] <= 31);
         const dailyGrid: (number | null)[][] = [];
@@ -62,19 +65,16 @@ function parseExcelData(workbook: XLSX.WorkBook): TerminalData[] {
                 dailyGrid.push(dayValues);
             }
         }
-
         // Monthly totals
         const monthlyTotals = months.map((_, mi) =>
             dailyGrid.reduce((sum, dayRow) => sum + (dayRow[mi] || 0), 0)
         );
-
         // Friendly terminal name
-        const friendlyName = sheetName
+        const friendlyName = ws.name
             .replace(/_pesados$/i, "")
             .replace(/_/g, " ")
             .replace(/^T/, "Terminal ")
             .trim();
-
         return { name: friendlyName, months, monthlyTotals, dailyGrid };
     });
 }
@@ -88,16 +88,21 @@ export default function ReportsPage() {
     const [previewMode, setPreviewMode] = useState<"table" | "chart">("chart");
     const [excelError, setExcelError] = useState(false);
 
-    // Load and parse Excel on mount
+    // Load and parse Excel on mount (exceljs)
     useEffect(() => {
         fetch("/documents/Movimento_pesados_2024_PortoAveiro.xlsx")
             .then(res => {
                 if (!res.ok) throw new Error("File not found");
                 return res.arrayBuffer();
             })
-            .then(buf => {
-                const wb = XLSX.read(buf, { type: "array" });
-                setTerminals(parseExcelData(wb));
+            .then(async (buf) => {
+                try {
+                    const terminals = await parseExcelData(buf);
+                    setTerminals(terminals);
+                } catch (err) {
+                    console.error("Failed to parse Excel:", err);
+                    setExcelError(true);
+                }
             })
             .catch(err => {
                 console.error("Failed to load Excel:", err);

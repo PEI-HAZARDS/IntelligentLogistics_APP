@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Clock,
   Truck,
@@ -13,30 +13,15 @@ import {
   ArrowLeft,
   Loader2,
   AlertTriangle,
-  ChevronsLeft,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
   Pin,
-  PinOff
+  PinOff,
+  Container
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
-import { getActiveAlerts } from "@/services/alerts";
-import type { Appointment, AppointmentStatusEnum, Alert, ArrivalsQueryParams } from "@/types/types";
-
-// Map API severity to UI
-function mapAlertSeverity(type: string): "warning" | "danger" | "info" {
-  if (type === "problem" || type === "safety") return "danger";
-  if (type === "operational") return "warning";
-  return "info";
-}
-
-// Map API alert type to UI type
-function mapAlertType(type: string): "plate" | "safety" | "adr" {
-  if (type === "safety" || type === "problem") return "adr";
-  if (type === "operational") return "safety";
-  return "plate";
-}
+import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
 
 // Map API status to English display
 function mapStatusToLabel(status: AppointmentStatusEnum): string {
@@ -63,17 +48,6 @@ function mapStatusToAPI(status: string): AppointmentStatusEnum {
   };
   return statusMap[status] || "in_transit";
 }
-
-// UI types for component state
-type UIAlert = {
-  id: string;
-  type: "plate" | "safety" | "adr";
-  title: string;
-  description: string;
-  time: string;
-  severity?: "warning" | "danger" | "info";
-};
-
 type UIArrival = {
   id: number;
   plate: string;
@@ -93,10 +67,10 @@ function ArrivalsList() {
 
   // API data states
   const [arrivals, setArrivals] = useState<UIArrival[]>([]);
-  const [alerts, setAlerts] = useState<UIAlert[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Debug: apenas console.log para statsData
 
   // Filter states
   const [dockFilter, setDockFilter] = useState("all");
@@ -146,18 +120,12 @@ function ArrivalsList() {
     return () => clearTimeout(timer);
   }, [searchQuery, debouncedSearch]);
 
-  // Sidebar collapse state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('alerts_sidebar_collapsed');
-    return saved === 'true';
-  });
-
   // Modal states
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
 
-  // Get gate ID from user info
-  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
-  const gateId = userInfo.gate_id || 1;
+  // Get gate ID from URL param (e.g. /gate/1/arrivals)
+  const { gateId: rawGateId } = useParams<{ gateId: string }>();
+  const gateId = rawGateId || "1";
 
   // Map API arrival to UI
   const mapArrivalToUI = (arrival: Appointment): UIArrival => ({
@@ -169,18 +137,8 @@ function ArrivalsList() {
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
-    apiStatus: arrival.status || "unknown" as any,
+    apiStatus: (arrival.status ?? "in_transit"),
     highwayInfraction: arrival.highway_infraction || false,
-  });
-
-  // Map API alert to UI
-  const mapAlertToUI = (alert: Alert): UIAlert => ({
-    id: String(alert.id),
-    type: mapAlertType(alert.type),
-    title: alert.type.charAt(0).toUpperCase() + alert.type.slice(1) + " Alert",
-    description: alert.description || "Alert without description",
-    time: new Date(alert.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-    severity: mapAlertSeverity(alert.type),
   });
 
   // Fetch data function
@@ -188,7 +146,7 @@ function ArrivalsList() {
     setError(null);
     try {
       const arrivalsParams: ArrivalsQueryParams = {
-        gate_id: gateId,
+        gate_id: Number(gateId),
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       };
@@ -198,11 +156,11 @@ function ArrivalsList() {
       }
       if (debouncedSearch) arrivalsParams.search = debouncedSearch;
 
-      const [arrivalsData, alertsData, statsData] = await Promise.all([
+      const [arrivalsData, statsData] = await Promise.all([
         getArrivals(arrivalsParams),
-        getActiveAlerts(20),
-        getArrivalsStats(gateId),
+        getArrivalsStats(Number(gateId)),
       ]);
+      console.log('Arrivals StatsData:', statsData);
 
       let mapped = arrivalsData.items.map(mapArrivalToUI);
 
@@ -221,8 +179,13 @@ function ArrivalsList() {
                 highwayInfraction: liveData.highway_infraction ?? cached.highwayInfraction
               };
             }
-          } catch (e) {
-            // Ignore error
+          } catch {
+            // display cached data if fetch fails (e.g. item was deleted or network error), but remove from pinned
+            setPinnedArrivals(prev => {
+              const next = prev.filter(p => p.id !== cached.id);
+              localStorage.setItem("pinned_arrivals", JSON.stringify(next));
+              return next;
+            });
           }
           return cached;
         });
@@ -238,7 +201,6 @@ function ArrivalsList() {
       setArrivals(mapped);
       setServerPages(arrivalsData.pages);
       setServerTotal(arrivalsData.total);
-      setAlerts(alertsData.map(mapAlertToUI));
       setStats(statsData);
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -246,6 +208,8 @@ function ArrivalsList() {
     } finally {
       setIsLoading(false);
     }
+    // Painel de debug removido
+    // console.log('Stats Data:', statsData);
   }, [gateId, currentPage, debouncedSearch, statusFilter, pinnedArrivals]);
 
   // Time update effect
@@ -314,57 +278,11 @@ function ArrivalsList() {
     fetchData();
   };
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('alerts_sidebar_collapsed', String(next));
-      return next;
-    });
-  };
-
   // Get unique docks from arrivals
   const availableDocks = [...new Set(arrivals.map(a => a.dock))].filter(d => d !== "N/A");
 
   return (
     <div className="arrivals-list-page">
-      {/* Álerta Sidebar — collapsible */}
-      <aside className={`alerts-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
-        <div className="sidebar-header">
-          {!sidebarCollapsed && <h2 className="sidebar-title">Latest Alerts</h2>}
-          <button
-            className="sidebar-collapse-btn"
-            onClick={toggleSidebar}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <ChevronsLeft size={18} style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
-          </button>
-        </div>
-        {!sidebarCollapsed && (
-          <div className="alerts-list">
-            {isLoading && alerts.length === 0 ? (
-              <div className="loading-state">
-                <Loader2 size={20} className="spin" />
-                <span>Loading...</span>
-              </div>
-            ) : alerts.length === 0 ? (
-              <div className="empty-state">
-                <span>No recent alerts.</span>
-              </div>
-            ) : (
-              alerts.map((alert) => (
-                <div key={alert.id} className={`alert-card severity-${alert.severity}`}>
-                  <div className="alert-header">
-                    <h4>{alert.title}</h4>
-                    <span className="alert-time">{alert.time}</span>
-                  </div>
-                  <p className="alert-description">{alert.description}</p>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </aside>
-
       {/* Coluna Direita - Lista de Chegadas */}
       <main className="arrivals-main">
         {/* Grid Header for alignment */}
@@ -372,7 +290,7 @@ function ArrivalsList() {
           <div className="header-left">
             <button
               className="btn-secondary"
-              onClick={() => navigate('/gate')}
+              onClick={() => navigate(`/gate/${gateId}`)}
             >
               <ArrowLeft size={18} />
               Gate View
@@ -419,7 +337,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Delayed")}
           >
-            <div className="stat-icon"><AlertTriangle size={20} /></div>
+            <div className="stat-icon"><Clock size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProgress}</span>
               <span className="stat-label">Delayed</span>
@@ -440,7 +358,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
           >
-            <div className="stat-icon"><Clock size={20} /></div>
+            <div className="stat-icon"><Truck size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.pending}</span>
               <span className="stat-label">In Transit</span>
@@ -450,7 +368,7 @@ function ArrivalsList() {
             className={`stat-card ${statusFilter === 'In Process' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Process")}
           >
-            <div className="stat-icon"><Truck size={20} /></div>
+            <div className="stat-icon"><Container size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
@@ -468,51 +386,40 @@ function ArrivalsList() {
           </div>
         </div>
 
-        {/* Tabela/Cards e Filtros Integrados */}
+        {/* Tabela/Cards — unified filter bar */}
         <div className="arrivals-content" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Table header row */}
-          <div className="content-header" style={{ marginBottom: 0 }}>
+          {/* Unified inline bar: title + filters + actions */}
+          <div className="arrivals-toolbar">
             <h3 className="content-title">Arrivals List</h3>
             <span className="content-count">
-              {displayArrivals.length} {displayArrivals.length === 1 ? 'arrival' : 'arrivals'}
+              {dynamicStats.total} {dynamicStats.total === 1 ? 'arrival' : 'arrivals'}
             </span>
-          </div>
-
-          {/* Filtros Integrados */}
-          <div className="filters-section" style={{ margin: 0, padding: 0, background: 'transparent', border: 'none' }}>
-            <div className="filters-grid" style={{ marginBottom: 0 }}>
-              <div className="filter-group">
-                <label htmlFor="dock-filter">Dock</label>
-                <select id="dock-filter" value={dockFilter} onChange={(e) => setDockFilter(e.target.value)}>
-                  <option value="all">All Docks</option>
-                  {availableDocks.map((dock) => (
-                    <option key={dock} value={dock}>Dock {dock}</option>
-                  ))}
-                </select>
-              </div>
-              {/* O filtro de status foi removido daqui pois está sendo controlado pelos cards acima */}
-              <div className="filter-group">
-                <label htmlFor="search-input">Search</label>
-                <input
-                  id="search-input"
-                  type="text"
-                  placeholder="License plate..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="filter-group filter-actions-inline">
-                <label>&nbsp;</label>
-                <div className="filter-buttons">
-                  <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
-                    <Trash2 size={18} />
-                  </button>
-                  <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
-                    {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <div className="toolbar-spacer" />
+            <select
+              id="dock-filter"
+              className="toolbar-select"
+              value={dockFilter}
+              onChange={(e) => setDockFilter(e.target.value)}
+            >
+              <option value="all">All Docks</option>
+              {availableDocks.map((dock) => (
+                <option key={dock} value={dock}>Dock {dock}</option>
+              ))}
+            </select>
+            <input
+              id="search-input"
+              className="toolbar-search"
+              type="text"
+              placeholder="License plate..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button className="btn-icon-only" onClick={handleClearFilters} title="Clear Filters">
+              <Trash2 size={18} />
+            </button>
+            <button className="btn-icon-only btn-primary-icon" onClick={handleRefresh} disabled={isLoading} title="Refresh">
+              {isLoading ? <Loader2 size={18} className="spin" /> : <RotateCcw size={18} />}
+            </button>
           </div>
 
           {isLoading && arrivals.length === 0 ? (

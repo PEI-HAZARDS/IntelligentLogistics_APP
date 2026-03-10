@@ -1,0 +1,338 @@
+/* Shared Theme Base — Gate Operator + Logistics Manager */
+
+:root {
+  --bg-primary: #0f172a;
+  --bg-gradient: radial-gradient(circle at 15% 25%, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.9) 90%);
+  --bg-surface: rgba(30, 41, 59, 0.6);
+  --bg-surface-glass: rgba(30, 41, 59, 0.85);
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-card-hover: rgba(51, 65, 85, 0.8);
+  --bg-dropdown: #1e293b;
+  --bg-header: #1e293b;
+  --bg-secondary: #1e293b;
+  --bg-hover: rgba(51, 65, 85, 0.6);
+  --accent-bg: rgba(2, 119, 189, 0.15);
+  --accent-hover: #0288D1;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-hover: rgba(41, 182, 246, 0.4);
+
+  --accent-color: #0277BD;
+  --accent-gradient: linear-gradient(135deg, #29B6F6 0%, #0277BD 100%);
+
+  --icon-color: #cbd5e1;
+  --icon-color-hover: #f8fafc;
+
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --color-success: #4CAF50;
+  --color-danger: #EF5350;
+  --color-warning: #FFA726;
+  --color-info: #29B6F6;
+
+  --badge-accent-bg: rgba(2, 119, 189, 0.22);
+  --badge-accent-text: #7DD3FC;
+  --badge-accent-border: rgba(41, 182, 246, 0.48);
+
+  --badge-info-bg: rgba(59, 130, 246, 0.2);
+  --badge-info-text: #93C5FD;
+  --badge-info-border: rgba(96, 165, 250, 0.45);
+
+  --badge-success-bg: rgba(46, 125, 50, 0.24);
+  --badge-success-text: #86EFAC;
+  --badge-success-border: rgba(74, 222, 128, 0.45);
+
+  --badge-warning-bg: rgba(230, 81, 0, 0.24);
+  --badge-warning-text: #FCD34D;
+  --badge-warning-border: rgba(251, 191, 36, 0.45);
+
+  --badge-danger-bg: rgba(220, 38, 38, 0.24);
+  --badge-danger-text: #FCA5A5;
+  --badge-danger-border: rgba(248, 113, 113, 0.48);
+
+  --badge-neutral-bg: rgba(100, 116, 139, 0.28);
+  --badge-neutral-text: #CBD5E1;
+  --badge-neutral-border: rgba(148, 163, 184, 0.5);
+
+  --badge-reason-bg: rgba(2, 119, 189, 0.2);
+  --badge-reason-text: #7DD3FC;
+  --badge-reason-border: rgba(41, 182, 246, 0.4);
+}
+
+.light-mode {
+  --bg-primary: #ECEFF1;
+  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #ECEFF1 100%);
+  --bg-surface: rgba(255, 255, 255, 0.85);
+  --bg-surface-glass: rgba(255, 255, 255, 0.92);
+  --bg-card: #ffffff;
+  --bg-card-hover: #F5F5F5;
+  --bg-dropdown: #ffffff;
+  --bg-header: #ffffff;
+  --bg-secondary: #FAFAFA;
+  --bg-hover: rgba(0, 0, 0, 0.06);
+  --accent-bg: rgba(1, 87, 155, 0.08);
+  --accent-hover: #004c8c;
+
+  --text-primary: #1e293b;
+  --text-secondary: #455A64;
+  --text-muted: #607D8B;
+
+  --border-color: rgba(0, 0, 0, 0.15);
+  --border-hover: rgba(2, 119, 189, 0.4);
+
+  --accent-color: #01579B;
+  --accent-gradient: linear-gradient(135deg, #0277BD 0%, #01579B 100%);
+
+  --icon-color: #455A64;
+  --icon-color-hover: #0f172a;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+
+  --color-success: #2E7D32;
+  --color-danger: #C62828;
+  --color-warning: #E65100;
+  --color-info: #01579B;
+
+  --badge-accent-bg: #E0F2FE;
+  --badge-accent-text: #01579B;
+  --badge-accent-border: #81D4FA;
+
+  --badge-info-bg: #DBEAFE;
+  --badge-info-text: #1E40AF;
+  --badge-info-border: #93C5FD;
+
+  --badge-success-bg: #DCFCE7;
+  --badge-success-text: #166534;
+  --badge-success-border: #86EFAC;
+
+  --badge-warning-bg: #FEF3C7;
+  --badge-warning-text: #92400E;
+  --badge-warning-border: #FCD34D;
+
+  --badge-danger-bg: #FEE2E2;
+  --badge-danger-text: #991B1B;
+  --badge-danger-border: #FCA5A5;
+
+  --badge-neutral-bg: #E2E8F0;
+  --badge-neutral-text: #334155;
+  --badge-neutral-border: #CBD5E1;
+
+  --badge-reason-bg: #E0F2FE;
+  --badge-reason-text: #075985;
+  --badge-reason-border: #7DD3FC;
+}
+
+/* Shared Header Primitives */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.header-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.header-icon-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  transition: all 0.15s ease;
+  color: var(--icon-color);
+}
+
+.header-icon-btn:hover {
+  background: var(--bg-card);
+  color: var(--icon-color-hover);
+}
+
+.header-icon-btn svg {
+  height: 20px;
+  min-width: 20px;
+}
+
+.user-name {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Shared User Dropdown */
+.user-section {
+  position: relative;
+}
+
+.user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.user-trigger:hover {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.user-avatar-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.user-trigger .user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dropdown-arrow {
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 260px;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  overflow: hidden;
+  animation: sharedDropdownFadeIn 0.2s ease;
+}
+
+@keyframes sharedDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dropdown-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dropdown-role {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0;
+}
+
+.dropdown-item {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.dropdown-item svg {
+  color: var(--text-muted);
+}
+
+/* Shared Badge Base */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}

@@ -1,6 +1,6 @@
 /**
  * Stream API Service
- * Fetches HLS stream URLs from API Gateway
+ * Fetches stream URLs from API Gateway (MediaMTX backend)
  */
 import api from '@/lib/api';
 
@@ -8,6 +8,7 @@ export interface StreamInfo {
     gate_id: string;
     quality: 'low' | 'high';
     hls_url: string;
+    webrtc_url: string;
 }
 
 /**
@@ -27,7 +28,8 @@ export async function getHighStreamUrl(gateId: string): Promise<StreamInfo> {
 }
 
 /**
- * Get stream URL for a gate with specified quality
+ * Get stream URL for a gate with specified quality.
+ * Returns the WebRTC iframe URL (ultra-low latency via MediaMTX).
  */
 export async function getStreamUrl(
     gateId: string,
@@ -36,5 +38,5 @@ export async function getStreamUrl(
     const streamInfo = quality === 'low'
         ? await getLowStreamUrl(gateId)
         : await getHighStreamUrl(gateId);
-    return streamInfo.hls_url;
+    return streamInfo.webrtc_url;
 }

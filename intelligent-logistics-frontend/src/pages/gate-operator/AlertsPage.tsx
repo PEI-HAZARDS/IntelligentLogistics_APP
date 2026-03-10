@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
     ArrowLeft,
     Bell,
@@ -25,6 +25,7 @@ interface Alert {
 
 export default function AlertsPage() {
     const navigate = useNavigate();
+    const { gateId } = useParams<{ gateId: string }>();
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<"all" | "unread" | "danger" | "warning" | "info">("all");
@@ -130,7 +131,7 @@ export default function AlertsPage() {
         <div className="alerts-page">
             {/* Header */}
             <div className="page-header">
-                <button className="btn-secondary" onClick={() => navigate("/gate")}>
+                <button className="btn-secondary" onClick={() => navigate(`/gate/${gateId || "1"}`)}>
                     <ArrowLeft size={18} />
                     Back to Dashboard
                 </button>
@@ -176,12 +177,12 @@ export default function AlertsPage() {
             {/* Alerts List */}
             <div className="alerts-list">
                 {isLoading ? (
-                    <div className="empty-state" style={{ padding: "3rem", textAlign: "center" }}>
+                    <div className="empty-state">
                         <Loader2 size={32} className="spin" />
-                        <span style={{ marginLeft: "0.5rem" }}>Loading alerts...</span>
+                        <span>Loading alerts...</span>
                     </div>
                 ) : filteredAlerts.length === 0 ? (
-                    <div className="empty-state" style={{ padding: "3rem", textAlign: "center" }}>
+                    <div className="empty-state">
                         <Bell size={48} style={{ color: "var(--text-muted)", marginBottom: "1rem" }} />
                         <p>No alerts found.</p>
                     </div>

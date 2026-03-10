@@ -43,7 +43,7 @@ export default function Login() {
       if (mode === 'manager') {
         nav("/manager");
       } else {
-        nav("/gate");
+        nav("/gate/1");
       }
     } catch (err: unknown) {
       console.error("Login error:", err);

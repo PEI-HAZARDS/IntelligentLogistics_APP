@@ -1,14 +1,18 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
-import HLSPlayer from "./HLSPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
 import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
-import { getStreamUrl as fetchStreamUrl } from "@/services/streams";
+import { useStreamScale } from "@/hooks/useStreamScale";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import type { Appointment } from "@/types/types";
+
+// Extended Appointment type with highway_infraction property
+interface ExtendedAppointment extends Appointment {
+  highway_infraction?: boolean;
+}
 
 // Map API status to English display
 function mapStatusToLabel(status: string): string {
@@ -61,7 +65,7 @@ function generateUniqueId(prefix: string): string {
 
 
 // Map API arrival to UI format  
-function mapArrivalToUI(arrival: Appointment) {
+function mapArrivalToUI(arrival: ExtendedAppointment) {
   return {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
@@ -72,7 +76,7 @@ function mapArrivalToUI(arrival: Appointment) {
     cargoAmount: arrival.notes || "",
     status: mapStatusToLabel(arrival.status) as string,
     dock: arrival.gate_in?.label || "N/A",
-    highwayInfraction: (arrival as any).highway_infraction || false,
+    highwayInfraction: arrival.highway_infraction || false,
   };
 }
 
@@ -91,9 +95,8 @@ export default function Dashboard() {
   // WebSocket states
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [crops, setCrops] = useState<CropImage[]>([]);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   // Load saved payloads from localStorage on mount
-  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: any }>>(() => {
+  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: DecisionUpdatePayload }>>(() => {
     try {
       const saved = localStorage.getItem('ws_payloads');
       return saved ? JSON.parse(saved) : [];
@@ -119,9 +122,12 @@ export default function Dashboard() {
   // Toast notifications
   const { toasts, addToast, dismissToast } = useToasts();
 
-  // Get gate ID from user info (default to 1 if not set)
-  const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
-  const gateId = userInfo.gate_id || 1;
+  // Get gate ID from URL param (e.g. /gate/1)
+  const { gateId: rawGateId } = useParams<{ gateId: string }>();
+  const gateId = rawGateId || "1";
+
+  // Stream quality switching via unified gate WebSocket (/ws/gate/{gate_id})
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
@@ -130,7 +136,7 @@ export default function Dashboard() {
       const statusFilter = arrivalFilter === "delayed" ? "delayed" : "in_transit";
       const { getArrivals } = await import('@/services/arrivals');
       const arrivalsData = await getArrivals({
-        gate_id: gateId,
+        gate_id: Number(gateId),
         status: statusFilter,
         page: 1,
         limit: 10
@@ -152,6 +158,11 @@ export default function Dashboard() {
       console.warn('[Dashboard] processPayload returning early - missing message_type', { data });
       return;
     }
+
+    // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
+    if (data.message_type === "scale_network") return;
+
+
 
     const lp_crop = data.license_crop_url;
     const hz_crop = data.hazard_crop_url;
@@ -445,22 +456,7 @@ export default function Dashboard() {
     };
   }, [fetchData]);
 
-  // Fetch stream URL from API Gateway on mount
-  useEffect(() => {
-    const loadStreamUrl = async () => {
-      try {
-        // Use gate1 format (not gate01) as expected by stream server
-        const gateKey = `gate${gateId}`;
-        const url = await fetchStreamUrl(gateKey, 'high');
-        setStreamUrl(url);
-      } catch (err) {
-        console.error('Failed to fetch stream URL:', err);
-        // Fallback to a default placeholder if API fails
-        setStreamUrl(null);
-      }
-    };
-    loadStreamUrl();
-  }, [gateId]);
+  // Stream URL is managed by useStreamScale hook
 
   const toggleAccordion = (id: string) => {
     setExpandedArrivalId(expandedArrivalId === id ? null : id);
@@ -488,6 +484,7 @@ export default function Dashboard() {
       <ManualReviewModal
         isOpen={manualReviewData !== null}
         reviewData={manualReviewData}
+        gateId={gateId}
         onClose={() => setManualReviewData(null)}
         onHold={(data) => {
           // Add to held reviews if not already there
@@ -526,17 +523,114 @@ export default function Dashboard() {
         <div className="camera-section">
           <div className="video-area">
             {streamUrl ? (
-              <HLSPlayer
-                streamUrl={streamUrl}
-                quality="high"
-                autoPlay={true}
+              <iframe
+                src={streamUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  background: '#000',
+                }}
+                allow="autoplay; fullscreen"
+                title={`Gate ${gateId} Stream (${streamQuality})`}
               />
             ) : (
-              <div className="video-loading">
-                <Loader2 size={32} className="spin" />
-                <span>Loading stream...</span>
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#000',
+                color: '#666',
+              }}>
+                Loading stream...
               </div>
             )}
+
+            {/* Stream Scaling Overlay */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 30,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                opacity: scalingDirection ? 1 : 0,
+                transition: 'opacity 0.4s ease-in-out',
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: '0.75rem',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  letterSpacing: '0.03em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid',
+                  background: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.2)'
+                    : 'rgba(245, 158, 11, 0.2)',
+                  borderColor: scalingDirection === 'up'
+                    ? 'rgba(16, 185, 129, 0.5)'
+                    : 'rgba(245, 158, 11, 0.5)',
+                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {scalingDirection === 'up' ? (
+                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                  ) : (
+                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                  )}
+                </svg>
+                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
+              </div>
+            </div>
+
+            {/* Top Left — Stream Quality Badge */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.5rem',
+                left: '0.5rem',
+                zIndex: 20,
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  border: '1px solid',
+                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
+                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
+                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                  }}
+                />
+                {streamQuality === 'high' ? 'HD' : 'SD'}
+              </div>
+            </div>
           </div>
 
           {/* Crops column - real-time images from WebSocket/MinIO */}
@@ -598,40 +692,64 @@ export default function Dashboard() {
 
           <div className="detections-list custom-scrollbar">
             {/* Held Reviews - displayed prominently at top */}
-            {heldReviews.map((held) => (
-              <div
-                key={`held-${held.id}`}
-                className="detection-card severity-warning held-review"
-                onClick={() => setManualReviewData(held)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="detection-header">
-                  <span className="decision-badge decision-held">
-                    HELD
-                  </span>
-                  <span className="detection-time">{held.timestamp}</span>
-                </div>
-                <div className="detection-fields">
-                  <div className="detection-field">
-                    <span className="field-label">LICENSE</span>
-                    <span className="field-value">{held.licensePlate || 'N/A'}</span>
+            {heldReviews.map((held) => {
+              // Parse kemler and UN to separate code from description
+              const parseCodeWithDescription = (value?: string): { code?: string; description?: string } => {
+                if (!value) return {};
+                const parts = value.split(':');
+                return {
+                  code: parts[0]?.trim(),
+                  description: parts[1]?.trim()
+                };
+              };
+
+              const kemlerParsed = parseCodeWithDescription(held.kemler);
+              const unParsed = parseCodeWithDescription(held.UN);
+
+              return (
+                <div
+                  key={`held-${held.id}`}
+                  className="detection-card decision-manual-review"
+                  onClick={() => setManualReviewData(held)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="detection-header">
+                    <span className="decision-badge decision-manual-review">
+                      MANUAL_REVIEW
+                    </span>
+                    <span className="decision-badge decision-manual-review">
+                      HELD
+                    </span>
+                    <span className="detection-time">{held.timestamp}</span>
                   </div>
-                  {held.kemler && (
+                  <div className="detection-fields">
                     <div className="detection-field">
-                      <span className="field-label">KEMLER</span>
-                      <span className="field-value">{held.kemler}</span>
+                      <span className="field-label">LICENSE</span>
+                      <span className="field-value">{held.licensePlate || 'N/A'}</span>
                     </div>
-                  )}
-                  {held.UN && (
-                    <div className="detection-field">
-                      <span className="field-label">UN</span>
-                      <span className="field-value">{held.UN}</span>
-                    </div>
-                  )}
+                    {kemlerParsed.code && (
+                      <div className="detection-field">
+                        <span className="field-label">KEMLER</span>
+                        <span className="field-value">{kemlerParsed.code}</span>
+                        {kemlerParsed.description && (
+                          <span className="field-description">{kemlerParsed.description}</span>
+                        )}
+                      </div>
+                    )}
+                    {unParsed.code && (
+                      <div className="detection-field">
+                        <span className="field-label">UN</span>
+                        <span className="field-value">{unParsed.code}</span>
+                        {unParsed.description && (
+                          <span className="field-description">{unParsed.description}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="held-hint">Click to resume review</div>
                 </div>
-                <div className="held-hint">Click to resume review</div>
-              </div>
-            ))}
+              );
+            })}
 
             {isLoading && detections.length === 0 && heldReviews.length === 0 ? (
               <div className="loading-state">
@@ -732,7 +850,7 @@ export default function Dashboard() {
 
         <button
           className="view-toggle-btn"
-          onClick={() => navigate("/gate/arrivals")}
+          onClick={() => navigate(`/gate/${gateId}/arrivals`)}
         >
           Arrivals List
         </button>
@@ -935,7 +1053,7 @@ export default function Dashboard() {
                 borderLeft: '3px solid #4ade80',
               }}>
                 <div style={{ color: '#9ca3af', marginBottom: '4px' }}>
-                  {new Date(msg.timestamp).toLocaleTimeString()} — {msg.data?.type || 'unknown'}
+                  {new Date(msg.timestamp).toLocaleTimeString()} — {(msg.data?.message_type as string) || 'unknown'}
                 </div>
                 <pre style={{
                   color: '#e5e7eb',

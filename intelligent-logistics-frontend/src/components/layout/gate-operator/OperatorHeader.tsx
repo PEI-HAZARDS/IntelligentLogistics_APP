@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
 import {
@@ -31,6 +31,7 @@ export default function OperatorHeader() {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const notificationsRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+    const { gateId } = useParams<{ gateId: string }>();
 
     // Get user info from localStorage
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
@@ -241,7 +242,7 @@ export default function OperatorHeader() {
                                 )}
                             </div>
                             <div className="notifications-footer">
-                                <button className="view-all-btn" onClick={() => navigate('/gate/alerts')}>
+                                <button className="view-all-btn" onClick={() => navigate(`/gate/${gateId || "1"}/alerts`)}>
                                     View All
                                 </button>
                             </div>
