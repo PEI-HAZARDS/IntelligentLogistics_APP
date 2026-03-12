@@ -129,6 +129,9 @@ export default function Dashboard() {
 
   // Stream quality switching via dedicated WebSocket (/ws/stream/{gate_id})
   const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  // Keep last non-null direction so the icon doesn't flip to "down" during fade-out of a scale-up
+  const lastScalingDirectionRef = useRef<'up' | 'down'>('up');
+  if (scalingDirection) lastScalingDirectionRef.current = scalingDirection;
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
@@ -533,15 +536,13 @@ export default function Dashboard() {
               />
             )}
 
-            {/* Stream Scaling Overlay */}
+            {/* Stream Scaling Overlay — bottom-right corner */}
             <div
               style={{
                 position: 'absolute',
-                inset: 0,
+                bottom: '0.6rem',
+                right: '0.6rem',
                 zIndex: 30,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 pointerEvents: 'none',
                 opacity: scalingDirection ? 1 : 0,
                 transition: 'opacity 0.4s ease-in-out',
@@ -549,33 +550,33 @@ export default function Dashboard() {
             >
               <div
                 style={{
-                  padding: '0.6rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  letterSpacing: '0.03em',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.02em',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.6rem',
-                  backdropFilter: 'blur(12px)',
+                  gap: '0.35rem',
+                  backdropFilter: 'blur(10px)',
                   border: '1px solid',
-                  background: scalingDirection === 'up'
+                  background: lastScalingDirectionRef.current === 'up'
                     ? 'rgba(16, 185, 129, 0.2)'
                     : 'rgba(245, 158, 11, 0.2)',
-                  borderColor: scalingDirection === 'up'
+                  borderColor: lastScalingDirectionRef.current === 'up'
                     ? 'rgba(16, 185, 129, 0.5)'
                     : 'rgba(245, 158, 11, 0.5)',
-                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
+                  color: lastScalingDirectionRef.current === 'up' ? '#34d399' : '#fbbf24',
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {scalingDirection === 'up' ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {lastScalingDirectionRef.current === 'up' ? (
                     <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
                   ) : (
                     <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
                   )}
                 </svg>
-                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
+                {lastScalingDirectionRef.current === 'up' ? 'HD' : 'SD'}
               </div>
             </div>
 
