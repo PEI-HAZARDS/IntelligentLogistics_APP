@@ -3421,12 +3421,17 @@ html {
 }
 
 /* ========== IMAGE PREVIEW MODAL ========== */
+.image-preview-overlay {
+  padding: 1rem;
+}
+
 .image-preview-modal {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  max-width: 90vw;
-  max-height: 90vh;
+  /* Scales with viewport: 60% on large screens, up to 95% on small */
+  width: clamp(320px, 75vw, 1100px);
+  max-height: 92vh;
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -3435,38 +3440,91 @@ html {
 }
 
 .image-preview-modal .preview-header {
-  padding: 1rem 1.5rem;
+  padding: 0.85rem 1.25rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
   background: var(--bg-card);
 }
 
 .image-preview-modal .preview-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .image-preview-modal .preview-body {
-  padding: 1.5rem;
+  padding: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1;
   overflow: auto;
+  min-height: 280px;
 }
 
 .image-preview-modal .preview-image {
+  width: 100%;
   max-width: 100%;
-  max-height: 70vh;
+  max-height: calc(92vh - 70px);
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  image-rendering: pixelated;
+}
+
+/* Large screens (≥1600px): allow even wider */
+@media (min-width: 1600px) {
+  .image-preview-modal {
+    width: clamp(800px, 65vw, 1400px);
+    max-height: 94vh;
+  }
+
+  .image-preview-modal .preview-header {
+    padding: 1.1rem 1.6rem;
+  }
+
+  .image-preview-modal .preview-title {
+    font-size: 1.1rem;
+    gap: 0.65rem;
+  }
+
+  .image-preview-modal .preview-body {
+    padding: 1.75rem;
+    min-height: 360px;
+  }
+
+  .image-preview-modal .preview-image {
+    max-height: calc(94vh - 88px);
+  }
+}
+
+/* Small screens (≤600px): full-width, reduced padding */
+@media (max-width: 600px) {
+  .image-preview-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+  .image-preview-modal {
+    width: 100%;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .image-preview-modal .preview-body {
+    padding: 0.75rem;
+    min-height: 180px;
+  }
+  .image-preview-modal .preview-image {
+    max-height: calc(85vh - 60px);
+  }
 }
 
 /* ========== BTN-HOLD (Manual Review) ========== */

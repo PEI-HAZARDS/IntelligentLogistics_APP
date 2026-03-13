@@ -20,11 +20,22 @@ import KPICard from "@/components/logistics-manager/KPICard";
 import {
     getDashboardSummary,
     getVolumeData,
+    MOCK_SUMMARY,
+    MOCK_VOLUME_DATA,
     type DashboardSummary,
     type VolumeDataPoint,
 } from "@/services/statistics";
 import { getActiveAlerts } from "@/services/alerts";
 import type { Alert } from "@/types/types";
+
+// Mock alerts used as fallback when the API is not yet available
+const MOCK_ALERTS: Alert[] = [
+    { id: 1, type: "safety",      description: "ADR load not declared — truck 12-AB-34",   timestamp: new Date(Date.now() - 5  * 60000).toISOString() },
+    { id: 2, type: "problem",     description: "Weight discrepancy detected — truck 56-CD-78", timestamp: new Date(Date.now() - 18 * 60000).toISOString() },
+    { id: 3, type: "operational", description: "Gate B queue exceeds 8 trucks",              timestamp: new Date(Date.now() - 32 * 60000).toISOString() },
+    { id: 4, type: "generic",     description: "Scheduled maintenance: Gate A sensor — 15:00", timestamp: new Date(Date.now() - 47 * 60000).toISOString() },
+    { id: 5, type: "problem",     description: "License plate unreadable — manual review pending", timestamp: new Date(Date.now() - 61 * 60000).toISOString() },
+];
 import { exportToPDF, exportToCSV } from "@/services/exportService";
 
 type TimeRange = "today" | "week" | "month" | "year";
@@ -52,25 +63,41 @@ export default function ManagerDashboard() {
         setIsLoading(true);
         setFetchError(false);
         try {
+            // TODO: connect to real API — remove mock fallbacks once backend is ready
             const [summaryData, alertsData, volumeResult] = await Promise.allSettled([
                 getDashboardSummary(),
                 getActiveAlerts(5),
                 getVolumeData(undefined, undefined, "hour"),
             ]);
 
-            if (summaryData.status === "fulfilled") setSummary(summaryData.value);
-            else { setFetchError(true); setSummary(null); }
+            if (summaryData.status === "fulfilled") {
+                setSummary(summaryData.value);
+            } else {
+                console.warn("[Dashboard] summary API unavailable — using mock data");
+                setFetchError(true);
+                setSummary(MOCK_SUMMARY); // TODO: remove when API is ready
+            }
 
-            if (alertsData.status === "fulfilled") setAlerts(alertsData.value);
-            else setAlerts([]);
+            if (alertsData.status === "fulfilled") {
+                setAlerts(alertsData.value);
+            } else {
+                setAlerts(MOCK_ALERTS); // TODO: remove when API is ready
+            }
 
-            if (volumeResult.status === "fulfilled") setVolumeData(volumeResult.value);
-            else setVolumeData([]);
+            if (volumeResult.status === "fulfilled") {
+                setVolumeData(volumeResult.value);
+            } else {
+                setVolumeData(MOCK_VOLUME_DATA); // TODO: remove when API is ready
+            }
 
             setLastUpdate(new Date());
         } catch (error) {
             console.error("Failed to fetch dashboard data:", error);
             setFetchError(true);
+            // TODO: remove mock fallbacks when API is ready
+            setSummary(MOCK_SUMMARY);
+            setAlerts(MOCK_ALERTS);
+            setVolumeData(MOCK_VOLUME_DATA);
         } finally {
             setIsLoading(false);
         }
