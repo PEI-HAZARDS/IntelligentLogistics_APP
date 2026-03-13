@@ -111,4 +111,34 @@ export const MOCK_TRANSPORT_STATS: TransportStats[] = [
     { companyName: "EuroFreight", companyNif: "503456789", avgUnloadingTime: 45, avgWaitingTime: 12, operationsCount: 15, slaAttendedRate: 92 },
     { companyName: "NorteTransporte", companyNif: "504567890", avgUnloadingTime: 38, avgWaitingTime: 22, operationsCount: 6, slaAttendedRate: 78 },
     { companyName: "SulExpress", companyNif: "505678901", avgUnloadingTime: 30, avgWaitingTime: 14, operationsCount: 10, slaAttendedRate: 96 },
+    { companyName: "IberTrans", companyNif: "506789012", avgUnloadingTime: 41, avgWaitingTime: 20, operationsCount: 9, slaAttendedRate: 83 },
+    { companyName: "AtlânticoCargo", companyNif: "507890123", avgUnloadingTime: 35, avgWaitingTime: 16, operationsCount: 11, slaAttendedRate: 91 },
+];
+
+// Generate mock hourly volume data for the last 24 hours
+function generateMockVolumeData(): VolumeDataPoint[] {
+    const points: VolumeDataPoint[] = [];
+    const now = new Date();
+    for (let i = 23; i >= 0; i--) {
+        const ts = new Date(now);
+        ts.setHours(ts.getHours() - i, 0, 0, 0);
+        const hour = ts.getHours();
+        // Simulate realistic port traffic patterns (busier 8-18h)
+        const base = hour >= 8 && hour <= 18 ? 6 : 2;
+        points.push({
+            timestamp: ts.toISOString(),
+            entries: base + Math.floor(Math.random() * 4),
+            exits: base + Math.floor(Math.random() * 4),
+        });
+    }
+    return points;
+}
+
+export const MOCK_VOLUME_DATA: VolumeDataPoint[] = generateMockVolumeData();
+
+export const MOCK_ALERTS_BREAKDOWN: AlertsBreakdown[] = [
+    { type: "operational", count: 18, percentage: 45 },
+    { type: "problem",     count: 12, percentage: 30 },
+    { type: "safety",      count: 7,  percentage: 17.5 },
+    { type: "generic",     count: 3,  percentage: 7.5 },
 ];

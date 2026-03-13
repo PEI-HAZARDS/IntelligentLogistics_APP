@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
     getTransportStats,
+    MOCK_TRANSPORT_STATS,
     type TransportStats,
 } from "@/services/statistics";
 
@@ -41,13 +42,15 @@ export default function TransportPage() {
         setIsLoading(true);
         setFetchError(false);
         try {
+            // TODO: connect to real API — remove mock fallback once backend is ready
             const { from, to } = getDateRange();
             const stats = await getTransportStats(from, to);
             setTransportStats(stats);
         } catch (error) {
             console.error("Failed to fetch transport data:", error);
+            console.warn("[Transport] API unavailable — using mock data");
             setFetchError(true);
-            setTransportStats([]);
+            setTransportStats(MOCK_TRANSPORT_STATS); // TODO: remove when API is ready
         } finally {
             setIsLoading(false);
         }

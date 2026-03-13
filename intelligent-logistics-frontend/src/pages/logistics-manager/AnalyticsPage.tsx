@@ -15,6 +15,8 @@ import GrafanaPanel, { DASHBOARD_PANELS } from "@/components/logistics-manager/G
 import {
     getVolumeData,
     getAlertsBreakdown,
+    MOCK_VOLUME_DATA,
+    MOCK_ALERTS_BREAKDOWN,
     type VolumeDataPoint,
     type AlertsBreakdown,
 } from "@/services/statistics";
@@ -42,15 +44,28 @@ export default function AnalyticsPage() {
     const fetchAnalytics = useCallback(async () => {
         setIsLoading(true);
         try {
+            // TODO: connect to real API — remove mock fallbacks once backend is ready
             const { from, to } = getDateRange();
             const [vol, alerts] = await Promise.allSettled([
                 getVolumeData(from, to, "day"),
                 getAlertsBreakdown(from, to),
             ]);
-            if (vol.status === "fulfilled") setVolumeData(vol.value);
-            if (alerts.status === "fulfilled") setAlertsBreakdown(alerts.value);
+            if (vol.status === "fulfilled") {
+                setVolumeData(vol.value);
+            } else {
+                console.warn("[Analytics] volume API unavailable — using mock data");
+                setVolumeData(MOCK_VOLUME_DATA); // TODO: remove when API is ready
+            }
+            if (alerts.status === "fulfilled") {
+                setAlertsBreakdown(alerts.value);
+            } else {
+                setAlertsBreakdown(MOCK_ALERTS_BREAKDOWN); // TODO: remove when API is ready
+            }
         } catch (err) {
             console.error("Analytics fetch failed:", err);
+            // TODO: remove mock fallbacks when API is ready
+            setVolumeData(MOCK_VOLUME_DATA);
+            setAlertsBreakdown(MOCK_ALERTS_BREAKDOWN);
         } finally {
             setIsLoading(false);
         }
