@@ -232,33 +232,6 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Ionicons name="car" size={28} color={colors.primary} />
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Intelligent Logistics</Text>
-                        <Text style={styles.driverName}>Hello, {driverName}</Text>
-                    </View>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        onPress={onRefresh}
-                        disabled={isLoading || isRefreshing}
-                    >
-                        {isLoading || isRefreshing ? (
-                            <ActivityIndicator size="small" color={colors.text.primary} />
-                        ) : (
-                            <Ionicons name="refresh" size={20} color={colors.text.primary} />
-                        )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.iconButton, styles.logoutButton]} onPress={logout}>
-                        <Ionicons name="log-out-outline" size={20} color="#f87171" />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
             <ScrollView
                 style={styles.main}
                 contentContainerStyle={styles.mainContent}

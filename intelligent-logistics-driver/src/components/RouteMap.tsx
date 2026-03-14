@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
@@ -18,8 +18,8 @@ interface RouteMapProps {
 
 // Port of Aveiro (default destination)
 const DEFAULT_DESTINATION = {
-    latitude: 40.6443,
-    longitude: -8.7455,
+    latitude: 40.6335912,
+    longitude: -8.73065429999997,
     name: 'Port of Aveiro',
 };
 
@@ -92,6 +92,18 @@ export default function RouteMap({
                 showsCompass={true}
                 userInterfaceStyle="dark"
             >
+                {/* Route Line */}
+                {location && (
+                    <Polyline
+                        coordinates={[
+                            { latitude: location.coords.latitude, longitude: location.coords.longitude },
+                            { latitude: destinationLat, longitude: destinationLng }
+                        ]}
+                        strokeColor={colors.primary}
+                        strokeWidth={4}
+                    />
+                )}
+
                 {/* Destination marker */}
                 <Marker
                     coordinate={{ latitude: destinationLat, longitude: destinationLng }}
@@ -100,17 +112,6 @@ export default function RouteMap({
                     pinColor="#3b82f6"
                 />
             </MapView>
-
-            {/* Destination info overlay */}
-            <View style={styles.infoOverlay}>
-                <View style={styles.infoIcon}>
-                    <Ionicons name="navigate" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Heading to</Text>
-                    <Text style={styles.infoValue}>{destinationName}</Text>
-                </View>
-            </View>
         </View>
     );
 }
@@ -149,39 +150,5 @@ const styles = StyleSheet.create({
         color: colors.text.muted,
         fontSize: fontSize.sm,
         textAlign: 'center',
-    },
-    infoOverlay: {
-        position: 'absolute',
-        top: spacing.sm,
-        left: spacing.sm,
-        right: spacing.sm,
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.border.light,
-    },
-    infoIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    infoContent: {
-        flex: 1,
-    },
-    infoLabel: {
-        fontSize: fontSize.xs,
-        color: colors.text.muted,
-    },
-    infoValue: {
-        fontSize: fontSize.sm,
-        color: colors.text.primary,
-        fontWeight: fontWeight.semibold,
     },
 });

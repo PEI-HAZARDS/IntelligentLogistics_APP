@@ -19,9 +19,11 @@ import {
     Dimensions,
     Linking,
     Alert,
+    TouchableWithoutFeedback,
+    Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getMyActiveArrival, claimArrival } from '../services/drivers';
@@ -45,7 +47,7 @@ const MOCK_ACTIVE: Appointment = {
     terminal_id: 1,
     scheduled_start_time: new Date().toISOString(),
     status: 'in_process',
-    notes: 'Container ABC-123 - 2.5 ton',
+    notes: 'Container ABC-123',
     gate_in_id: 1,
 };
 
@@ -54,47 +56,93 @@ const MOCK_CLAIM_RESULT: ClaimAppointmentResponse = {
     dock_bay_number: 'A-05',
     dock_location: 'North Terminal - Sector 3',
     license_plate: '00-AA-00',
-    cargo_description: 'Container ABC-123 - 2.5 tons',
+    cargo_description: 'Container ABC-123',
     navigation_url: 'maps://',
 };
+
+const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
+    {
+        id: 1001,
+        arrival_id: 'ARR-001',
+        booking_reference: 'BK-2026-001',
+        driver_license: 'AB-123456',
+        truck_license_plate: '00-AA-00',
+        terminal_id: 1,
+        scheduled_start_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        status: 'pending',
+        notes: 'Container ABC-123',
+        gate_in_id: 1,
+    },
+    {
+        id: 1002,
+        arrival_id: 'ARR-002',
+        booking_reference: 'BK-2026-005',
+        driver_license: 'AB-123456',
+        truck_license_plate: '00-AA-00',
+        terminal_id: 2,
+        scheduled_start_time: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
+        status: 'pending',
+        notes: 'Steel Pallets',
+        gate_in_id: 2,
+    },
+    {
+        id: 1003,
+        arrival_id: 'ARR-003',
+        booking_reference: 'BK-2026-012',
+        driver_license: 'AB-123456',
+        truck_license_plate: '00-AA-00',
+        terminal_id: 1,
+        scheduled_start_time: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
+        status: 'pending',
+        notes: 'General Cargo',
+        gate_in_id: 1,
+    },
+];
 // ===== END MOCK MODE =====
 
 // Delivery states - TRIGGER: Driver action buttons
-type DeliveryPhase = 'arrived' | 'in_route' | 'unloading' | 'completed';
+type DeliveryPhase = 'idle' | 'in_transit' | 'gate_opening' | 'in_port' | 'unloading' | 'completed';
 
 const DELIVERY_STEPS: { id: DeliveryPhase; label: string; icon: string }[] = [
-    { id: 'arrived', label: 'Arrived', icon: 'enter-outline' },
-    { id: 'in_route', label: 'In Route', icon: 'navigate-outline' },
+    { id: 'in_transit', label: 'In Transit', icon: 'navigate-outline' },
+    { id: 'gate_opening', label: 'Gate', icon: 'enter-outline' },
+    { id: 'in_port', label: 'Port Nav', icon: 'map-outline' },
     { id: 'unloading', label: 'Unloading', icon: 'cube-outline' },
     { id: 'completed', label: 'Completed', icon: 'checkmark-circle-outline' },
 ];
 
-function getDeliveryPhase(status: string, isUnloading: boolean): number {
-    if (status === 'completed') return 4;
-    if (isUnloading) return 3;
-    if (status === 'in_process') return 2;
-    return 1;
+function getDeliveryPhaseIndex(phase: DeliveryPhase): number {
+    switch (phase) {
+        case 'completed': return 5;
+        case 'unloading': return 4;
+        case 'in_port': return 3;
+        case 'gate_opening': return 2;
+        case 'in_transit': return 1;
+        default: return 0;
+    }
 }
 
-function getStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
+function getStatusLabel(phase: DeliveryPhase): string {
+    const labels: Record<DeliveryPhase, string> = {
+        idle: 'Not Started',
         in_transit: 'In Transit',
-        in_process: 'At Port',
-        delayed: 'Delayed',
+        gate_opening: 'At Gate',
+        in_port: 'At Port',
+        unloading: 'Unloading',
         completed: 'Completed',
-        canceled: 'Canceled',
     };
-    return labels[status] || status;
+    return labels[phase] || phase;
 }
 
-function getStatusColors(status: string): { bg: string; text: string; accent: string } {
-    switch (status) {
+function getStatusColors(phase: DeliveryPhase): { bg: string; text: string; accent: string } {
+    switch (phase) {
         case 'completed':
             return { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e', accent: '#22c55e' };
-        case 'in_process':
+        case 'unloading':
+        case 'in_port':
             return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', accent: '#3b82f6' };
-        case 'delayed':
-            return { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', accent: '#ef4444' };
+        case 'gate_opening':
+            return { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7', accent: '#a855f7' };
         default:
             return { bg: 'rgba(234, 179, 8, 0.15)', text: '#eab308', accent: '#eab308' };
     }
@@ -106,28 +154,42 @@ export default function ActiveArrivalScreen() {
     const driverName = user?.name || 'Driver';
 
     const [activeArrival, setActiveArrival] = useState<Appointment | null>(null);
-    const [claimResult, setClaimResult] = useState<ClaimAppointmentResponse | null>(DEV_MOCK_MODE ? MOCK_CLAIM_RESULT : null);
+    const [assignedDeliveries, setAssignedDeliveries] = useState<Appointment[]>([]);
+    const [selectedForPin, setSelectedForPin] = useState<Appointment | null>(null);
+    const [claimResult, setClaimResult] = useState<ClaimAppointmentResponse | null>(null);
     const [pinCode, setPinCode] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
-    const [isUnloading, setIsUnloading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isMapExpanded, setIsMapExpanded] = useState(false);
+    
+    // Simulation State
+    const [deliveryPhase, setDeliveryPhase] = useState<DeliveryPhase>('idle');
+    const [showGatePopup, setShowGatePopup] = useState(false);
 
     const fetchData = useCallback(async () => {
         setError(null);
         try {
             if (DEV_MOCK_MODE) {
                 await new Promise(resolve => setTimeout(resolve, 500));
-                setActiveArrival(MOCK_ACTIVE);
+                setAssignedDeliveries(MOCK_ASSIGNED_DELIVERIES);
+                // If we are already in a simulation, don't reset to null
+                if (deliveryPhase === 'idle') {
+                    setActiveArrival(null);
+                }
                 setIsLoading(false);
                 setIsRefreshing(false);
                 return;
             }
             const active = await getMyActiveArrival(driversLicense);
             setActiveArrival(active);
+            if (active) {
+                if (active.status === 'in_process') setDeliveryPhase('in_port');
+                else if (active.status === 'completed') setDeliveryPhase('completed');
+                else setDeliveryPhase('in_transit');
+            }
         } catch (err) {
             console.error('Failed to load arrival:', err);
             setError('Failed to load data.');
@@ -135,7 +197,7 @@ export default function ActiveArrivalScreen() {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, [driversLicense]);
+    }, [driversLicense, deliveryPhase]);
 
     useEffect(() => {
         fetchData();
@@ -153,31 +215,49 @@ export default function ActiveArrivalScreen() {
             haptics.warning();
             return;
         }
-        setIsClaiming(true);
-        setError(null);
-        try {
-            if (DEV_MOCK_MODE) {
-                await new Promise(resolve => setTimeout(resolve, 800));
-                setClaimResult(MOCK_CLAIM_RESULT);
-                setActiveArrival({ ...MOCK_ACTIVE, status: 'in_process' });
-                setSuccessMessage('Arrival registered successfully!');
-                setPinCode('');
-                haptics.success();
-                setIsClaiming(false);
-                return;
-            }
-            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
-            haptics.success();
-            setClaimResult(result);
-            setSuccessMessage('Arrival registered!');
-            setPinCode('');
-            fetchData();
-        } catch (err) {
-            setError('Invalid PIN code.');
-            haptics.error();
-        } finally {
-            setIsClaiming(false);
-        }
+
+        Alert.alert(
+            'Confirm Arrival',
+            `Do you want to register delivery with PIN ${pinCode}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Confirm', 
+                    onPress: async () => {
+                        setIsClaiming(true);
+                        setError(null);
+                        try {
+                            if (DEV_MOCK_MODE) {
+                                await new Promise(resolve => setTimeout(resolve, 800));
+                                setClaimResult(MOCK_CLAIM_RESULT);
+                                setActiveArrival(MOCK_ACTIVE);
+                                setDeliveryPhase('in_transit');
+                                setSuccessMessage('Arrival registered! Ready to drive.');
+                                setPinCode('');
+                                setSelectedForPin(null); // Close modal on success
+                                haptics.success();
+                                setIsClaiming(false);
+
+                                // Simulation: Timer removed for manual trigger below map
+                                return;
+                            }
+                            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
+                            haptics.success();
+                            setClaimResult(result);
+                            setSuccessMessage('Arrival registered!');
+                            setPinCode('');
+                            setSelectedForPin(null); // Close modal on success
+                            fetchData();
+                        } catch (err) {
+                            setError('Invalid PIN code.');
+                            haptics.error();
+                        } finally {
+                            setIsClaiming(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     // Expand map modal
@@ -190,35 +270,79 @@ export default function ActiveArrivalScreen() {
         setIsMapExpanded(false);
     };
 
-    // Report problem
-    const handleReportProblem = () => {
+    // Simulation: Arrive at Gate
+    const handleArriveAtGate = () => {
         haptics.medium();
-        Alert.alert(
-            'Report Problem',
-            'What type of issue would you like to report?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Wrong Location', onPress: () => console.log('Wrong location reported') },
-                { text: 'Dock Occupied', onPress: () => console.log('Dock occupied reported') },
-                { text: 'Other Issue', onPress: () => console.log('Other issue reported') },
-            ]
-        );
+        setDeliveryPhase('gate_opening');
+        setShowGatePopup(true);
+        
+        // Auto close popup and move to internal navigation after 3 seconds
+        setTimeout(() => {
+            setShowGatePopup(false);
+            setDeliveryPhase('in_port');
+            haptics.success();
+        }, 3500);
     };
 
     // TRIGGER: Driver arrived at dock and starts unloading
     const handleStartUnloading = () => {
-        haptics.medium();
-        setIsUnloading(true);
-        setSuccessMessage('Unloading started!');
+        Alert.alert(
+            'Start Unloading',
+            'Are you positioned at the dock and ready to start unloading?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Start', 
+                    onPress: () => {
+                        haptics.medium();
+                        setDeliveryPhase('unloading');
+                        setSuccessMessage('Unloading started!');
+                    }
+                }
+            ]
+        );
     };
 
     // TRIGGER: Driver finishes unloading
     const handleFinishDelivery = () => {
-        haptics.success();
-        if (activeArrival) {
-            setActiveArrival({ ...activeArrival, status: 'completed' });
-        }
-        setSuccessMessage('Delivery completed!');
+        Alert.alert(
+            'Complete Delivery',
+            'Has all cargo been unloaded and processed?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Complete', 
+                    onPress: () => {
+                        haptics.success();
+                        setDeliveryPhase('completed');
+                        setSuccessMessage('Delivery completed!');
+                    }
+                }
+            ]
+        );
+    };
+
+    // RESET Simulation
+    const handleReset = () => {
+        Alert.alert(
+            'Leave Port',
+            'Confirm you are finished and leaving the terminal area?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Finish', 
+                    onPress: () => {
+                        haptics.medium();
+                        setDeliveryPhase('idle');
+                        setActiveArrival(null);
+                        setSelectedForPin(null);
+                        setClaimResult(null);
+                        setSuccessMessage(null);
+                        setPinCode('');
+                    }
+                }
+            ]
+        );
     };
 
     const formatTime = (dateStr: string | null | undefined) => {
@@ -226,8 +350,465 @@ export default function ActiveArrivalScreen() {
         return new Date(dateStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const currentPhase = activeArrival ? getDeliveryPhase(activeArrival.status, isUnloading) : 0;
-    const statusColors = activeArrival ? getStatusColors(activeArrival.status) : getStatusColors('');
+    const currentPhaseIndex = getDeliveryPhaseIndex(deliveryPhase);
+    const statusColors = getStatusColors(deliveryPhase);
+
+    // Gate Accepted Popup
+    const renderGatePopup = () => (
+        <Modal
+            visible={showGatePopup}
+            transparent
+            animationType="fade"
+        >
+            <View style={styles.gatePopupOverlay}>
+                <Animated.View 
+                    entering={ZoomIn.duration(400)} 
+                    style={styles.gatePopupContent}
+                >
+                    <View style={styles.gatePopupIcon}>
+                        <Ionicons name="checkmark-circle" size={80} color="#22c55e" />
+                    </View>
+                    <Text style={styles.gatePopupTitle}>ACCEPTED</Text>
+                    <Text style={styles.gatePopupSubtitle}>Gate is opening...</Text>
+                    <Text style={styles.gatePopupInstructions}>Proceed to Dock {claimResult?.dock_bay_number || 'A-05'}</Text>
+                    
+                    <ActivityIndicator 
+                        size="large" 
+                        color={colors.primary} 
+                        style={{ marginTop: spacing.xl }} 
+                    />
+                </Animated.View>
+            </View>
+        </Modal>
+    );
+
+    // Shared Progress Timeline component
+    const renderProgressTimeline = () => (
+        <Animated.View style={styles.progressCard} entering={FadeInDown.delay(100).duration(400)}>
+            <Text style={styles.sectionLabel}>DELIVERY PROGRESS</Text>
+            <View style={styles.timeline}>
+                {DELIVERY_STEPS.map((step, index) => {
+                    const stepIndex = index + 1;
+                    const isCompleted = stepIndex < currentPhaseIndex;
+                    const isCurrent = stepIndex === currentPhaseIndex;
+                    return (
+                        <View key={step.id} style={styles.timelineItem}>
+                            <View style={[
+                                styles.timelineDot,
+                                isCompleted && styles.timelineDotCompleted,
+                                isCurrent && styles.timelineDotCurrent,
+                            ]}>
+                                <Ionicons
+                                    name={step.icon as any}
+                                    size={12}
+                                    color={isCompleted || isCurrent ? colors.white : colors.text.muted}
+                                />
+                            </View>
+                            <Text style={[
+                                styles.timelineText,
+                                (isCompleted || isCurrent) && styles.timelineTextActive,
+                            ]}>
+                                {step.label}
+                            </Text>
+                            {index < DELIVERY_STEPS.length - 1 && (
+                                <View style={[
+                                    styles.timelineLine,
+                                    isCompleted && styles.timelineLineCompleted,
+                                ]} />
+                            )}
+                        </View>
+                    );
+                })}
+            </View>
+        </Animated.View>
+    );
+
+    // Layout for in_port or unloading
+    const renderInPortLayout = () => {
+        const isMapVisible = deliveryPhase === 'in_port';
+        
+        return (
+            <View style={styles.contentContainer}>
+                {/* 1. Map OR Unified Task Focus Area */}
+                {isMapVisible ? (
+                    <TouchableOpacity onPress={handleExpandMap} activeOpacity={0.9}>
+                        <Animated.View style={styles.mapContainerExtraLarge} entering={FadeInUp.delay(100).duration(400)}>
+                            <PortMap
+                                terminalId={activeArrival?.terminal_id}
+                                dockNumber={claimResult?.dock_bay_number || 'A-05'}
+                            />
+                            
+                            {/* Floating Overlay (Visible ONLY during navigation) */}
+                            <View style={styles.floatingStatsCard}>
+                                <View style={styles.statsHeader}>
+                                    <View style={[styles.gateIndicator, { backgroundColor: 'rgba(168, 85, 247, 0.2)' }]}>
+                                        <Ionicons name="cube" size={16} color="#a855f7" />
+                                        <Text style={[styles.gateText, { color: '#a855f7' }]}>DOCK {claimResult?.dock_bay_number || 'A-05'}</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.destinationName}>{claimResult?.dock_location || 'North Terminal'}</Text>
+                                    </View>
+                                    <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                                        <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                                            {getStatusLabel(deliveryPhase)}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.statsDivider} />
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statLabel}>CARGO</Text>
+                                        <Text style={styles.statValue} numberOfLines={1}>
+                                            {claimResult?.cargo_description || 'General Cargo'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.statVerticalDivider} />
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statLabel}>LICENSE</Text>
+                                        <Text style={styles.statValue}>{activeArrival?.truck_license_plate || '00-AA-00'}</Text>
+                                    </View>
+                                    <View style={styles.statVerticalDivider} />
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statLabel}>ENTRY</Text>
+                                        <Text style={styles.statValue}>{formatTime(activeArrival?.scheduled_start_time)}</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.mapOverlay}>
+                                <View style={styles.mapOverlayBadge}>
+                                    <Ionicons name="expand-outline" size={14} color={colors.white} />
+                                    <Text style={styles.mapOverlayText}>Full Screen</Text>
+                                </View>
+                            </View>
+                        </Animated.View>
+                    </TouchableOpacity>
+                ) : (
+                    <Animated.View style={styles.taskFocusCard} entering={FadeIn.duration(600)}>
+                        {/* Integrated Header inside the card */}
+                        <View style={styles.taskFocusHeader}>
+                            <View style={styles.statsHeader}>
+                                <View style={[styles.gateIndicator, { backgroundColor: deliveryPhase === 'completed' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(168, 85, 247, 0.15)' }]}>
+                                    <Ionicons 
+                                        name={deliveryPhase === 'completed' ? "checkmark-circle" : "cube"} 
+                                        size={16} 
+                                        color={deliveryPhase === 'completed' ? colors.status.completed : "#a855f7"} 
+                                    />
+                                    <Text style={[styles.gateText, { color: deliveryPhase === 'completed' ? colors.status.completed : "#a855f7" }]}>
+                                        DOCK {claimResult?.dock_bay_number || 'A-05'}
+                                    </Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.destinationName}>{claimResult?.dock_location || 'North Terminal'}</Text>
+                                </View>
+                                <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                                    <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                                        {getStatusLabel(deliveryPhase)}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.statsDivider} />
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statLabel}>CARGO</Text>
+                                    <Text style={styles.statValue} numberOfLines={1}>
+                                        {claimResult?.cargo_description || 'General Cargo'}
+                                    </Text>
+                                </View>
+                                <View style={styles.statVerticalDivider} />
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statLabel}>LICENSE</Text>
+                                    <Text style={styles.statValue}>{activeArrival?.truck_license_plate || '00-AA-00'}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.taskDivider} />
+
+                        {/* Main Body */}
+                        <View style={styles.taskFocusBody}>
+                            <View style={styles.taskIconContainer}>
+                                <Ionicons 
+                                    name={deliveryPhase === 'completed' ? "checkmark-circle" : "sync"} 
+                                    size={80} 
+                                    color={deliveryPhase === 'completed' ? colors.status.completed : colors.primary} 
+                                />
+                            </View>
+                            <Text style={styles.taskTitle}>
+                                {deliveryPhase === 'completed' ? 'Delivery Successful' : 'Unloading in Progress'}
+                            </Text>
+                            <Text style={styles.taskSubtitle}>
+                                {deliveryPhase === 'completed' 
+                                    ? 'You may now leave the port terminal.' 
+                                    : 'Please wait at the dock while the cargo is being processed.'}
+                            </Text>
+                        </View>
+                    </Animated.View>
+                )}
+
+                {renderProgressTimeline()}
+
+                <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+                    {deliveryPhase === 'in_port' ? (
+                        <TouchableOpacity style={styles.primaryButton} onPress={handleStartUnloading}>
+                            <Ionicons name="cube-outline" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>START UNLOADING</Text>
+                        </TouchableOpacity>
+                    ) : deliveryPhase === 'unloading' ? (
+                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleFinishDelivery}>
+                            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>COMPLETE DELIVERY</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>
+                            <Ionicons name="log-out-outline" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>LEAVE PORT / FINISH</Text>
+                        </TouchableOpacity>
+                    )}
+                </Animated.View>
+            </View>
+        );
+    };
+
+    // Layout for in_transit (on the way)
+    const renderInTransitLayout = () => (
+        <View style={styles.contentContainer}>
+            {/* Extra Large Map with Floating Stats Overlay */}
+            <TouchableOpacity onPress={handleExpandMap} activeOpacity={0.9}>
+                <Animated.View style={styles.mapContainerExtraLarge} entering={FadeInUp.delay(100).duration(400)}>
+                    <RouteMap destinationName="Port of Aveiro" />
+                    
+                    {/* Floating Stats Overlay (Modern Navigation Look) */}
+                    <View style={styles.floatingStatsCard}>
+                        <View style={styles.statsHeader}>
+                            <View style={styles.gateIndicator}>
+                                <Ionicons name="log-in" size={16} color={colors.primary} />
+                                <Text style={styles.gateText}>GATE {activeArrival?.gate_in_id || '01'}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.destinationName}>Port of Aveiro</Text>
+                            </View>
+                            <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                                <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                                    {getStatusLabel(deliveryPhase)}
+                                </Text>
+                            </View>
+                        </View>
+                        
+                        <View style={styles.statsDivider} />
+                        
+                        <View style={styles.statsRow}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>DISTANCE</Text>
+                                <Text style={styles.statValue}>4.2 km</Text>
+                            </View>
+                            <View style={styles.statVerticalDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>ETA</Text>
+                                <Text style={styles.statValue}>{formatTime(new Date(Date.now() + 8 * 60 * 1000).toISOString())}</Text>
+                            </View>
+                            <View style={styles.statVerticalDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>SCHEDULED</Text>
+                                <Text style={[styles.statValue, { color: colors.status.delayed }]}>
+                                    {formatTime(activeArrival?.scheduled_start_time)}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Simulation Overlay */}
+                    <View style={styles.simulationOverlay}>
+                        <ActivityIndicator size="small" color={colors.white} />
+                        <Text style={styles.simulationOverlayText}>Simulating drive...</Text>
+                    </View>
+                </Animated.View>
+            </TouchableOpacity>
+
+            {/* Progress Timeline (Shared) - Touchable Simulation Hotspot */}
+            <TouchableOpacity 
+                onPress={() => deliveryPhase === 'in_transit' && handleArriveAtGate()}
+                activeOpacity={1}
+                style={{ marginTop: spacing.md }}
+            >
+                {renderProgressTimeline()}
+            </TouchableOpacity>
+        </View>
+    );
+
+    // PIN Entry Modal
+    const renderPinModal = () => (
+        <Modal
+            visible={!!selectedForPin}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSelectedForPin(null)}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.gatePopupOverlay}>
+                    <Animated.View 
+                        entering={ZoomIn.duration(400)} 
+                        style={styles.gatePopupContent}
+                    >
+                        <TouchableOpacity 
+                            style={styles.modalCloseIcon} 
+                            onPress={() => {
+                                setSelectedForPin(null);
+                                setPinCode('');
+                                setError(null);
+                            }}
+                        >
+                            <Ionicons name="close" size={24} color={colors.text.muted} />
+                        </TouchableOpacity>
+
+                        <View style={styles.gatePopupIcon}>
+                            <Ionicons name="keypad" size={60} color={colors.primary} />
+                        </View>
+                        
+                        <Text style={styles.gatePopupTitle}>VERIFY</Text>
+                        <Text style={styles.gatePopupSubtitle}>Enter Delivery PIN</Text>
+                        <Text style={styles.gatePopupInstructions}>
+                            For booking: {selectedForPin?.booking_reference}
+                        </Text>
+
+                        {error && (
+                            <View style={[styles.errorBanner, { width: '100%', marginTop: spacing.md }]}>
+                                <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
+
+                        <View style={[styles.pinInputContainer, { width: '100%', marginTop: spacing.xl }]}>
+                            <TextInput
+                                style={styles.pinInput}
+                                placeholder="----"
+                                placeholderTextColor={colors.text.muted}
+                                value={pinCode}
+                                onChangeText={setPinCode}
+                                autoCapitalize="characters"
+                                autoCorrect={false}
+                                editable={!isClaiming}
+                                maxLength={10}
+                                autoFocus={false}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.primaryButton, { width: '100%', marginTop: spacing.lg }, isClaiming && styles.buttonDisabled]}
+                            onPress={handleClaimArrival}
+                            disabled={isClaiming}
+                        >
+                            {isClaiming ? (
+                                <ActivityIndicator size="small" color={colors.white} />
+                            ) : (
+                                <>
+                                    <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+                                    <Text style={styles.primaryButtonText}>CONFIRM & START</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </TouchableWithoutFeedback>
+        </Modal>
+    );
+
+    // PIN Claim Form (Dashboard)
+    const renderClaimForm = () => {
+        const nextDelivery = assignedDeliveries[0];
+        const otherDeliveries = assignedDeliveries.slice(1);
+
+        return (
+            <View style={styles.contentContainer}>
+                {/* Dashboard Welcome */}
+                <Animated.View entering={FadeIn.duration(600)} style={styles.dashboardHeader}>
+                    <View>
+                        <Text style={styles.dashboardGreeting}>Ready to roll, {driverName.split(' ')[0]}?</Text>
+                        <Text style={styles.dashboardSub}>You have {assignedDeliveries.length} deliveries scheduled for today.</Text>
+                    </View>
+                </Animated.View>
+
+                {/* Daily Summary Row */}
+                <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.summaryRow}>
+                    <View style={styles.summaryItem}>
+                        <Ionicons name="time-outline" size={16} color={colors.primary} />
+                        <Text style={styles.summaryText}>Next: {nextDelivery ? formatTime(nextDelivery.scheduled_start_time) : '--:--'}</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                        <Ionicons name="cube-outline" size={16} color={colors.primary} />
+                        <Text style={styles.summaryText}>{assignedDeliveries.length} Total</Text>
+                    </View>
+                </Animated.View>
+
+                {/* Priority Hero Card */}
+                <Text style={styles.sectionTitle}>PRIORITY TASK</Text>
+                {nextDelivery ? (
+                    <TouchableOpacity 
+                        onPress={() => { haptics.light(); setSelectedForPin(nextDelivery); }}
+                        activeOpacity={0.9}
+                    >
+                        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.heroCard}>
+                            <View style={styles.heroCardHeader}>
+                                <View style={styles.heroBadge}>
+                                    <Text style={styles.heroBadgeText}>NEXT UP</Text>
+                                </View>
+                                <Text style={styles.heroTime}>{formatTime(nextDelivery.scheduled_start_time)}</Text>
+                            </View>
+                            
+                            <Text style={styles.heroRef}>{nextDelivery.booking_reference}</Text>
+                            <Text style={styles.heroNotes}>{nextDelivery.notes}</Text>
+                            
+                            <View style={styles.heroFooter}>
+                                <View style={styles.heroTag}>
+                                    <Ionicons name="location" size={14} color={colors.white} />
+                                    <Text style={styles.heroTagText}>Gate {nextDelivery.gate_in_id}</Text>
+                                </View>
+                                <View style={styles.heroAction}>
+                                    <Text style={styles.heroActionText}>START NOW</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={colors.white} />
+                                </View>
+                            </View>
+                            
+                            {/* Visual Decor */}
+                            <View style={styles.heroDecor}>
+                                <Ionicons name="car-sport" size={100} color="rgba(255, 255, 255, 0.05)" />
+                            </View>
+                        </Animated.View>
+                    </TouchableOpacity>
+                ) : (
+                    <Text style={styles.emptyListText}>No pending deliveries</Text>
+                )}
+
+                {/* Other Deliveries List */}
+                {otherDeliveries.length > 0 && (
+                    <View style={{ marginTop: spacing.lg }}>
+                        <Text style={styles.sectionTitle}>UPCOMING SCHEDULE</Text>
+                        {otherDeliveries.map((delivery, idx) => (
+                            <Animated.View 
+                                key={delivery.id} 
+                                entering={FadeInDown.delay(300 + (idx * 100)).duration(400)}
+                            >
+                                <TouchableOpacity 
+                                    style={styles.deliveryListItem}
+                                    onPress={() => { haptics.light(); setSelectedForPin(delivery); }}
+                                >
+                                    <View style={styles.deliveryListInfo}>
+                                        <View style={styles.deliveryListHeader}>
+                                            <Text style={styles.deliveryListRef}>{delivery.booking_reference}</Text>
+                                            <Text style={styles.deliveryListTimeSmall}>{formatTime(delivery.scheduled_start_time)}</Text>
+                                        </View>
+                                        <Text style={styles.deliveryListNotes}>{delivery.notes}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+                                </TouchableOpacity>
+                            </Animated.View>
+                        ))}
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     // Expanded Map Modal
     const renderMapModal = () => (
@@ -244,18 +825,18 @@ export default function ActiveArrivalScreen() {
                         <Ionicons name="chevron-down" size={28} color={colors.text.primary} />
                     </TouchableOpacity>
                     <View style={styles.modalTitleContainer}>
-                        <Text style={styles.modalTitle}>Dock {claimResult?.dock_bay_number || 'A-01'}</Text>
-                        <Text style={styles.modalSubtitle}>{claimResult?.dock_location || 'Terminal A'}</Text>
+                        <Text style={styles.modalTitle}>Dock {claimResult?.dock_bay_number || 'A-05'}</Text>
+                        <Text style={styles.modalSubtitle}>{claimResult?.dock_location || 'North Terminal'}</Text>
                     </View>
                     <View style={{ width: 28 }} />
                 </View>
 
                 {/* Large Map */}
                 <View style={styles.modalMapContainer}>
-                    {activeArrival?.status === 'in_process' || isUnloading ? (
+                    {deliveryPhase === 'in_port' || deliveryPhase === 'unloading' ? (
                         <PortMap
                             terminalId={activeArrival?.terminal_id}
-                            dockNumber={claimResult?.dock_bay_number || 'A-01'}
+                            dockNumber={claimResult?.dock_bay_number || 'A-05'}
                         />
                     ) : (
                         <RouteMap destinationName="Port of Aveiro" />
@@ -268,14 +849,14 @@ export default function ActiveArrivalScreen() {
                         <View style={styles.modalInfoItem}>
                             <Text style={styles.modalInfoLabel}>Cargo</Text>
                             <Text style={styles.modalInfoValue}>
-                                {claimResult?.cargo_description || activeArrival?.notes}
+                                {claimResult?.cargo_description || activeArrival?.notes || 'General Cargo'}
                             </Text>
                         </View>
                     </View>
                     <View style={styles.modalInfoRow}>
                         <View style={styles.modalInfoItem}>
                             <Text style={styles.modalInfoLabel}>License Plate</Text>
-                            <Text style={styles.modalInfoValue}>{activeArrival?.truck_license_plate}</Text>
+                            <Text style={styles.modalInfoValue}>{activeArrival?.truck_license_plate || '00-AA-00'}</Text>
                         </View>
                         <View style={styles.modalInfoItem}>
                             <Text style={styles.modalInfoLabel}>Entry Time</Text>
@@ -285,7 +866,7 @@ export default function ActiveArrivalScreen() {
                 </View>
 
                 {/* Report Problem Button */}
-                <TouchableOpacity style={styles.reportButton} onPress={handleReportProblem}>
+                <TouchableOpacity style={styles.reportButton} onPress={() => {}}>
                     <Ionicons name="warning-outline" size={20} color="#ef4444" />
                     <Text style={styles.reportButtonText}>Report Problem</Text>
                 </TouchableOpacity>
@@ -293,212 +874,8 @@ export default function ActiveArrivalScreen() {
         </Modal>
     );
 
-    // Layout for in_process (at port)
-    const renderInProcessLayout = () => (
-        <View style={styles.contentContainer}>
-            {/* Destination Card - Clickable to expand map */}
-            <TouchableOpacity onPress={handleExpandMap} activeOpacity={0.7}>
-                <Animated.View style={styles.destinationCard} entering={FadeInDown.duration(400)}>
-                    <View style={styles.destinationHeader}>
-                        <View style={[styles.destinationIcon, { backgroundColor: statusColors.bg }]}>
-                            <Ionicons name="location" size={24} color={statusColors.accent} />
-                        </View>
-                        <View style={styles.destinationInfo}>
-                            <Text style={styles.destinationLabel}>PROCEED TO</Text>
-                            <Text style={styles.destinationTitle}>
-                                Dock {claimResult?.dock_bay_number || 'A-01'}
-                            </Text>
-                            <Text style={styles.destinationSubtitle}>
-                                {claimResult?.dock_location || 'Terminal A'}
-                            </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
-                    </View>
-                </Animated.View>
-            </TouchableOpacity>
-
-            {/* Small Map Preview - Also clickable */}
-            <TouchableOpacity onPress={handleExpandMap} activeOpacity={0.9}>
-                <Animated.View style={styles.mapContainer} entering={FadeInDown.delay(100).duration(400)}>
-                    <PortMap
-                        terminalId={activeArrival?.terminal_id}
-                        dockNumber={claimResult?.dock_bay_number || 'A-01'}
-                    />
-                    {/* Tap to expand overlay */}
-                    <View style={styles.mapOverlay}>
-                        <View style={styles.mapOverlayBadge}>
-                            <Ionicons name="expand-outline" size={14} color={colors.white} />
-                            <Text style={styles.mapOverlayText}>Tap to expand</Text>
-                        </View>
-                    </View>
-                </Animated.View>
-            </TouchableOpacity>
-
-            {/* Progress Timeline */}
-            <Animated.View style={styles.progressCard} entering={FadeInDown.delay(200).duration(400)}>
-                <Text style={styles.sectionLabel}>PROGRESS</Text>
-                <View style={styles.timeline}>
-                    {DELIVERY_STEPS.map((step, index) => {
-                        const isCompleted = index < currentPhase;
-                        const isCurrent = index === currentPhase - 1;
-                        return (
-                            <View key={step.id} style={styles.timelineItem}>
-                                <View style={[
-                                    styles.timelineDot,
-                                    isCompleted && styles.timelineDotCompleted,
-                                    isCurrent && styles.timelineDotCurrent,
-                                ]}>
-                                    <Ionicons
-                                        name={step.icon as any}
-                                        size={12}
-                                        color={isCompleted || isCurrent ? colors.white : colors.text.muted}
-                                    />
-                                </View>
-                                <Text style={[
-                                    styles.timelineText,
-                                    (isCompleted || isCurrent) && styles.timelineTextActive,
-                                ]}>
-                                    {step.label}
-                                </Text>
-                                {index < DELIVERY_STEPS.length - 1 && (
-                                    <View style={[
-                                        styles.timelineLine,
-                                        isCompleted && styles.timelineLineCompleted,
-                                    ]} />
-                                )}
-                            </View>
-                        );
-                    })}
-                </View>
-            </Animated.View>
-
-            {/* Action Button */}
-            <Animated.View entering={FadeInUp.delay(300).duration(400)}>
-                {!isUnloading ? (
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleStartUnloading}>
-                        <Ionicons name="cube-outline" size={20} color={colors.white} />
-                        <Text style={styles.primaryButtonText}>START UNLOADING</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleFinishDelivery}>
-                        <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-                        <Text style={styles.primaryButtonText}>COMPLETE DELIVERY</Text>
-                    </TouchableOpacity>
-                )}
-            </Animated.View>
-
-            {/* Success message */}
-            {successMessage && (
-                <View style={styles.successBanner}>
-                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                    <Text style={styles.successText}>{successMessage}</Text>
-                </View>
-            )}
-        </View>
-    );
-
-    // Layout for in_transit (on the way)
-    const renderInTransitLayout = () => (
-        <View style={styles.contentContainer}>
-            {/* Status Card */}
-            <Animated.View style={styles.statusCard} entering={FadeInDown.duration(400)}>
-                <View style={styles.statusRow}>
-                    <View>
-                        <Text style={styles.statusTitle}>{activeArrival?.booking_reference}</Text>
-                        <Text style={styles.statusSubtitle}>
-                            Expected time: {formatTime(activeArrival?.scheduled_start_time)}
-                        </Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-                        <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                            {getStatusLabel(activeArrival?.status || '')}
-                        </Text>
-                    </View>
-                </View>
-            </Animated.View>
-
-            {/* Large Map */}
-            <Animated.View style={styles.mapContainerLarge} entering={FadeInUp.delay(200).duration(400)}>
-                <RouteMap destinationName="Port of Aveiro" />
-            </Animated.View>
-        </View>
-    );
-
-    // PIN Claim Form
-    const renderClaimForm = () => (
-        <View style={styles.contentContainer}>
-            <Animated.View style={styles.claimCard} entering={FadeInDown.duration(400)}>
-                <View style={styles.claimHeader}>
-                    <View style={styles.claimIconContainer}>
-                        <Ionicons name="qr-code" size={36} color={colors.primary} />
-                    </View>
-                    <Text style={styles.claimTitle}>Register Arrival</Text>
-                    <Text style={styles.claimSubtitle}>
-                        Enter the PIN code provided at the gate
-                    </Text>
-                </View>
-
-                {error && (
-                    <View style={styles.errorBanner}>
-                        <Ionicons name="alert-circle" size={16} color="#ef4444" />
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                )}
-
-                <View style={styles.pinInputContainer}>
-                    <TextInput
-                        style={styles.pinInput}
-                        placeholder="PIN CODE"
-                        placeholderTextColor={colors.text.muted}
-                        value={pinCode}
-                        onChangeText={setPinCode}
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                        editable={!isClaiming}
-                        maxLength={10}
-                    />
-                </View>
-
-                <TouchableOpacity
-                    style={[styles.primaryButton, isClaiming && styles.buttonDisabled]}
-                    onPress={handleClaimArrival}
-                    disabled={isClaiming}
-                >
-                    {isClaiming ? (
-                        <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>CONFIRM ARRIVAL</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
-            </Animated.View>
-        </View>
-    );
-
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <Animated.View style={styles.header} entering={FadeIn.duration(400)}>
-                <View>
-                    <Text style={styles.greeting}>Hello, {driverName.split(' ')[0]}!</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {activeArrival
-                            ? `Delivery ${isUnloading ? 'unloading' : 'in progress'}`
-                            : 'No active deliveries'}
-                    </Text>
-                </View>
-                {activeArrival && (
-                    <View style={[styles.headerBadge, { backgroundColor: statusColors.bg }]}>
-                        <View style={[styles.headerBadgeDot, { backgroundColor: statusColors.accent }]} />
-                        <Text style={[styles.headerBadgeText, { color: statusColors.text }]}>
-                            {isUnloading ? 'Unloading' : getStatusLabel(activeArrival.status)}
-                        </Text>
-                    </View>
-                )}
-            </Animated.View>
-
+        <View style={styles.container}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -514,9 +891,9 @@ export default function ActiveArrivalScreen() {
                         <SkeletonCard style={{ height: 100 }} />
                     </View>
                 ) : activeArrival ? (
-                    activeArrival.status === 'in_process' || isUnloading
-                        ? renderInProcessLayout()
-                        : renderInTransitLayout()
+                    deliveryPhase === 'in_transit' || deliveryPhase === 'gate_opening'
+                        ? renderInTransitLayout()
+                        : renderInPortLayout()
                 ) : (
                     renderClaimForm()
                 )}
@@ -524,7 +901,13 @@ export default function ActiveArrivalScreen() {
 
             {/* Expanded Map Modal */}
             {renderMapModal()}
-        </SafeAreaView>
+            
+            {/* PIN Entry simulated popup */}
+            {renderPinModal()}
+            
+            {/* Gate opening simulated popup */}
+            {renderGatePopup()}
+        </View>
     );
 }
 
@@ -571,6 +954,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        paddingTop: spacing.md,
         paddingBottom: spacing.xxl,
     },
     contentContainer: {
@@ -629,6 +1013,164 @@ const styles = StyleSheet.create({
         height: 300,
         borderRadius: borderRadius.lg,
         overflow: 'hidden',
+        position: 'relative',
+    },
+    mapContainerExtraLarge: {
+        height: 480,
+        borderRadius: borderRadius.lg,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    floatingStatsCard: {
+        position: 'absolute',
+        top: spacing.md,
+        left: spacing.md,
+        right: spacing.md,
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    statsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    gateIndicator: {
+        backgroundColor: 'rgba(14, 165, 233, 0.15)',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    gateText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    destinationName: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text.primary,
+    },
+    statusBadgeTextSmall: {
+        fontSize: 9,
+        fontWeight: '600',
+        color: colors.text.muted,
+        marginTop: 1,
+    },
+    statsDivider: {
+        height: 1,
+        backgroundColor: colors.border.light,
+        marginBottom: spacing.sm,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statLabel: {
+        fontSize: 8,
+        fontWeight: '600',
+        color: colors.text.muted,
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    statValue: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: colors.text.primary,
+    },
+    statVerticalDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: colors.border.light,
+    },
+    simulationOverlay: {
+        position: 'absolute',
+        bottom: spacing.md,
+        left: spacing.md,
+        right: spacing.md,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        padding: spacing.sm,
+        borderRadius: borderRadius.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    simulationOverlayText: {
+        color: colors.white,
+        fontSize: fontSize.xs,
+        fontWeight: '600',
+    },
+    taskFocusCard: {
+        height: 520,
+        backgroundColor: colors.background.card,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        overflow: 'hidden',
+    },
+    taskFocusHeader: {
+        padding: spacing.md,
+        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    },
+    taskFocusBody: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.xl,
+    },
+    taskDivider: {
+        height: 1,
+        backgroundColor: colors.border.light,
+    },
+    taskIconContainer: {
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.xl,
+    },
+    taskTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: colors.text.primary,
+        textAlign: 'center',
+    },
+    taskSubtitle: {
+        fontSize: fontSize.md,
+        color: colors.text.muted,
+        textAlign: 'center',
+        marginTop: spacing.md,
+        lineHeight: 22,
+    },
+    simulationHint: {
+        marginTop: spacing.xs,
+        alignItems: 'center',
+    },
+    simulationHintText: {
+        fontSize: 10,
+        color: 'rgba(255, 255, 255, 0.2)',
+        fontStyle: 'italic',
     },
     mapOverlay: {
         position: 'absolute',
@@ -771,6 +1313,191 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
 
+    // Dashboard Styles
+    dashboardHeader: {
+        marginBottom: spacing.lg,
+    },
+    dashboardGreeting: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: colors.text.primary,
+    },
+    dashboardSub: {
+        fontSize: fontSize.sm,
+        color: colors.text.muted,
+        marginTop: 4,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.background.medium,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginBottom: spacing.xl,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+    },
+    summaryItem: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    summaryText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.text.primary,
+    },
+    summaryDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: colors.border.light,
+    },
+    heroCard: {
+        backgroundColor: colors.primary,
+        borderRadius: borderRadius.xl,
+        padding: spacing.xl,
+        marginBottom: spacing.xl,
+        position: 'relative',
+        overflow: 'hidden',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 15,
+        elevation: 10,
+    },
+    heroCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    heroBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    heroBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: colors.white,
+        letterSpacing: 1,
+    },
+    heroTime: {
+        fontSize: fontSize.lg,
+        fontWeight: '800',
+        color: colors.white,
+    },
+    heroRef: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: colors.white,
+        marginBottom: 4,
+    },
+    heroNotes: {
+        fontSize: fontSize.md,
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontWeight: '500',
+        marginBottom: spacing.xl,
+    },
+    heroFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    heroTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    heroTagText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.white,
+    },
+    heroAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    heroActionText: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: colors.white,
+    },
+    heroDecor: {
+        position: 'absolute',
+        right: -20,
+        bottom: -20,
+        opacity: 0.5,
+    },
+
+    // Delivery Selection List
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: colors.text.muted,
+        letterSpacing: 1,
+        marginBottom: spacing.sm,
+    },
+    deliveryListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.background.card,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+    },
+    deliveryListInfo: {
+        flex: 1,
+    },
+    deliveryListHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    deliveryListRef: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text.primary,
+    },
+    deliveryListTimeSmall: {
+        fontSize: fontSize.xs,
+        fontWeight: '600',
+        color: colors.primary,
+    },
+    deliveryListNotes: {
+        fontSize: fontSize.sm,
+        color: colors.text.secondary,
+    },
+    emptyListText: {
+        color: colors.text.muted,
+        fontSize: fontSize.sm,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        marginVertical: spacing.xl,
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: spacing.md,
+    },
+    backButtonText: {
+        fontSize: fontSize.sm,
+        color: colors.text.muted,
+        fontWeight: '600',
+    },
+
     // Claim Form
     claimCard: {
         backgroundColor: colors.background.card,
@@ -817,6 +1544,56 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         letterSpacing: 4,
         fontWeight: '600',
+    },
+
+    // Gate Popup
+    gatePopupOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
+    },
+    gatePopupContent: {
+        backgroundColor: colors.background.medium,
+        borderRadius: borderRadius.xl,
+        padding: spacing.xxl,
+        alignItems: 'center',
+        width: '100%',
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 15,
+        elevation: 10,
+    },
+    gatePopupIcon: {
+        marginBottom: spacing.lg,
+    },
+    gatePopupTitle: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#22c55e',
+        letterSpacing: 2,
+    },
+    gatePopupSubtitle: {
+        fontSize: fontSize.xl,
+        color: colors.text.primary,
+        marginTop: spacing.sm,
+        fontWeight: '600',
+    },
+    gatePopupInstructions: {
+        fontSize: fontSize.md,
+        color: colors.text.secondary,
+        marginTop: spacing.md,
+        textAlign: 'center',
+    },
+    modalCloseIcon: {
+        position: 'absolute',
+        top: spacing.md,
+        right: spacing.md,
+        padding: 4,
     },
 
     // Banners
