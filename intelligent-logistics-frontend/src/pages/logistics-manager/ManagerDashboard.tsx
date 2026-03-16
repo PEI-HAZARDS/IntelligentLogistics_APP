@@ -3,7 +3,7 @@
  * Port logistics overview: KPIs, active alerts feed, and today's operations mini-chart.
  * Grafana charts live in the Analytics tab for detailed analysis.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import {
     Download,
     RefreshCw,
@@ -26,22 +26,49 @@ import {
     type VolumeDataPoint,
 } from "@/services/statistics";
 import { getActiveAlerts } from "@/services/alerts";
+import { exportToPDF, exportToCSV } from "@/services/exportService";
 import type { Alert } from "@/types/types";
+
+
 
 // Mock alerts used as fallback when the API is not yet available
 const MOCK_ALERTS: Alert[] = [
-    { id: 1, type: "safety",      description: "ADR load not declared — truck 12-AB-34",   timestamp: new Date(Date.now() - 5  * 60000).toISOString() },
-    { id: 2, type: "problem",     description: "Weight discrepancy detected — truck 56-CD-78", timestamp: new Date(Date.now() - 18 * 60000).toISOString() },
-    { id: 3, type: "operational", description: "Gate B queue exceeds 8 trucks",              timestamp: new Date(Date.now() - 32 * 60000).toISOString() },
-    { id: 4, type: "generic",     description: "Scheduled maintenance: Gate A sensor — 15:00", timestamp: new Date(Date.now() - 47 * 60000).toISOString() },
-    { id: 5, type: "problem",     description: "License plate unreadable — manual review pending", timestamp: new Date(Date.now() - 61 * 60000).toISOString() },
+    {
+        id: 1,
+        type: "operational",
+        description: "Gate B queue above target threshold — 7 trucks awaiting processing",
+        timestamp: new Date(Date.now() - 6 * 60000).toISOString(),
+    },
+    {
+        id: 2,
+        type: "problem",
+        description: "Truck 42-QX-17 sent to manual verification after OCR mismatch",
+        timestamp: new Date(Date.now() - 14 * 60000).toISOString(),
+    },
+    {
+        id: 3,
+        type: "safety",
+        description: "PPE compliance check triggered at unloading bay 2",
+        timestamp: new Date(Date.now() - 27 * 60000).toISOString(),
+    },
+    {
+        id: 4,
+        type: "operational",
+        description: "Temporary slowdown at weighbridge lane 1 due to calibration check",
+        timestamp: new Date(Date.now() - 39 * 60000).toISOString(),
+    },
+    {
+        id: 5,
+        type: "generic",
+        description: "Planned sensor maintenance scheduled for Gate A at 15:00",
+        timestamp: new Date(Date.now() - 58 * 60000).toISOString(),
+    },
 ];
-import { exportToPDF, exportToCSV } from "@/services/exportService";
 
 type TimeRange = "today" | "week" | "month" | "year";
 
 // Alert type → icon + color map
-const alertConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+const alertConfig: Record<string, { icon: ReactNode; color: string; label: string }> = {
     safety: { icon: <Shield size={16} />, color: "#ef4444", label: "Safety" },
     problem: { icon: <AlertCircle size={16} />, color: "#f59e0b", label: "Problem" },
     operational: { icon: <Activity size={16} />, color: "#3b82f6", label: "Operational" },
@@ -62,8 +89,21 @@ export default function ManagerDashboard() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         setFetchError(false);
+
         try {
-            // TODO: connect to real API — remove mock fallbacks once backend is ready
+            // -----------------------------------------------------------------
+            // DEMO MODE: use frontend mock data directly for presentation.
+            //
+            // To restore live API mode:
+            // 1. Remove the mock block below
+            // 2. Uncomment the API block underneath it
+            // -----------------------------------------------------------------
+            setSummary(MOCK_SUMMARY);
+            setAlerts(MOCK_ALERTS);
+            setVolumeData(MOCK_VOLUME_DATA);
+            setLastUpdate(new Date());
+
+            /*
             const [summaryData, alertsData, volumeResult] = await Promise.allSettled([
                 getDashboardSummary(),
                 getActiveAlerts(5),
@@ -75,29 +115,34 @@ export default function ManagerDashboard() {
             } else {
                 console.warn("[Dashboard] summary API unavailable — using mock data");
                 setFetchError(true);
-                setSummary(MOCK_SUMMARY); // TODO: remove when API is ready
+                setSummary(MOCK_SUMMARY);
             }
 
             if (alertsData.status === "fulfilled") {
                 setAlerts(alertsData.value);
             } else {
-                setAlerts(MOCK_ALERTS); // TODO: remove when API is ready
+                console.warn("[Dashboard] alerts API unavailable — using mock data");
+                setFetchError(true);
+                setAlerts(MOCK_ALERTS);
             }
 
             if (volumeResult.status === "fulfilled") {
                 setVolumeData(volumeResult.value);
             } else {
-                setVolumeData(MOCK_VOLUME_DATA); // TODO: remove when API is ready
+                console.warn("[Dashboard] volume API unavailable — using mock data");
+                setFetchError(true);
+                setVolumeData(MOCK_VOLUME_DATA);
             }
 
             setLastUpdate(new Date());
+            */
         } catch (error) {
             console.error("Failed to fetch dashboard data:", error);
             setFetchError(true);
-            // TODO: remove mock fallbacks when API is ready
             setSummary(MOCK_SUMMARY);
             setAlerts(MOCK_ALERTS);
             setVolumeData(MOCK_VOLUME_DATA);
+            setLastUpdate(new Date());
         } finally {
             setIsLoading(false);
         }

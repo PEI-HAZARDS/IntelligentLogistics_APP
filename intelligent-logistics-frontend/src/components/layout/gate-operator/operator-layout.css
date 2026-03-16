@@ -3631,4 +3631,440 @@ html {
   background: var(--bg-card-hover) !important;
   color: var(--text-primary) !important;
   box-shadow: var(--shadow-sm) !important;
+} 
+
+
+
+
+
+
+/* =============================================================================
+FLUID TYPOGRAPHY WITH clamp()
+
+Use fluid values so text scales better on large screens.
+   ============================================================================= */
+
+/* --- Global base --- */
+html {
+  /* Fluid scale: 14px at 360px -> 18px at 2560px */
+  font-size: clamp(14px, 0.5rem + 0.5vw, 20px);
+}
+
+/* --- Logo and header --- */
+.logo-text {
+  font-size: clamp(1.1rem, 1rem + 0.3vw, 1.6rem);
+}
+
+.header-subtitle {
+  font-size: clamp(0.8rem, 0.7rem + 0.2vw, 1rem);
+  max-width: clamp(260px, 25vw, 600px);
+}
+
+.user-name {
+  font-size: clamp(0.85rem, 0.8rem + 0.15vw, 1.05rem);
+}
+
+/* --- Section titles --- */
+.section-title {
+  font-size: clamp(1rem, 0.9rem + 0.2vw, 1.35rem);
+}
+
+.panel-title {
+  font-size: clamp(1.1rem, 1rem + 0.25vw, 1.5rem);
+}
+
+.page-title {
+  font-size: clamp(1.5rem, 1.2rem + 0.5vw, 2.5rem);
+}
+
+.alerts-page .page-title {
+  font-size: clamp(1.25rem, 1rem + 0.4vw, 2rem);
+}
+
+/* --- Detection cards --- */
+.detection-field .field-label {
+  font-size: clamp(0.7rem, 0.65rem + 0.1vw, 0.85rem);
+}
+
+.detection-field .field-value {
+  font-size: clamp(0.875rem, 0.8rem + 0.2vw, 1.15rem);
+}
+
+.detection-field .field-description {
+  font-size: clamp(0.75rem, 0.7rem + 0.1vw, 0.9rem);
+}
+
+.detection-description {
+  font-size: clamp(0.82rem, 0.75rem + 0.15vw, 1rem);
+}
+
+.detection-time {
+  font-size: clamp(0.72rem, 0.65rem + 0.12vw, 0.9rem);
+}
+
+/* --- Arrival cards --- */
+.plate-id {
+  font-size: clamp(1rem, 0.9rem + 0.2vw, 1.3rem);
+}
+
+.arrival-time {
+  font-size: clamp(0.78rem, 0.72rem + 0.12vw, 0.95rem);
+}
+
+.arrival-field .label {
+  font-size: clamp(0.7rem, 0.65rem + 0.1vw, 0.85rem);
+}
+
+.arrival-field .value {
+  font-size: clamp(0.9rem, 0.85rem + 0.18vw, 1.15rem);
+}
+
+/* --- Stats --- */
+.stat-value {
+  font-size: clamp(1.4rem, 1.2rem + 0.4vw, 2.4rem);
+}
+
+.stat-label {
+  font-size: clamp(0.78rem, 0.72rem + 0.12vw, 1rem);
+}
+
+/* --- Arrivals table --- */
+.arrivals-toolbar .content-title {
+  font-size: clamp(1rem, 0.9rem + 0.2vw, 1.3rem);
+}
+
+/* --- Footer --- */
+.operator-footer {
+  font-size: clamp(0.72rem, 0.65rem + 0.12vw, 0.9rem);
+}
+
+/* --- Badges and labels --- */
+.detection-header .decision-badge,
+.source-badge,
+.decision-badge {
+  font-size: clamp(0.68rem, 0.62rem + 0.1vw, 0.82rem);
+}
+
+.time-value {
+  font-size: clamp(0.9rem, 0.82rem + 0.15vw, 1.15rem);
+}
+
+/* --- Modals --- */
+.manual-review-modal .modal-title,
+.detection-details-modal .detail-value {
+  font-size: clamp(1rem, 0.9rem + 0.2vw, 1.3rem);
+}
+
+
+/* =============================================================================
+  RESPONSIVE LAYOUT FOR LARGE SCREENS (>=1600px and >=2200px)
+  ============================================================================= */
+
+@media (min-width: 1600px) {
+  .operator-header {
+    padding: 0.6rem 2.5rem;
+  }
+
+  .operator-main {
+    padding: 2rem 2.5rem;
+    gap: 2rem;
+  }
+
+  .operator-dashboard {
+    gap: 2rem;
+  }
+
+  .left-panel,
+  .right-panel {
+    gap: 2rem;
+  }
+
+  .camera-section {
+    max-height: 50vh;
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+
+  .detection-card {
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .right-panel {
+    padding: 2rem;
+  }
+
+  .alerts-sidebar {
+    width: 320px;
+  }
+
+  .stat-card {
+    padding: 0.9rem 1.1rem;
+    gap: 1rem;
+  }
+
+  .stat-icon {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (min-width: 2200px) {
+  .operator-main {
+    padding: 2.5rem 3.5rem;
+    gap: 2.5rem;
+  }
+
+  .operator-dashboard {
+    grid-template-columns: 2.5fr 1fr;
+    gap: 2.5rem;
+  }
+
+  .camera-section {
+    max-height: 55vh;
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+
+  .alerts-sidebar {
+    width: 380px;
+  }
+
+  .detection-card {
+    padding: 1.5rem;
+    border-radius: 16px;
+  }
+
+  .header-icon-btn {
+    width: 52px;
+    height: 52px;
+  }
+
+  .header-icon-btn svg {
+    height: 24px;
+    min-width: 24px;
+  }
+}
+
+
+/* =============================================================================
+KEYBOARD NAVIGATION (TAB) - WCAG 2.1 AA
+
+Keep focus visible and high contrast on interactive elements.
+   ============================================================================= */
+
+/* --- Safe focus reset --- */
+*:focus {
+  /* Keep browser outline as fallback */
+  outline-offset: 2px;
+}
+
+/* --- Main focus ring --- */
+*:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  border-radius: 4px;
+  /* Extra contrast on light and dark backgrounds */
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.25);
+}
+
+/* --- Header buttons --- */
+.header-icon-btn:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  background: var(--bg-card);
+  color: var(--icon-color-hover);
+}
+
+/* --- Main navigation --- */
+.nav-item:focus-visible,
+.nav-link:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* --- Clickable cards --- */
+.detection-card:focus-visible,
+.arrival-card:focus-visible,
+.arrival-accordion-item:focus-visible,
+.stat-card:focus-visible,
+.alert-card:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow:
+    0 0 0 5px rgba(59, 130, 246, 0.2),
+    var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2));
+}
+
+/* --- Accordion header (keyboard toggle) --- */
+.accordion-header:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 12px;
+  background: var(--bg-card-hover);
+}
+
+/* --- Crop thumbnails --- */
+.crop-thumb:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  transform: scale(1.05);
+}
+
+/* --- Primary and action buttons --- */
+.btn-primary:focus-visible,
+.btn-approve:focus-visible,
+.btn-reject:focus-visible,
+.view-toggle-btn:focus-visible,
+.btn-hold:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.5);
+}
+
+/* --- Outline and secondary buttons --- */
+.btn-outline:focus-visible,
+.btn-icon-only:focus-visible,
+.sidebar-collapse-btn:focus-visible,
+.retry-button:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+}
+
+/* --- Arrival filter toggle --- */
+.arrival-filter-btn:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px !important;
+}
+
+/* --- Inputs, selects, textareas --- */
+.filter-group select:focus-visible,
+.filter-group input:focus-visible,
+.toolbar-select:focus-visible,
+.toolbar-search:focus-visible,
+.search-input:focus-visible,
+.notes-input:focus-visible,
+.alerts-page .filter-select:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 0;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* --- Manual review candidate --- */
+.candidate-item:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+/* --- Alert delete button --- */
+.alerts-page .alert-delete-btn:focus-visible {
+  outline: 3px solid var(--danger, #ef4444);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* --- Detail links --- */
+.details-btn:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  border-radius: 4px;
+  text-decoration: underline;
+}
+
+/* --- Modal close button --- */
+[aria-label="Fechar"]:focus-visible,
+[aria-label="Close"]:focus-visible,
+.modal-close:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+
+/* =============================================================================
+SKIP LINK - JUMP TO MAIN CONTENT
+
+  Add as the first element in <body>:
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  Main element:
+  <main id="main-content" tabindex="-1">...</main>
+  ============================================================================= */
+
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 1rem;
+  z-index: 99999;
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.2s;
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+
+/* =============================================================================
+FOCUS RING FOR DARK/LIGHT MODE
+
+  Strengthen ring contrast in light mode.
+  ============================================================================= */
+
+.light-mode *:focus-visible {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 5px var(--accent-color, #3b82f6);
+}
+
+/* Exception: colored buttons already have enough contrast */
+.light-mode .btn-primary:focus-visible,
+.light-mode .btn-approve:focus-visible,
+.light-mode .btn-reject:focus-visible {
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.5);
+}
+
+
+/* =============================================================================
+FOCUS STATE FOR role="button" OR tabindex="0"
+
+  Apply clear focus to non-native interactive elements.
+  ============================================================================= */
+
+[tabindex="0"]:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 3px solid var(--accent-color, #3b82f6);
+  outline-offset: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2);
+}
+
+
+/* =============================================================================
+VISIBLE FOCUS FLOW - ACTIVE SECTION HIGHLIGHT
+
+  Highlight the active panel while tabbing.
+  ============================================================================= */
+
+.left-panel:focus-within .detections-section {
+  border-color: rgba(59, 130, 246, 0.3);
+  transition: border-color 0.2s;
+}
+
+.right-panel:focus-within {
+  border-color: rgba(59, 130, 246, 0.3);
+  transition: border-color 0.2s;
 }

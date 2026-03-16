@@ -2,7 +2,7 @@
  * Grafana Panel Component
  * Embeds Grafana dashboard panels via iframe
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import config from "@/config/appConfig";
 
@@ -21,6 +21,8 @@ interface GrafanaPanelProps {
     title?: string;
     /** Refresh interval in seconds (0 = no refresh) */
     refresh?: number;
+    /** Demo fallback content */
+    mockContent?: ReactNode;
 }
 
 export default function GrafanaPanel({
@@ -31,12 +33,12 @@ export default function GrafanaPanel({
     height = 250,
     title,
     refresh = 30,
+    mockContent,
 }: GrafanaPanelProps) {
     const { isDarkMode } = useTheme();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Build Grafana embed URL
     const buildGrafanaUrl = () => {
         const theme = isDarkMode ? "dark" : "light";
         const params = new URLSearchParams({
@@ -61,10 +63,9 @@ export default function GrafanaPanel({
 
     const handleError = () => {
         setIsLoading(false);
-        setError("Failed to load Grafana panel. Please check your connection.");
+        setError("Failed to load panel");
     };
 
-    // Reset loading state when URL changes
     useEffect(() => {
         setIsLoading(true);
         setError(null);
@@ -77,29 +78,62 @@ export default function GrafanaPanel({
                     <h3 className="chart-title">{title}</h3>
                 </div>
             )}
-            <div className="chart-container" style={{ height }}>
+
+            <div className="chart-container" style={{ height, position: "relative" }}>
+                {/* -------------------------------------------------------------
+                   DEMO MODE: show mock content directly for presentation.
+                   
+                   To restore live Grafana mode:
+                   1. Remove the demo block below
+                   2. Uncomment the iframe block underneath it
+                ------------------------------------------------------------- */}
+                {mockContent ? (
+                    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                        <div
+                            style={{
+                                fontSize: "0.8rem",
+                                opacity: 0.75,
+                                marginBottom: "0.75rem",
+                            }}
+                        >
+                            Demo data
+                        </div>
+                        <div style={{ flex: 1, minHeight: 0 }}>{mockContent}</div>
+                    </div>
+                ) : (
+                    <div className="grafana-loading">
+                        <span>No chart data available</span>
+                    </div>
+                )}
+
+                {/*
                 {isLoading && !error && (
                     <div className="grafana-loading">
                         <div className="grafana-loading-spinner" />
                         <span>Loading chart...</span>
                     </div>
                 )}
+
                 {error && (
                     <div className="grafana-loading">
-                        <span style={{ color: 'var(--danger-color)' }}>{error}</span>
+                        <span style={{ color: "var(--danger-color)" }}>
+                            Failed to load Grafana panel. Please check your connection.
+                        </span>
                     </div>
                 )}
+
                 <iframe
                     src={buildGrafanaUrl()}
                     className="grafana-panel"
                     style={{
-                        display: isLoading || error ? 'none' : 'block',
+                        display: isLoading || error ? "none" : "block",
                         height,
                     }}
                     onLoad={handleLoad}
                     onError={handleError}
                     title={title || `Grafana Panel ${panelId}`}
                 />
+                */}
             </div>
         </div>
     );
@@ -112,9 +146,9 @@ export default function GrafanaPanel({
 export const DASHBOARD_PANELS = {
     overview: {
         uid: "overview",
-        volumeChart: 1,        // Volume de Chegadas panel ID
-        alertsDonut: 2,        // Número de Alertas panel ID
-        avgTimeBar: 3,         // Tempo Médio por Transportadora panel ID
+        volumeChart: 1,
+        alertsDonut: 2,
+        avgTimeBar: 3,
     },
     apiGateway: {
         uid: "api-gateway",
