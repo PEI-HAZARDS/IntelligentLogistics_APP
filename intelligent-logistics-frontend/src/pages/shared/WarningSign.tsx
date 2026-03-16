@@ -21,8 +21,22 @@ export default function WarningSign() {
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
   const gateId = rawGateId || "2";
 
-  // Stream quality switching via dedicated WebSocket — gate camera
-  const { streamUrl } = useStreamScale({ gateId });
+  // Stream quality switching via unified WebSocket — gate camera
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const isScalingTransition = Boolean(scalingDirection);
+  const scalingUp = scalingDirection === 'up';
+  const streamBadgeLabel = isScalingTransition
+    ? (scalingUp ? 'Up -> HD' : 'Down -> SD')
+    : (streamQuality === 'high' ? 'HD' : 'SD');
+  const streamBadgeBackground = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.2)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)');
+  const streamBadgeBorder = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.5)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)');
+  const streamBadgeColor = isScalingTransition
+    ? (scalingUp ? '#34d399' : '#fbbf24')
+    : (streamQuality === 'high' ? '#34d399' : '#94a3b8');
 
   // Listen for all events on the shared WebSocket
   useEffect(() => {
@@ -102,15 +116,24 @@ export default function WarningSign() {
               ? 'border-neutral-800'
               : 'border-slate-300'
           }`}>
-            {/* Real HLS Stream */}
+            {/* Real WebRTC Stream */}
             <style>{`
                             .stream-wrapper .stream-player-container { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-                            .stream-wrapper video.camera-feed { width: 100%; height: 100%; object-fit: cover; }
-                            .stream-wrapper video::-webkit-media-controls { display: none !important; }
+                            .stream-wrapper iframe.camera-feed { width: 100%; height: 100%; object-fit: cover; }
                             .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
                         `}</style>
             <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
-              <StreamPlayer streamUrl={streamUrl ?? ""} />
+              {streamUrl ? (
+                <StreamPlayer
+                  streamUrl={streamUrl}
+                  quality={streamQuality}
+                  autoPlay={true}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>
+                  Loading stream...
+                </div>
+              )}
             </div>
 
             {/* Overlay Grid */}
@@ -129,6 +152,38 @@ export default function WarningSign() {
                   REGULAR TRAFFIC
                 </div>
               )}
+            </div>
+
+            {/* Top Left — Unified Stream Badge */}
+            <div className="absolute top-4 left-4 z-20">
+              <div
+                className="px-3 py-1.5 rounded font-mono text-xs font-bold backdrop-blur-sm flex items-center gap-2 border"
+                style={{
+                  background: streamBadgeBackground,
+                  borderColor: streamBadgeBorder,
+                  color: streamBadgeColor,
+                  minWidth: isScalingTransition ? '104px' : '56px',
+                  justifyContent: 'center',
+                  transform: isScalingTransition ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'min-width 0.35s ease, transform 0.35s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
+                }}
+              >
+                {isScalingTransition ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {scalingUp ? (
+                      <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                    ) : (
+                      <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                    )}
+                  </svg>
+                ) : (
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: streamBadgeColor }}
+                  />
+                )}
+                {streamBadgeLabel}
+              </div>
             </div>
 
           </div>

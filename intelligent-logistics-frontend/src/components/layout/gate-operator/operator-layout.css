@@ -2947,6 +2947,14 @@ html {
 .search-section {
   display: flex;
   gap: 0.5rem;
+/* Infraction Banner */
+.infraction-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  border-left: 4px solid #f59e0b;
+}
 }
 
 .search-input-wrapper {
@@ -3098,25 +3106,32 @@ html {
   gap: 1rem;
 }
 
-.btn-approve {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: white;
-  border: none;
+.manual-review-modal .btn-approve,
+.manual-review-modal .btn-reject,
+.manual-review-modal .btn-hold {
+  border: 1px solid transparent;
   padding: 0.7rem 1.5rem;
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s;
-  box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3);
+  min-width: 120px;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-approve {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: white;
 }
 
 .btn-approve:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+  background: #15803d;
+  border-color: #15803d;
 }
 
 .btn-approve:disabled {
@@ -3125,23 +3140,14 @@ html {
 }
 
 .btn-reject {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  padding: 0.7rem 1.5rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s;
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
 }
 
 .btn-reject:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .btn-reject:disabled {
@@ -3531,23 +3537,14 @@ html {
 
 /* ========== BTN-HOLD (Manual Review) ========== */
 .btn-hold {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background: #d97706;
+  border-color: #d97706;
+  color: #fff;
 }
 
 .btn-hold:hover:not(:disabled) {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
+  background: #b45309;
+  border-color: #b45309;
 }
 
 .btn-hold:disabled {

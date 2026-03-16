@@ -2,6 +2,8 @@ import { WifiOff } from "lucide-react";
 
 type StreamPlayerProps = {
   streamUrl: string;
+  quality?: "low" | "high";
+  autoPlay?: boolean;
 };
 
 export default function StreamPlayer({ streamUrl }: StreamPlayerProps) {

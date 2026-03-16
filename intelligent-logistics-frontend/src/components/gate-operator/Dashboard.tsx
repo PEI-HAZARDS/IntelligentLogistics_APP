@@ -127,7 +127,22 @@ export default function Dashboard() {
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
   const gateId = rawGateId || "1";
 
-  const { streamUrl } = useStreamScale({ gateId });
+  // Stream quality switching via unified WebSocket (/ws/gate/{gate_id})
+  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const isScalingTransition = Boolean(scalingDirection);
+  const scalingUp = scalingDirection === 'up';
+  const streamBadgeLabel = isScalingTransition
+    ? (scalingUp ? 'Up -> HD' : 'Down -> SD')
+    : (streamQuality === 'high' ? 'HD' : 'SD');
+  const streamBadgeBackground = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.2)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)');
+  const streamBadgeBorder = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.5)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)');
+  const streamBadgeColor = isScalingTransition
+    ? (scalingUp ? '#34d399' : '#fbbf24')
+    : (streamQuality === 'high' ? '#34d399' : '#94a3b8');
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
@@ -522,8 +537,71 @@ export default function Dashboard() {
       <div className="left-panel">
         <div className="camera-section">
           <div className="video-area">
-            <StreamPlayer streamUrl={streamUrl ?? ""} />
+            {streamUrl ? (
+              <StreamPlayer
+                streamUrl={streamUrl}
+                quality={streamQuality}
+                autoPlay={true}
+              />
+            ) : (
+              <StreamPlayer
+                streamUrl=""
+                quality="low"
+                autoPlay={false}
+              />
+            )}
 
+            {/* Top Left — Unified Stream Badge */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.5rem',
+                left: '0.5rem',
+                zIndex: 20,
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  border: '1px solid',
+                  background: streamBadgeBackground,
+                  borderColor: streamBadgeBorder,
+                  color: streamBadgeColor,
+                  minWidth: isScalingTransition ? '104px' : '56px',
+                  justifyContent: 'center',
+                  transform: isScalingTransition ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'min-width 0.35s ease, transform 0.35s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
+                }}
+              >
+                {isScalingTransition ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {scalingUp ? (
+                      <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                    ) : (
+                      <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                    )}
+                  </svg>
+                ) : (
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: streamBadgeColor,
+                    }}
+                  />
+                )}
+                {streamBadgeLabel}
+              </div>
+            </div>
           </div>
 
           {/* Crops column - real-time images from WebSocket/MinIO */}
