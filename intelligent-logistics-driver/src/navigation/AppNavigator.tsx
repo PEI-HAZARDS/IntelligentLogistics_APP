@@ -11,8 +11,8 @@ import { colors } from '../theme/colors';
 import LoginScreen from '../screens/LoginScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
-// Tab Navigator for authenticated users
-import MainTabNavigator from './MainTabNavigator';
+// Drawer Navigator for authenticated users
+import MainDrawerNavigator from './MainDrawerNavigator';
 
 export type RootStackParamList = {
     Loading: undefined;
@@ -39,7 +39,7 @@ export default function AppNavigator() {
                 ) : !isAuthenticated ? (
                     <Stack.Screen name="Login" component={LoginScreen} />
                 ) : (
-                    <Stack.Screen name="Main" component={MainTabNavigator} />
+                    <Stack.Screen name="Main" component={MainDrawerNavigator} />
                 )}
             </Stack.Navigator>
         </NavigationContainer>

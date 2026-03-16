@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getStreamUrl } from "@/services/streams";
+import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 
 interface UseStreamScaleOptions {
     gateId: string | number;

@@ -20,11 +20,7 @@ export default function ProfileScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Animated.View style={styles.header} entering={FadeIn.duration(400)}>
-                <Text style={styles.title}>Profile</Text>
-            </Animated.View>
-
+        <View style={styles.container}>
             <Animated.View style={styles.content} entering={FadeInDown.delay(200).duration(400)}>
                 {/* Avatar */}
                 <View style={styles.avatarContainer}>
@@ -80,7 +76,7 @@ export default function ProfileScreen() {
                     <Text style={styles.logoutText}>Log Out</Text>
                 </TouchableOpacity>
             </Animated.View>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -101,6 +97,7 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
     },
     avatarContainer: {
         alignItems: 'center',
