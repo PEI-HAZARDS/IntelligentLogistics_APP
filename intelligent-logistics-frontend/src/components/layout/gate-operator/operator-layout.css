@@ -13,12 +13,14 @@
   flex-direction: column;
   height: 100vh;
   width: 100%;
+  min-width: 1180px;
+  min-height: 720px;
   background: var(--bg-gradient);
   /* Removed texture to clean up look */
   background-color: var(--bg-primary);
   /* Slate 800 - Lighter than before */
   color: var(--text-primary);
-  overflow: hidden;
+  overflow: auto;
   font-family: 'Inter', sans-serif;
   transition: background 0.3s, color 0.3s;
 }
@@ -3646,8 +3648,8 @@ Use fluid values so text scales better on large screens.
 
 /* --- Global base --- */
 html {
-  /* Fluid scale: 14px at 360px -> 18px at 2560px */
-  font-size: clamp(14px, 0.5rem + 0.5vw, 20px);
+  /* Fluid scale with width+height: larger text on presentation screens */
+  font-size: clamp(15px, calc(10px + 0.28vw + 0.14vh), 22px);
 }
 
 /* --- Logo and header --- */
