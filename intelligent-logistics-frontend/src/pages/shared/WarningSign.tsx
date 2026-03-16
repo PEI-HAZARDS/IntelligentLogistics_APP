@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Bug, ChevronDown, ChevronUp, Wifi } from 'lucide-react';
 import StreamPlayer from '@/components/gate-operator/StreamPlayer';
 import { useStreamScale } from '@/hooks/useStreamScale';
 import { getGateWebSocket, type DecisionUpdatePayload } from '@/lib/websocket';
@@ -11,13 +11,18 @@ export default function WarningSign() {
   const [isActive, setIsActive] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stream quality switching via dedicated WebSocket — gate02 camera
-  const { streamUrl } = useStreamScale({ gateId: 2 });
+  // WebSocket and Debug states
+  const [isWsConnected, setIsWsConnected] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugMessages, setDebugMessages] = useState<Array<{ id: string, timestamp: string, data: DecisionUpdatePayload }>>([]);
+  const debugIdCounter = useRef(0);
 
   // Get gate ID from URL param (e.g. /warning-sign/2)
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
   const gateId = rawGateId || "2";
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+
+  // Stream quality switching via dedicated WebSocket — gate camera
+  const { streamUrl } = useStreamScale({ gateId });
 
   // Listen for all events on the shared WebSocket
   useEffect(() => {
