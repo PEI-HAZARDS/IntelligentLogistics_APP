@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
 
 // API Gateway base URL (proxies to Data Module)
-const API_BASE = import.meta.env.VITE_API_URL || 'http://10.255.32.70:8000/api';
+const DEFAULT_API_BASE = 'http://10.255.32.70:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_BASE;
 
 const api = axios.create({
   baseURL: API_BASE,

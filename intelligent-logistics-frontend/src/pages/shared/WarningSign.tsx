@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Sun, Moon, Bug, ChevronDown, ChevronUp, Wifi } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
+import StreamPlayer from '@/components/gate-operator/StreamPlayer';
 import { useStreamScale } from '@/hooks/useStreamScale';
 import { getGateWebSocket, type DecisionUpdatePayload } from '@/lib/websocket';
 
@@ -10,11 +11,8 @@ export default function WarningSign() {
   const [isActive, setIsActive] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debug WebSocket state
-  const [debugMessages, setDebugMessages] = useState<Array<{ id: string; timestamp: string; data: DecisionUpdatePayload }>>([]);
-  const [showDebug, setShowDebug] = useState(false);
-  const [isWsConnected, setIsWsConnected] = useState(false);
-  const debugIdCounter = useRef(0);
+  // Stream quality switching via dedicated WebSocket — gate02 camera
+  const { streamUrl } = useStreamScale({ gateId: 2 });
 
   // Get gate ID from URL param (e.g. /warning-sign/2)
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
@@ -94,65 +92,24 @@ export default function WarningSign() {
             </p>
           </div>
 
-          <div className={`relative aspect-video bg-black rounded-xl overflow-hidden border shadow-2xl flex items-center justify-center group h-96 lg:h-full ${isDarkMode
-            ? 'border-neutral-800'
-            : 'border-slate-300'
-            }`}>
-            {/* WebRTC Stream via iframe */}
-            <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105">
-              {streamUrl ? (
-                <iframe
-                  src={streamUrl}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    background: '#000',
-                    pointerEvents: 'auto',
-                  }}
-                  allow="autoplay; fullscreen"
-                  title={`Gate ${gateId} Stream (${streamQuality})`}
-                />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666' }}>
-                  Loading stream...
-                </div>
-              )}
+          <div className={`relative aspect-video bg-black rounded-xl overflow-hidden border shadow-2xl flex items-center justify-center group h-96 lg:h-full ${
+            isDarkMode
+              ? 'border-neutral-800'
+              : 'border-slate-300'
+          }`}>
+            {/* Real HLS Stream */}
+            <style>{`
+                            .stream-wrapper .stream-player-container { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+                            .stream-wrapper video.camera-feed { width: 100%; height: 100%; object-fit: cover; }
+                            .stream-wrapper video::-webkit-media-controls { display: none !important; }
+                            .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
+                        `}</style>
+            <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
+              <StreamPlayer streamUrl={streamUrl ?? ""} />
             </div>
 
             {/* Overlay Grid */}
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0gNDAgMCBMIDAgMCBMIDAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgc3Ryb2tlLXdpZHRoPSIxIi8+Cjwvc3ZnPg==')] opacity-30"></div>
-
-            {/* Stream Scaling Overlay */}
-            <div
-              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
-              style={{
-                opacity: scalingDirection ? 1 : 0,
-                transition: 'opacity 0.4s ease-in-out',
-              }}
-            >
-              <div
-                className="px-8 py-4 rounded-xl font-bold text-xl tracking-wide flex items-center gap-3 backdrop-blur-md border"
-                style={{
-                  background: scalingDirection === 'up'
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'rgba(245, 158, 11, 0.2)',
-                  borderColor: scalingDirection === 'up'
-                    ? 'rgba(16, 185, 129, 0.5)'
-                    : 'rgba(245, 158, 11, 0.5)',
-                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
-                }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {scalingDirection === 'up' ? (
-                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
-                  ) : (
-                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
-                  )}
-                </svg>
-                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
-              </div>
-            </div>
 
             {/* Top Right Status (moved from center & replaced REC tracker) */}
             <div className="absolute top-4 right-4 z-20">
@@ -169,23 +126,6 @@ export default function WarningSign() {
               )}
             </div>
 
-            {/* Top Left — Stream Quality Badge */}
-            <div className="absolute top-4 left-4 z-20">
-              <div
-                className="px-3 py-1.5 rounded font-mono text-xs font-bold backdrop-blur-sm flex items-center gap-2 border"
-                style={{
-                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
-                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
-                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
-                }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: streamQuality === 'high' ? '#34d399' : '#94a3b8' }}
-                />
-                {streamQuality === 'high' ? 'HD' : 'SD'}
-              </div>
-            </div>
           </div>
         </div>
 
