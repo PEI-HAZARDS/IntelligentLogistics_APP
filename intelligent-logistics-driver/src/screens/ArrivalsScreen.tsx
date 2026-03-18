@@ -120,12 +120,7 @@ export default function ArrivalsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Animated.View style={styles.header} entering={FadeIn.duration(400)}>
-                <Text style={styles.title}>Today's Arrivals</Text>
-                <Text style={styles.subtitle}>{arrivals.length} scheduled</Text>
-            </Animated.View>
-
+        <View style={styles.container}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -193,7 +188,7 @@ export default function ArrivalsScreen() {
                     })
                 )}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -221,6 +216,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
         paddingBottom: spacing.xl,
     },
     card: {

@@ -23,6 +23,7 @@ export interface ManualReviewData {
 interface ManualReviewModalProps {
     isOpen: boolean;
     reviewData: ManualReviewData | null;
+    gateId?: string;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
     onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
@@ -31,6 +32,7 @@ interface ManualReviewModalProps {
 export default function ManualReviewModal({
     isOpen,
     reviewData,
+    gateId,
     onClose,
     onHold,
     onDecisionComplete,
@@ -42,6 +44,9 @@ export default function ManualReviewModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchPlate, setSearchPlate] = useState('');
+    const [pendingDecision, setPendingDecision] = useState<'accepted' | 'rejected' | null>(null);
+    const [infractions, setInfractions] = useState<Appointment[]>([]);
+    const isInfractionCase = reviewData?.licensePlate === 'N/A' || !reviewData?.licensePlate;
 
     // Load candidates when modal opens or reviewData changes
     useEffect(() => {
@@ -60,9 +65,26 @@ export default function ManualReviewModal({
             setSelectedAppointment(null);
             setError(null);
             setSearchPlate('');
+            setPendingDecision(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, reviewData?.id]);
+
+    // Handle ESC key to close modal with auto-hold
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen && reviewData) {
+                e.preventDefault();
+                onHold(reviewData);
+                onClose();
+            }
+        };
+
+        if (isOpen) {
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isOpen, reviewData, onHold, onClose]);
 
     // Filter candidates when search changes (client-side, like ArrivalsList)
     useEffect(() => {
@@ -87,6 +109,10 @@ export default function ManualReviewModal({
             const appointments = results.items || [];
             setAllCandidates(appointments);
 
+            // Check for infractions
+            const infractions = appointments.filter(apt => apt.highway_infraction === true);
+            setInfractions(infractions);
+
             // Apply initial filter if there's a detected plate
             const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
@@ -95,7 +121,14 @@ export default function ManualReviewModal({
                 );
                 setCandidates(filtered.length > 0 ? filtered : appointments);
             } else {
-                setCandidates(appointments);
+                // For unknown plate (infraction case), show infractions first
+                if (infractions.length > 0) {
+                    setCandidates(infractions);
+                    // Auto-select first infraction
+                    setSelectedAppointment(infractions[0]);
+                } else {
+                    setCandidates(appointments);
+                }
             }
         } catch (err) {
             console.error('Failed to fetch candidates:', err);
@@ -111,49 +144,19 @@ export default function ManualReviewModal({
         // The actual filtering happens in the useEffect above
     };
 
-    const handleApprove = async () => {
+    const submitDecision = async (decision: 'accepted' | 'rejected') => {
         setIsSubmitting(true);
         setError(null);
         try {
             const lp = (selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '').toUpperCase();
             const orig = reviewData?.originalPayload;
-
-            await submitManualReview({
-                // Preserve every field from the original agent-decision payload
-                license_plate: lp,
-                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
-                un: orig?.un || reviewData?.UN || '',
-                kemler: orig?.kemler || reviewData?.kemler || '',
-                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
-                alerts: orig?.alerts,
-                route: orig?.route || '',
-                truck_id: reviewData?.truckId,
-                // Override only the decision fields
-                decision: 'ACCEPTED',
-                decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
-                decision_source: 'operator',
-            });
-            onDecisionComplete(lp, 'accepted');
-            onClose();
-        } catch (err) {
-            console.error('Failed to approve:', err);
-            setError('Failed to submit decision. Try again.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleReject = async () => {
-        setIsSubmitting(true);
-        setError(null);
-        try {
-            const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
-            const reason = selectedAppointment
+            const isApprove = decision === 'accepted';
+            const rejectReason = selectedAppointment
                 ? `OPERATOR_REJECTED_FOR_APPOINTMENT_${selectedAppointment.id}`
                 : 'OPERATOR_REJECTED';
-            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                gate_id: gateId || String(orig?.gate_id || 1),
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
@@ -164,14 +167,17 @@ export default function ManualReviewModal({
                 route: orig?.route || '',
                 truck_id: reviewData?.truckId,
                 // Override only the decision fields
-                decision: 'REJECTED',
-                decision_reason: reason,
+                decision: isApprove ? 'ACCEPTED' : 'REJECTED',
+                decision_reason: isApprove
+                    ? `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment?.id || 'UNKNOWN'}`
+                    : rejectReason,
                 decision_source: 'operator',
             });
-            onDecisionComplete(lp, 'rejected');
+            onDecisionComplete(lp, decision);
+            setPendingDecision(null);
             onClose();
         } catch (err) {
-            console.error('Failed to reject:', err);
+            console.error('Failed to submit manual review decision:', err);
             setError('Failed to submit decision. Try again.');
         } finally {
             setIsSubmitting(false);
@@ -196,46 +202,77 @@ export default function ManualReviewModal({
 
                 {/* Body */}
                 <div className="modal-body">
-                    {/* Detection Info Section - Text Only */}
+                    {/* Detection Info Section - Text Only OR Infraction Info */}
                     <div className="detection-info-section">
-                        <div className="detected-data">
-                            <div className="data-field">
-                                <span className="field-label">Detected Plate:</span>
-                                <span className="field-value plate-value">
-                                    {reviewData.licensePlate || 'Not detected'}
-                                </span>
+                        {isInfractionCase && infractions.length > 0 ? (
+                            <div className="infraction-banner">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                    <div style={{
+                                        background: '#f59e0b',
+                                        color: 'white',
+                                        padding: '0.4rem 0.8rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '600',
+                                    }}>HIGHWAY INFRACTION</div>
+                                </div>
+                                <p style={{ color: '#cbd5e1', fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+                                    <strong>Wrong way with break of street rules</strong>
+                                </p>
+                                {selectedAppointment && (
+                                    <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0' }}>
+                                        <strong>License Plate:</strong> {selectedAppointment.truck_license_plate}
+                                        {selectedAppointment.notes && (
+                                            <>
+                                                <br />
+                                                <strong>Details:</strong> {selectedAppointment.notes}
+                                            </>
+                                        )}
+                                    </p>
+                                )}
                             </div>
-                            {reviewData.UN && (
+                        ) : (
+                            <div className="detected-data">
                                 <div className="data-field">
-                                    <span className="field-label">UN:</span>
-                                    <span className="field-value">{reviewData.UN}</span>
+                                    <span className="field-label">Detected Plate:</span>
+                                    <span className="field-value plate-value">
+                                        {reviewData.licensePlate || 'Not detected'}
+                                    </span>
                                 </div>
-                            )}
-                            {reviewData.kemler && (
-                                <div className="data-field">
-                                    <span className="field-label">Kemler:</span>
-                                    <span className="field-value">{reviewData.kemler}</span>
-                                </div>
-                            )}
-                        </div>
+                                {reviewData.UN && (
+                                    <div className="data-field">
+                                        <span className="field-label">UN:</span>
+                                        <span className="field-value">{reviewData.UN}</span>
+                                    </div>
+                                )}
+                                {reviewData.kemler && (
+                                    <div className="data-field">
+                                        <span className="field-label">Kemler:</span>
+                                        <span className="field-value">{reviewData.kemler}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Search Section */}
-                    <div className="search-section">
-                        <div className="search-input-wrapper">
-                            <input
-                                type="text"
-                                placeholder="Search by license plate..."
-                                value={searchPlate}
-                                onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                className="search-input"
-                            />
-                            <button className="search-btn" onClick={handleSearch} disabled={isLoading}>
-                                <Search size={16} />
-                            </button>
+                    {/* Search Section - Hidden for infractions */}
+                    {!isInfractionCase && (
+                        <div className="search-section">
+                            <div className="search-input-wrapper">
+                                <input
+                                    type="text"
+                                    placeholder="Search by license plate..."
+                                    value={searchPlate}
+                                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    className="search-input"
+                                />
+                                <button className="search-btn" onClick={handleSearch} disabled={isLoading}>
+                                    <Search size={16} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Candidates List */}
                     <div className="candidates-section">
@@ -294,14 +331,6 @@ export default function ManualReviewModal({
                 {/* Footer */}
                 <div className="modal-footer">
                     <button
-                        className="btn-reject"
-                        onClick={handleReject}
-                        disabled={isSubmitting}
-                    >
-                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <XCircle size={16} />}
-                        Reject
-                    </button>
-                    <button
                         className="btn-hold"
                         onClick={() => {
                             if (reviewData) onHold(reviewData);
@@ -314,14 +343,84 @@ export default function ManualReviewModal({
                         Hold
                     </button>
                     <button
+                        className="btn-reject"
+                        onClick={() => setPendingDecision('rejected')}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <XCircle size={16} />}
+                        Reject
+                    </button>
+                    <button
                         className="btn-approve"
-                        onClick={handleApprove}
+                        onClick={() => setPendingDecision('accepted')}
                         disabled={!selectedAppointment || isSubmitting}
                     >
                         {isSubmitting ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />}
                         Approve
                     </button>
                 </div>
+
+                {pendingDecision && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(2, 6, 23, 0.78)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 40,
+                            padding: '1rem',
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '100%',
+                                maxWidth: '430px',
+                                background: 'rgba(15, 23, 42, 0.98)',
+                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                borderRadius: '12px',
+                                padding: '1rem',
+                                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                {pendingDecision === 'accepted' ? <CheckCircle size={18} color="#22c55e" /> : <XCircle size={18} color="#f87171" />}
+                                <strong style={{ color: '#e2e8f0' }}>
+                                    Confirm {pendingDecision === 'accepted' ? 'Approve' : 'Reject'}
+                                </strong>
+                            </div>
+
+                            <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '0.85rem' }}>
+                                Plate: <strong>{(selectedAppointment?.truck_license_plate || reviewData.licensePlate || 'N/A').toUpperCase()}</strong>
+                            </p>
+
+                            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                                {pendingDecision === 'accepted'
+                                    ? 'This will submit ACCEPTED and close this review.'
+                                    : 'This will submit REJECTED and close this review.'}
+                            </p>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                                <button
+                                    className="btn-hold"
+                                    onClick={() => setPendingDecision(null)}
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className={pendingDecision === 'accepted' ? 'btn-approve' : 'btn-reject'}
+                                    onClick={() => submitDecision(pendingDecision)}
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? <Loader2 size={16} className="spin" /> : null}
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>,
         document.body

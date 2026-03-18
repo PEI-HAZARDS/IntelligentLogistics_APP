@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import MapView, { Marker, Polygon } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 
@@ -17,23 +17,33 @@ interface PortMapProps {
 
 // Port of Aveiro - main coordinates
 const PORT_CENTER = {
-    latitude: 40.6443,
-    longitude: -8.7455,
+    latitude: 40.6335912,
+    longitude: -8.73065429999997,
 };
 
-// Terminal locations (mock)
+// Gate entrance location (mock)
+const GATE_LOCATION = {
+    latitude: 40.6345,
+    longitude: -8.7290,
+};
+
+// Terminal locations (mock - centered around the new point)
 const TERMINALS: Record<number, { latitude: number; longitude: number; name: string }> = {
-    1: { latitude: 40.6450, longitude: -8.7440, name: 'Terminal A' },
-    2: { latitude: 40.6435, longitude: -8.7465, name: 'Terminal B' },
-    3: { latitude: 40.6440, longitude: -8.7480, name: 'Terminal C' },
+    1: { latitude: 40.6338, longitude: -8.7308, name: 'Terminal A' },
+    2: { latitude: 40.6332, longitude: -8.7304, name: 'Terminal B' },
+    3: { latitude: 40.6335, longitude: -8.7312, name: 'Terminal C' },
 };
 
-// Port boundary (simplified polygon)
+// Port boundary (refined to land-only industrial area)
 const PORT_BOUNDARY = [
-    { latitude: 40.6460, longitude: -8.7420 },
-    { latitude: 40.6460, longitude: -8.7490 },
-    { latitude: 40.6425, longitude: -8.7490 },
-    { latitude: 40.6425, longitude: -8.7420 },
+    { latitude: 40.6365, longitude: -8.7305 }, // North inner
+    { latitude: 40.6365, longitude: -8.7320 }, // North waterfront edge
+    { latitude: 40.6345, longitude: -8.7325 }, // Mid waterfront edge
+    { latitude: 40.6315, longitude: -8.7325 }, // South waterfront edge
+    { latitude: 40.6295, longitude: -8.7315 }, // South corner
+    { latitude: 40.6295, longitude: -8.7285 }, // South east land
+    { latitude: 40.6325, longitude: -8.7280 }, // East land
+    { latitude: 40.6345, longitude: -8.7280 }, // Entrance
 ];
 
 export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMapProps) {
@@ -61,6 +71,28 @@ export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMap
                     strokeWidth={2}
                 />
 
+                {/* Internal Port Route */}
+                <Polyline
+                    coordinates={[
+                        GATE_LOCATION,
+                        { latitude: terminal.latitude, longitude: terminal.longitude }
+                    ]}
+                    strokeColor="#a855f7"
+                    strokeWidth={4}
+                    lineDashPattern={[5, 5]}
+                />
+
+                {/* Gate Marker */}
+                <Marker
+                    coordinate={GATE_LOCATION}
+                    title="Port Entrance"
+                    description="Main Gate"
+                >
+                    <View style={styles.gateMarker}>
+                        <Ionicons name="log-in" size={16} color={colors.white} />
+                    </View>
+                </Marker>
+
                 {/* Destination marker (dock) - simple marker without animation */}
                 <Marker
                     coordinate={{ latitude: terminal.latitude, longitude: terminal.longitude }}
@@ -69,17 +101,6 @@ export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMap
                     pinColor="#22c55e"
                 />
             </MapView>
-
-            {/* Destination info overlay */}
-            <View style={styles.infoOverlay}>
-                <View style={styles.infoIcon}>
-                    <Ionicons name="location" size={18} color="#22c55e" />
-                </View>
-                <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Destination</Text>
-                    <Text style={styles.infoValue}>{terminal.name} • Dock {dockNumber}</Text>
-                </View>
-            </View>
         </View>
     );
 }
@@ -93,38 +114,11 @@ const styles = StyleSheet.create({
     map: {
         flex: 1,
     },
-    infoOverlay: {
-        position: 'absolute',
-        top: spacing.sm,
-        left: spacing.sm,
-        right: spacing.sm,
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        borderWidth: 1,
-        borderColor: colors.border.light,
-    },
-    infoIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(34, 197, 94, 0.15)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    infoContent: {
-        flex: 1,
-    },
-    infoLabel: {
-        fontSize: fontSize.xs,
-        color: colors.text.muted,
-    },
-    infoValue: {
-        fontSize: fontSize.sm,
-        color: colors.text.primary,
-        fontWeight: fontWeight.semibold,
+    gateMarker: {
+        backgroundColor: colors.primary,
+        padding: 6,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: colors.white,
     },
 });

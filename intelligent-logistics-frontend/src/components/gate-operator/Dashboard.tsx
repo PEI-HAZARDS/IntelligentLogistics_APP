@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
+import StreamPlayer from "./StreamPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
@@ -126,11 +127,22 @@ export default function Dashboard() {
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
   const gateId = rawGateId || "1";
 
-  // Stream quality switching via unified gate WebSocket (/ws/gate/{gate_id})
+  // Stream quality switching via unified WebSocket (/ws/gate/{gate_id})
   const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
-  // Keep last non-null direction so the icon doesn't flip to "down" during fade-out of a scale-up
-  const lastScalingDirectionRef = useRef<'up' | 'down'>('up');
-  if (scalingDirection) lastScalingDirectionRef.current = scalingDirection;
+  const isScalingTransition = Boolean(scalingDirection);
+  const scalingUp = scalingDirection === 'up';
+  const streamBadgeLabel = isScalingTransition
+    ? (scalingUp ? 'Up -> HD' : 'Down -> SD')
+    : (streamQuality === 'high' ? 'HD' : 'SD');
+  const streamBadgeBackground = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.2)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)');
+  const streamBadgeBorder = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.5)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)');
+  const streamBadgeColor = isScalingTransition
+    ? (scalingUp ? '#34d399' : '#fbbf24')
+    : (streamQuality === 'high' ? '#34d399' : '#94a3b8');
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
@@ -526,76 +538,20 @@ export default function Dashboard() {
         <div className="camera-section">
           <div className="video-area">
             {streamUrl ? (
-              <iframe
-                src={streamUrl}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  background: '#000',
-                }}
-                allow="autoplay; fullscreen"
-                title={`Gate ${gateId} Stream (${streamQuality})`}
+              <StreamPlayer
+                streamUrl={streamUrl}
+                quality={streamQuality}
+                autoPlay={true}
               />
             ) : (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#000',
-                color: '#666',
-              }}>
-                Loading stream...
-              </div>
+              <StreamPlayer
+                streamUrl=""
+                quality="low"
+                autoPlay={false}
+              />
             )}
 
-            {/* Stream Scaling Overlay — bottom-right corner */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '0.6rem',
-                right: '0.6rem',
-                zIndex: 30,
-                pointerEvents: 'none',
-                opacity: scalingDirection ? 1 : 0,
-                transition: 'opacity 0.4s ease-in-out',
-              }}
-            >
-              <div
-                style={{
-                  padding: '0.25rem 0.6rem',
-                  borderRadius: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.02em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid',
-                  background: lastScalingDirectionRef.current === 'up'
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'rgba(245, 158, 11, 0.2)',
-                  borderColor: lastScalingDirectionRef.current === 'up'
-                    ? 'rgba(16, 185, 129, 0.5)'
-                    : 'rgba(245, 158, 11, 0.5)',
-                  color: lastScalingDirectionRef.current === 'up' ? '#34d399' : '#fbbf24',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {lastScalingDirectionRef.current === 'up' ? (
-                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
-                  ) : (
-                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
-                  )}
-                </svg>
-                {lastScalingDirectionRef.current === 'up' ? 'HD' : 'SD'}
-              </div>
-            </div>
-
-            {/* Top Left — Stream Quality Badge */}
+            {/* Top Left — Unified Stream Badge */}
             <div
               style={{
                 position: 'absolute',
@@ -616,20 +572,34 @@ export default function Dashboard() {
                   alignItems: 'center',
                   gap: '0.4rem',
                   border: '1px solid',
-                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
-                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
-                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                  background: streamBadgeBackground,
+                  borderColor: streamBadgeBorder,
+                  color: streamBadgeColor,
+                  minWidth: isScalingTransition ? '104px' : '56px',
+                  justifyContent: 'center',
+                  transform: isScalingTransition ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'min-width 0.35s ease, transform 0.35s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
                 }}
               >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: streamQuality === 'high' ? '#34d399' : '#94a3b8',
-                  }}
-                />
-                {streamQuality === 'high' ? 'HD' : 'SD'}
+                {isScalingTransition ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {scalingUp ? (
+                      <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                    ) : (
+                      <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                    )}
+                  </svg>
+                ) : (
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: streamBadgeColor,
+                    }}
+                  />
+                )}
+                {streamBadgeLabel}
               </div>
             </div>
           </div>
