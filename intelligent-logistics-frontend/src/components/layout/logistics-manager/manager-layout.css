@@ -685,6 +685,8 @@
     border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .status-badge.active {
@@ -1017,15 +1019,15 @@
 }
 
 .congestion-low {
-    background: rgba(34, 197, 94, 0.3);
+    background: rgb(34, 197, 94);
 }
 
 .congestion-medium {
-    background: rgba(245, 158, 11, 0.4);
+    background: rgb(245, 158, 11);
 }
 
 .congestion-high {
-    background: rgba(239, 68, 68, 0.4);
+    background: rgb(239, 68, 68);
 }
 
 .congestion-label {
