@@ -37,7 +37,7 @@ export default function EnergyMetrics() {
                 isDarkMode ? "text-neutral-400" : "text-slate-600"
               }`}
             >
-              Real-time energy consumption metrics from the Network RAN
+              Real-time energy consumption metrics from the 5G RAN
             </p>
           </div>
 
