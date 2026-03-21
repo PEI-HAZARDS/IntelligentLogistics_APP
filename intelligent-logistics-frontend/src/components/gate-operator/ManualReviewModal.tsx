@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck } from 'lucide-react';
 import { getArrivals } from '@/services/arrivals';
 import { submitManualReview } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
@@ -45,8 +45,6 @@ export default function ManualReviewModal({
     const [error, setError] = useState<string | null>(null);
     const [searchPlate, setSearchPlate] = useState('');
     const [pendingDecision, setPendingDecision] = useState<'accepted' | 'rejected' | null>(null);
-    const [infractions, setInfractions] = useState<Appointment[]>([]);
-    const isInfractionCase = reviewData?.licensePlate === 'N/A' || !reviewData?.licensePlate;
 
     // Load candidates when modal opens or reviewData changes
     useEffect(() => {
@@ -108,11 +106,6 @@ export default function ManualReviewModal({
             const results = await getArrivals({ status: 'in_transit', limit: 100 });
             const appointments = results.items || [];
             setAllCandidates(appointments);
-
-            // Check for infractions
-            const infractions = appointments.filter(apt => apt.highway_infraction === true);
-            setInfractions(infractions);
-
             // Apply initial filter if there's a detected plate
             const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
@@ -121,14 +114,7 @@ export default function ManualReviewModal({
                 );
                 setCandidates(filtered.length > 0 ? filtered : appointments);
             } else {
-                // For unknown plate (infraction case), show infractions first
-                if (infractions.length > 0) {
-                    setCandidates(infractions);
-                    // Auto-select first infraction
-                    setSelectedAppointment(infractions[0]);
-                } else {
-                    setCandidates(appointments);
-                }
+                setCandidates(appointments);
             }
         } catch (err) {
             console.error('Failed to fetch candidates:', err);
@@ -202,77 +188,45 @@ export default function ManualReviewModal({
 
                 {/* Body */}
                 <div className="modal-body">
-                    {/* Detection Info Section - Text Only OR Infraction Info */}
                     <div className="detection-info-section">
-                        {isInfractionCase && infractions.length > 0 ? (
-                            <div className="infraction-banner">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                                    <div style={{
-                                        background: '#f59e0b',
-                                        color: 'white',
-                                        padding: '0.4rem 0.8rem',
-                                        borderRadius: '6px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: '600',
-                                    }}>HIGHWAY INFRACTION</div>
-                                </div>
-                                <p style={{ color: '#cbd5e1', fontSize: '0.95rem', marginBottom: '0.5rem' }}>
-                                    <strong>Wrong way with break of street rules</strong>
-                                </p>
-                                {selectedAppointment && (
-                                    <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0' }}>
-                                        <strong>License Plate:</strong> {selectedAppointment.truck_license_plate}
-                                        {selectedAppointment.notes && (
-                                            <>
-                                                <br />
-                                                <strong>Details:</strong> {selectedAppointment.notes}
-                                            </>
-                                        )}
-                                    </p>
-                                )}
+                        <div className="detected-data">
+                            <div className="data-field">
+                                <span className="field-label">Detected Plate:</span>
+                                <span className="field-value plate-value">
+                                    {reviewData.licensePlate || 'Not detected'}
+                                </span>
                             </div>
-                        ) : (
-                            <div className="detected-data">
+                            {reviewData.UN && (
                                 <div className="data-field">
-                                    <span className="field-label">Detected Plate:</span>
-                                    <span className="field-value plate-value">
-                                        {reviewData.licensePlate || 'Not detected'}
-                                    </span>
+                                    <span className="field-label">UN:</span>
+                                    <span className="field-value">{reviewData.UN}</span>
                                 </div>
-                                {reviewData.UN && (
-                                    <div className="data-field">
-                                        <span className="field-label">UN:</span>
-                                        <span className="field-value">{reviewData.UN}</span>
-                                    </div>
-                                )}
-                                {reviewData.kemler && (
-                                    <div className="data-field">
-                                        <span className="field-label">Kemler:</span>
-                                        <span className="field-value">{reviewData.kemler}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                            )}
+                            {reviewData.kemler && (
+                                <div className="data-field">
+                                    <span className="field-label">Kemler:</span>
+                                    <span className="field-value">{reviewData.kemler}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Search Section - Hidden for infractions */}
-                    {!isInfractionCase && (
-                        <div className="search-section">
-                            <div className="search-input-wrapper">
-                                <input
-                                    type="text"
-                                    placeholder="Search by license plate..."
-                                    value={searchPlate}
-                                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    className="search-input"
-                                />
-                                <button className="search-btn" onClick={handleSearch} disabled={isLoading}>
-                                    <Search size={16} />
-                                </button>
-                            </div>
+                    {/* Search Section */}
+                    <div className="search-section">
+                        <div className="search-input-wrapper">
+                            <input
+                                type="text"
+                                placeholder="Search by license plate..."
+                                value={searchPlate}
+                                onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                className="search-input"
+                            />
+                            <button className="search-btn" onClick={handleSearch} disabled={isLoading}>
+                                <Search size={16} />
+                            </button>
                         </div>
-                    )}
+                    </div>
 
                     {/* Candidates List */}
                     <div className="candidates-section">
@@ -339,7 +293,6 @@ export default function ManualReviewModal({
                         disabled={isSubmitting}
                         title="Hold and check camera feed"
                     >
-                        <Clock size={16} />
                         Hold
                     </button>
                     <button
@@ -347,7 +300,7 @@ export default function ManualReviewModal({
                         onClick={() => setPendingDecision('rejected')}
                         disabled={isSubmitting}
                     >
-                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <XCircle size={16} />}
+                        {isSubmitting && <Loader2 size={16} className="spin" />}
                         Reject
                     </button>
                     <button
@@ -355,7 +308,7 @@ export default function ManualReviewModal({
                         onClick={() => setPendingDecision('accepted')}
                         disabled={!selectedAppointment || isSubmitting}
                     >
-                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />}
+                        {isSubmitting && <Loader2 size={16} className="spin" />}
                         Approve
                     </button>
                 </div>
@@ -365,7 +318,8 @@ export default function ManualReviewModal({
                         style={{
                             position: 'absolute',
                             inset: 0,
-                            background: 'rgba(2, 6, 23, 0.78)',
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            backdropFilter: 'blur(4px)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -377,29 +331,40 @@ export default function ManualReviewModal({
                             style={{
                                 width: '100%',
                                 maxWidth: '430px',
-                                background: 'rgba(15, 23, 42, 0.98)',
-                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                background: 'var(--bg-dropdown)',
+                                border: '1px solid var(--border-color)',
                                 borderRadius: '12px',
-                                padding: '1rem',
-                                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
+                                padding: '1.5rem',
+                                boxShadow: 'var(--shadow-lg)',
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                {pendingDecision === 'accepted' ? <CheckCircle size={18} color="#22c55e" /> : <XCircle size={18} color="#f87171" />}
-                                <strong style={{ color: '#e2e8f0' }}>
+                                {pendingDecision === 'accepted' ? (
+                                    <CheckCircle size={18} color="#22c55e" />
+                                ) : (
+                                    <XCircle size={18} color="#ef4444" />
+                                )}
+                                <strong style={{ color: 'var(--text-primary)' }}>
                                     Confirm {pendingDecision === 'accepted' ? 'Approve' : 'Reject'}
                                 </strong>
                             </div>
 
-                            <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '0.85rem' }}>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.85rem' }}>
                                 Plate: <strong>{(selectedAppointment?.truck_license_plate || reviewData.licensePlate || 'N/A').toUpperCase()}</strong>
                             </p>
 
-                            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
                                 {pendingDecision === 'accepted'
                                     ? 'This will submit ACCEPTED and close this review.'
                                     : 'This will submit REJECTED and close this review.'}
                             </p>
+
+                            {error && (
+                                <div className="error-message" style={{ marginBottom: '1rem' }}>
+                                    <AlertTriangle size={16} />
+                                    <span>{error}</span>
+                                </div>
+                            )}
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
                                 <button

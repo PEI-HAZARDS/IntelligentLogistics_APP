@@ -1712,11 +1712,15 @@ html {
 }
 
 .status-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* English status classes */
@@ -2947,14 +2951,15 @@ html {
 .search-section {
   display: flex;
   gap: 0.5rem;
-/* Infraction Banner */
-.infraction-banner {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 12px;
-  padding: 1rem;
-  border-left: 4px solid #f59e0b;
-}
+
+  /* Infraction Banner */
+  .infraction-banner {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+    border-left: 4px solid #f59e0b;
+  }
 }
 
 .search-input-wrapper {
@@ -3124,14 +3129,13 @@ html {
 }
 
 .btn-approve {
-  background: #16a34a;
-  border-color: #16a34a;
+  background: #22c55e;
+  border: none;
   color: white;
 }
 
 .btn-approve:hover:not(:disabled) {
-  background: #15803d;
-  border-color: #15803d;
+  background: #16a34a;
 }
 
 .btn-approve:disabled {
@@ -3140,14 +3144,13 @@ html {
 }
 
 .btn-reject {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: #ef4444;
+  border: none;
   color: white;
 }
 
 .btn-reject:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: #dc2626;
 }
 
 .btn-reject:disabled {
@@ -3489,6 +3492,24 @@ html {
   image-rendering: pixelated;
 }
 
+.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+  border: 1px solid #ef4444;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  transform: translateY(-1px);
+}
+
 /* Large screens (≥1600px): allow even wider */
 @media (min-width: 1600px) {
   .image-preview-modal {
@@ -3521,15 +3542,18 @@ html {
     padding: 0.5rem;
     align-items: flex-end;
   }
+
   .image-preview-modal {
     width: 100%;
     max-height: 85vh;
     border-radius: 16px 16px 0 0;
   }
+
   .image-preview-modal .preview-body {
     padding: 0.75rem;
     min-height: 180px;
   }
+
   .image-preview-modal .preview-image {
     max-height: calc(85vh - 60px);
   }
@@ -3537,14 +3561,13 @@ html {
 
 /* ========== BTN-HOLD (Manual Review) ========== */
 .btn-hold {
-  background: #d97706;
-  border-color: #d97706;
-  color: #fff;
+  background: #f59e0b;
+  border: none;
+  color: white;
 }
 
 .btn-hold:hover:not(:disabled) {
-  background: #b45309;
-  border-color: #b45309;
+  background: #d97706;
 }
 
 .btn-hold:disabled {
@@ -3630,7 +3653,7 @@ html {
   background: var(--bg-card-hover) !important;
   color: var(--text-primary) !important;
   box-shadow: var(--shadow-sm) !important;
-} 
+}
 
 
 
@@ -3892,7 +3915,7 @@ Keep focus visible and high contrast on interactive elements.
   border-color: var(--accent-color, #3b82f6);
   box-shadow:
     0 0 0 5px rgba(59, 130, 246, 0.2),
-    var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2));
+    var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.2));
 }
 
 /* --- Accordion header (keyboard toggle) --- */

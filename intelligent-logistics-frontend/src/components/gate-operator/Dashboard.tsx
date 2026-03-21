@@ -175,7 +175,8 @@ export default function Dashboard() {
     }
 
     // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
-    if (data.message_type === "scale_network") return;
+    // Also skip infraction_decision as it's processed by the WarningSign component
+    if (data.message_type === "scale_network" || data.message_type === "infraction_decision") return;
 
 
 
@@ -691,7 +692,9 @@ export default function Dashboard() {
                     <span className="decision-badge decision-manual-review">
                       HELD
                     </span>
-                    <span className="detection-time">{held.timestamp}</span>
+                    <span className="detection-time">
+                      {new Date(held.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
                   <div className="detection-fields">
                     <div className="detection-field">
@@ -762,7 +765,7 @@ export default function Dashboard() {
                   <div className="detection-header">
                     {detection.decision ? (
                       <span className={`decision-badge decision-${detection.decision.toLowerCase().replace('_', '-')}`}>
-                        {detection.decision}
+                        {detection.decision.replace('_', ' ')}
                       </span>
                     ) : (
                       <span className="decision-badge decision-manual-review">UNKNOWN</span>
@@ -772,7 +775,7 @@ export default function Dashboard() {
                         {detection.decisionSource === 'automated' ? 'Automated' : 'Operator'}
                       </span>
                     )}
-                    {detection.decisionReason && <span className="decision-reason">{detection.decisionReason}</span>}
+                    {detection.decisionReason && <span className="decision-reason">{detection.decisionReason.replace(/_/g, ' ')}</span>}
                     <span className="detection-time">{detection.time}</span>
                   </div>
 
@@ -879,7 +882,7 @@ export default function Dashboard() {
                       <span className="arrival-time">{arrival.arrivalTime}</span>
                     </div>
                     <div className="header-status">
-                      <span className="status-badge-wrapper" style={{ display: 'flex', gap: '0.5rem' }}>
+                      <span className="status-badge-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                         <span
                           className={`status-badge status-${arrival.status
                             .toLowerCase()
