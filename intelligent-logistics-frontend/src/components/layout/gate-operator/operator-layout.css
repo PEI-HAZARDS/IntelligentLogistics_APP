@@ -1754,6 +1754,12 @@ html {
   border: 1px solid var(--badge-success-border);
 }
 
+.status-badge.status-unloading {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+
 .status-badge.status-highway-infraction {
   background: var(--badge-danger-bg) !important;
   color: var(--badge-danger-text) !important;

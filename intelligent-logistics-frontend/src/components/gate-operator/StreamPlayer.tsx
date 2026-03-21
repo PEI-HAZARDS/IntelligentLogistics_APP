@@ -6,7 +6,7 @@ type StreamPlayerProps = {
   autoPlay?: boolean;
 };
 
-export default function StreamPlayer({ streamUrl }: StreamPlayerProps) {
+export default function StreamPlayer({ streamUrl, autoPlay = true }: StreamPlayerProps) {
   if (!streamUrl) {
     return (
       <div className="stream-player-container">
@@ -18,14 +18,29 @@ export default function StreamPlayer({ streamUrl }: StreamPlayerProps) {
     );
   }
 
+  const iframeSrc = (() => {
+    if (!autoPlay) return streamUrl;
+
+    // Prefer query-driven autoplay when supported by the stream endpoint.
+    try {
+      const url = new URL(streamUrl, window.location.origin);
+      if (!url.searchParams.has("autoplay")) {
+        url.searchParams.set("autoplay", "1");
+      }
+      return url.toString();
+    } catch {
+      return streamUrl;
+    }
+  })();
+
   return (
     <div className="stream-player-container">
       <iframe
-        src={streamUrl}
+        src={iframeSrc}
         className="camera-feed"
         style={{ border: "none" }}
         allowFullScreen
-        allow="autoplay"
+        allow="fullscreen; picture-in-picture"
         title="Live stream"
       />
     </div>

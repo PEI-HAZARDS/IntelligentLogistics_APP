@@ -26,7 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
-import { getMyActiveArrival, claimArrival } from '../services/drivers';
+import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startUnloading, completeAppointment } from '../services/drivers';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import RouteMap from '../components/RouteMap';
@@ -36,7 +36,7 @@ import type { Appointment, ClaimAppointmentResponse } from '../types/types';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ===== MOCK MODE - REMOVE AFTER TESTING =====
-const DEV_MOCK_MODE = true;
+const DEV_MOCK_MODE = false;
 
 const MOCK_ACTIVE: Appointment = {
     id: 1001,
@@ -175,7 +175,6 @@ export default function ActiveArrivalScreen() {
             if (DEV_MOCK_MODE) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 setAssignedDeliveries(MOCK_ASSIGNED_DELIVERIES);
-                // If we are already in a simulation, don't reset to null
                 if (deliveryPhase === 'idle') {
                     setActiveArrival(null);
                 }
@@ -183,12 +182,27 @@ export default function ActiveArrivalScreen() {
                 setIsRefreshing(false);
                 return;
             }
-            const active = await getMyActiveArrival(driversLicense);
-            setActiveArrival(active);
-            if (active) {
-                if (active.status === 'in_process') setDeliveryPhase('in_port');
+
+            // Fetch active arrival and today's schedule in parallel
+            const [active, todayArrivals] = await Promise.all([
+                getMyActiveArrival(driversLicense),
+                getMyTodayArrivals(driversLicense).catch(() => []),
+            ]);
+
+            // Show pending/upcoming deliveries on the dashboard
+            const pending = (todayArrivals || []).filter(
+                (a) => a.status === 'in_transit' || a.status === 'delayed' || a.status === 'in_process' || a.status === 'unloading' || (a.status as string) === 'pending'
+            );
+            setAssignedDeliveries(pending);
+
+            if (active && deliveryPhase === 'idle') {
+                setActiveArrival(active);
+                if (active.status === 'unloading') setDeliveryPhase('unloading');
+                else if (active.status === 'in_process') setDeliveryPhase('in_port');
                 else if (active.status === 'completed') setDeliveryPhase('completed');
                 else setDeliveryPhase('in_transit');
+            } else if (!active && deliveryPhase === 'idle') {
+                setActiveArrival(null);
             }
         } catch (err) {
             console.error('Failed to load arrival:', err);
@@ -270,12 +284,21 @@ export default function ActiveArrivalScreen() {
         setIsMapExpanded(false);
     };
 
-    // Simulation: Arrive at Gate
-    const handleArriveAtGate = () => {
+    // Arrive at Gate — update backend status to in_process
+    const handleArriveAtGate = async () => {
         haptics.medium();
         setDeliveryPhase('gate_opening');
         setShowGatePopup(true);
-        
+
+        // Notify backend that truck arrived at gate
+        if (activeArrival?.id) {
+            try {
+                await updateArrivalStatus(activeArrival.id, 'in_process');
+            } catch (err) {
+                console.warn('Failed to update status to in_process:', err);
+            }
+        }
+
         // Auto close popup and move to internal navigation after 3 seconds
         setTimeout(() => {
             setShowGatePopup(false);
@@ -291,10 +314,18 @@ export default function ActiveArrivalScreen() {
             'Are you positioned at the dock and ready to start unloading?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Start', 
-                    onPress: () => {
+                {
+                    text: 'Start',
+                    onPress: async () => {
                         haptics.medium();
+                        // Notify backend of unloading state transition
+                        if (activeArrival?.id) {
+                            try {
+                                await startUnloading(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to update status to unloading:', err);
+                            }
+                        }
                         setDeliveryPhase('unloading');
                         setSuccessMessage('Unloading started!');
                     }
@@ -303,16 +334,24 @@ export default function ActiveArrivalScreen() {
         );
     };
 
-    // TRIGGER: Driver finishes unloading
+    // TRIGGER: Driver finishes unloading — marks appointment as completed on backend
     const handleFinishDelivery = () => {
         Alert.alert(
             'Complete Delivery',
             'Has all cargo been unloaded and processed?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Complete', 
-                    onPress: () => {
+                {
+                    text: 'Complete',
+                    onPress: async () => {
+                        // Call backend to mark appointment completed
+                        if (activeArrival?.id) {
+                            try {
+                                await completeAppointment(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to complete appointment on backend:', err);
+                            }
+                        }
                         haptics.success();
                         setDeliveryPhase('completed');
                         setSuccessMessage('Delivery completed!');

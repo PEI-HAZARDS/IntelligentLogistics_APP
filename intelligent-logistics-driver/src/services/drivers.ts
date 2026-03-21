@@ -81,6 +81,27 @@ export async function getDriverArrivals(
 }
 
 /**
+ * Update appointment status
+ */
+export async function updateArrivalStatus(
+    appointmentId: number,
+    status: string,
+    notes?: string,
+): Promise<void> {
+    await api.patch(`/arrivals/${appointmentId}/status`, { status, notes });
+}
+
+/**
+ * Start unloading — transition appointment to 'unloading' state
+ */
+export async function startUnloading(appointmentId: number): Promise<void> {
+    await api.patch(`/arrivals/${appointmentId}/status`, {
+        status: 'unloading',
+        notes: 'Driver started unloading',
+    });
+}
+
+/**
  * Complete an appointment (confirm delivery)
  */
 export async function completeAppointment(appointmentId: number): Promise<void> {

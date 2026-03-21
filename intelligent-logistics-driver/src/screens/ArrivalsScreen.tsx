@@ -14,7 +14,7 @@ import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import type { Appointment } from '../types/types';
 
 // ===== MOCK MODE - REMOVE AFTER TESTING =====
-const DEV_MOCK_MODE = true;
+const DEV_MOCK_MODE = false;
 
 const MOCK_ARRIVALS: Appointment[] = [
     {
@@ -63,6 +63,8 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' };
         case 'in_process':
             return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' };
+        case 'unloading':
+            return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
         default:
             return { bg: 'rgba(234, 179, 8, 0.15)', text: '#eab308' };
     }
@@ -72,6 +74,7 @@ function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
         in_transit: 'In Transit',
         in_process: 'At Port',
+        unloading: 'Unloading',
         delayed: 'Delayed',
         completed: 'Completed',
         canceled: 'Canceled',

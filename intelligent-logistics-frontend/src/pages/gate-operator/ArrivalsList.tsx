@@ -21,6 +21,7 @@ import {
   Container
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
+import { getGateWebSocket } from "@/lib/websocket";
 import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
 
 // Map API status to English display
@@ -28,6 +29,7 @@ function mapStatusToLabel(status: AppointmentStatusEnum): string {
   const statusMap: Record<AppointmentStatusEnum, string> = {
     in_transit: "In Transit",
     in_process: "In Process",
+    unloading: "Unloading",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -41,7 +43,7 @@ function mapStatusToAPI(status: string): AppointmentStatusEnum {
     "Pending": "in_transit",
     "In Transit": "in_transit",
     "In Process": "in_process",
-    "Unloading": "in_process",
+    "Unloading": "unloading",
     "Delayed": "delayed",
     "Completed": "completed",
     "Canceled": "canceled",
@@ -227,6 +229,26 @@ function ArrivalsList() {
     const refreshTimer = setInterval(fetchData, 30000);
     return () => clearInterval(refreshTimer);
   }, [fetchData]);
+
+  // Real-time WebSocket: re-fetch arrivals when an infraction or decision changes
+  useEffect(() => {
+    const ws = getGateWebSocket(gateId);
+    ws.connect();
+
+    const unsubscribe = ws.onMessage((data: { message_type?: string }) => {
+      if (
+        data.message_type === "infraction_decision" ||
+        data.message_type === "decision_results"
+      ) {
+        console.log("[ArrivalsList] WS trigger re-fetch:", data.message_type);
+        fetchData();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [gateId, fetchData]);
 
   // Filter Logic — dock is the only remaining client-side dimension
   // Pinned items always bypass client-side filters

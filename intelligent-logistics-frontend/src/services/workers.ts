@@ -123,6 +123,40 @@ export async function getManagerDashboard(numWorker: string): Promise<ManagerOve
 }
 
 /**
+ * List all shifts for a date (manager ShiftsPage)
+ */
+export interface ShiftListItem {
+    id: string;
+    gateId: number;
+    gateName: string;
+    shiftType: 'MORNING' | 'AFTERNOON' | 'NIGHT';
+    date: string;
+    operatorId: string;
+    operatorName: string;
+    managerId?: string;
+    managerName?: string;
+    currentArrivals: number;
+    maxArrivals: number;
+    status: 'active' | 'pending' | 'completed' | 'inactive';
+}
+
+export async function getShifts(params?: {
+    targetDate?: string;
+    shiftType?: string;
+    gateId?: number;
+}): Promise<ShiftListItem[]> {
+    const queryParams: Record<string, string | number> = {};
+    if (params?.targetDate) queryParams.target_date = params.targetDate;
+    if (params?.shiftType) queryParams.shift_type = params.shiftType;
+    if (params?.gateId !== undefined) queryParams.gate_id = params.gateId;
+
+    const response = await api.get<ShiftListItem[]>(`${BASE_PATH}/shifts`, {
+        params: queryParams,
+    });
+    return response.data;
+}
+
+/**
  * List all workers
  */
 export async function getAllWorkers(

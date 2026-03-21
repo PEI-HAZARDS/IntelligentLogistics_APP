@@ -13,8 +13,6 @@ export interface AppConfig {
     logoPath: string;
     /** Contact email for support */
     supportEmail: string;
-    /** Grafana base URL for embedding panels */
-    grafanaUrl: string;
     /** API base URL */
     apiBaseUrl: string;
     /** WebSocket base URL */
@@ -27,7 +25,6 @@ const config: AppConfig = {
     subtitle: import.meta.env.VITE_SUBTITLE || 'Intelligent Logistics',
     logoPath: import.meta.env.VITE_LOGO_PATH || '/logo.png',
     supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@intelligentlogistics.com',
-    grafanaUrl: import.meta.env.VITE_GRAFANA_URL || 'http://10.255.32.70:3000',
     apiBaseUrl: import.meta.env.VITE_API_URL || 'http://10.255.32.70:8000/api',
     wsBaseUrl: import.meta.env.VITE_WS_URL || 'ws://10.255.32.70:8000/api',
 };
@@ -41,7 +38,6 @@ declare global {
         VITE_SUBTITLE?: string;
         VITE_LOGO_PATH?: string;
         VITE_SUPPORT_EMAIL?: string;
-        VITE_GRAFANA_URL?: string;
         VITE_API_URL?: string;
         VITE_WS_URL?: string;
     }

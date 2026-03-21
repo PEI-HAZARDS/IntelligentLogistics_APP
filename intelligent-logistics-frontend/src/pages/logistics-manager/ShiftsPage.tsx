@@ -4,34 +4,13 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { Search, Filter, RefreshCw, Plus, Check, Clock, User } from "lucide-react";
+import { getShifts, type ShiftListItem } from "@/services/workers";
 
 // Shift status type
 type ShiftStatus = 'active' | 'pending' | 'completed' | 'inactive';
 
-// Shift data interface
-interface Shift {
-    id: string;
-    gateId: number;
-    gateName: string;
-    shiftType: 'MORNING' | 'AFTERNOON' | 'NIGHT';
-    date: string;
-    operatorId: string;
-    operatorName: string;
-    managerId?: string;
-    managerName?: string;
-    maxArrivals: number;
-    currentArrivals: number;
-    status: ShiftStatus;
-}
-
-// Mock data for development
-const MOCK_SHIFTS: Shift[] = [
-    { id: '1', gateId: 1, gateName: 'Gate A', shiftType: 'MORNING', date: '2026-01-30', operatorId: 'OP001', operatorName: 'João Silva', managerId: 'MG001', managerName: 'Maria Santos', maxArrivals: 20, currentArrivals: 15, status: 'active' },
-    { id: '2', gateId: 1, gateName: 'Gate A', shiftType: 'AFTERNOON', date: '2026-01-30', operatorId: 'OP002', operatorName: 'Pedro Costa', managerId: 'MG001', managerName: 'Maria Santos', maxArrivals: 25, currentArrivals: 0, status: 'pending' },
-    { id: '3', gateId: 2, gateName: 'Gate B', shiftType: 'MORNING', date: '2026-01-30', operatorId: 'OP003', operatorName: 'Ana Ferreira', maxArrivals: 18, currentArrivals: 18, status: 'completed' },
-    { id: '4', gateId: 2, gateName: 'Gate B', shiftType: 'AFTERNOON', date: '2026-01-30', operatorId: '', operatorName: '', maxArrivals: 20, currentArrivals: 0, status: 'inactive' },
-    { id: '5', gateId: 1, gateName: 'Gate A', shiftType: 'NIGHT', date: '2026-01-30', operatorId: 'OP004', operatorName: 'Rui Martins', maxArrivals: 15, currentArrivals: 3, status: 'pending' },
-];
+// Use the API type directly
+type Shift = ShiftListItem;
 
 const SHIFT_TYPE_LABELS: Record<string, string> = {
     'MORNING': '06:00 - 14:00',
@@ -55,18 +34,17 @@ export default function ShiftsPage() {
         shiftType: '' as 'MORNING' | 'AFTERNOON' | 'NIGHT' | '',
     });
 
-    // Fetch shifts data
+    // Fetch shifts data from API
     const fetchShifts = useCallback(async () => {
         setIsLoading(true);
         try {
-            // TODO: Replace with actual API call
-            // const response = await getShifts(filters);
-            // setShifts(response);
+            const data = await getShifts({
+                shiftType: filters.shiftType || undefined,
+                gateId: undefined,
+            });
 
-            // Using mock data for now
-            await new Promise(resolve => setTimeout(resolve, 500));
-            let filtered = [...MOCK_SHIFTS];
-
+            // Apply client-side filters for text search and status
+            let filtered = data;
             if (filters.workerId) {
                 filtered = filtered.filter(s =>
                     s.operatorName.toLowerCase().includes(filters.workerId.toLowerCase()) ||
@@ -76,14 +54,11 @@ export default function ShiftsPage() {
             if (filters.status) {
                 filtered = filtered.filter(s => s.status === filters.status);
             }
-            if (filters.shiftType) {
-                filtered = filtered.filter(s => s.shiftType === filters.shiftType);
-            }
 
             setShifts(filtered);
         } catch (error) {
             console.error("Failed to fetch shifts:", error);
-            setShifts(MOCK_SHIFTS);
+            setShifts([]);
         } finally {
             setIsLoading(false);
         }

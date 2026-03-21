@@ -175,8 +175,15 @@ export default function Dashboard() {
     }
 
     // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
-    // Also skip infraction_decision as it's processed by the WarningSign component
-    if (data.message_type === "scale_network" || data.message_type === "infraction_decision") return;
+    if (data.message_type === "scale_network") return;
+
+    // Infraction decisions are visually handled by the WarningSign component,
+    // but we still need to re-fetch the upcoming arrivals so the infraction
+    // badge and stats update in real-time.
+    if (data.message_type === "infraction_decision") {
+      fetchData();
+      return;
+    }
 
 
 

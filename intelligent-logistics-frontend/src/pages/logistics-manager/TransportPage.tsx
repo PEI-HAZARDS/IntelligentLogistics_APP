@@ -1,8 +1,9 @@
 /**
  * Transport Companies Page
- * Aggregated data per transport company with KPIs and detailed table
+ * Aggregated data per transport company with KPIs and detailed table.
+ * All data sourced from /statistics/by-company — no fallbacks.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
     RefreshCw,
     Search,
@@ -10,61 +11,48 @@ import {
     Award,
     AlertTriangle,
     Activity,
+    AlertCircle,
 } from "lucide-react";
-import {
-    getTransportStats,
-    MOCK_TRANSPORT_STATS,
-    type TransportStats,
-} from "@/services/statistics";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTransportStats } from "@/hooks/useStatistics";
 
 type TransportRange = "week" | "month" | "quarter" | "year";
 
+function getDateRange(timeRange: TransportRange) {
+    const to = new Date().toISOString().split("T")[0];
+    const from = new Date();
+    switch (timeRange) {
+        case "week": from.setDate(from.getDate() - 7); break;
+        case "month": from.setMonth(from.getMonth() - 1); break;
+        case "quarter": from.setMonth(from.getMonth() - 3); break;
+        case "year": from.setFullYear(from.getFullYear() - 1); break;
+    }
+    return { from: from.toISOString().split("T")[0], to };
+}
+
+const rangeLabels: Record<TransportRange, string> = {
+    week: "Week",
+    month: "Month",
+    quarter: "Quarter",
+    year: "Year",
+};
+
 export default function TransportPage() {
     const [timeRange, setTimeRange] = useState<TransportRange>("month");
-    const [transportStats, setTransportStats] = useState<TransportStats[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [fetchError, setFetchError] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const queryClient = useQueryClient();
+    const { from, to } = getDateRange(timeRange);
 
-    const getDateRange = useCallback(() => {
-        const to = new Date().toISOString().split("T")[0];
-        const from = new Date();
-        switch (timeRange) {
-            case "week": from.setDate(from.getDate() - 7); break;
-            case "month": from.setMonth(from.getMonth() - 1); break;
-            case "quarter": from.setMonth(from.getMonth() - 3); break;
-            case "year": from.setFullYear(from.getFullYear() - 1); break;
-        }
-        return { from: from.toISOString().split("T")[0], to };
-    }, [timeRange]);
+    const { data: transportStats = [], isLoading, isError } = useTransportStats(from, to);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setFetchError(false);
-        try {
-            // TODO: connect to real API — remove mock fallback once backend is ready
-            const { from, to } = getDateRange();
-            const stats = await getTransportStats(from, to);
-            setTransportStats(stats);
-        } catch (error) {
-            console.error("Failed to fetch transport data:", error);
-            console.warn("[Transport] API unavailable — using mock data");
-            setFetchError(true);
-            setTransportStats(MOCK_TRANSPORT_STATS); // TODO: remove when API is ready
-        } finally {
-            setIsLoading(false);
-        }
-    }, [getDateRange]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    const handleRefresh = () => {
+        queryClient.invalidateQueries({ queryKey: ['statistics', 'transport'] });
+    };
 
     const filteredStats = transportStats.filter((s) =>
         s.companyName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Computed KPIs
     const totalCompanies = transportStats.length;
     const bestSla = transportStats.length > 0
         ? Math.max(...transportStats.map(s => s.slaAttendedRate))
@@ -76,13 +64,6 @@ export default function TransportPage() {
         ? Math.round(transportStats.reduce((acc, s) => acc + s.operationsCount, 0) / transportStats.length)
         : 0;
 
-    const rangeLabels: Record<TransportRange, string> = {
-        week: "Week",
-        month: "Month",
-        quarter: "Quarter",
-        year: "Year",
-    };
-
     return (
         <div className="transport-page">
             {/* Header */}
@@ -91,8 +72,8 @@ export default function TransportPage() {
                     <h1 className="dashboard-title">Carriers</h1>
                     <span className="dashboard-subtitle">
                         Aggregated data per transport company
-                        {fetchError && (
-                            <span className="dashboard-api-error">· API unavailable</span>
+                        {isError && (
+                            <span className="dashboard-api-error"> · API error</span>
                         )}
                     </span>
                 </div>
@@ -106,12 +87,7 @@ export default function TransportPage() {
                             {rangeLabels[range]}
                         </button>
                     ))}
-                    <button
-                        className="filter-btn"
-                        onClick={fetchData}
-                        disabled={isLoading}
-                        title="Refresh data"
-                    >
+                    <button className="filter-btn" onClick={handleRefresh} disabled={isLoading} title="Refresh data">
                         <RefreshCw size={16} className={isLoading ? "spinning" : ""} />
                     </button>
                 </div>
@@ -135,9 +111,7 @@ export default function TransportPage() {
                             <Award size={18} />
                         </span>
                     </div>
-                    <div className="kpi-value">
-                        {isLoading ? "--" : `${bestSla}%`}
-                    </div>
+                    <div className="kpi-value">{isLoading ? "--" : `${bestSla}%`}</div>
                 </div>
                 <div className="kpi-card">
                     <div className="kpi-header">
@@ -146,9 +120,7 @@ export default function TransportPage() {
                             <AlertTriangle size={18} />
                         </span>
                     </div>
-                    <div className="kpi-value">
-                        {isLoading ? "--" : `${worstSla}%`}
-                    </div>
+                    <div className="kpi-value">{isLoading ? "--" : `${worstSla}%`}</div>
                 </div>
                 <div className="kpi-card">
                     <div className="kpi-header">
@@ -192,17 +164,21 @@ export default function TransportPage() {
                             {isLoading ? (
                                 <tr>
                                     <td colSpan={6} className="table-empty-state">
+                                        <RefreshCw size={20} className="spinning" style={{ marginRight: '0.5rem', display: 'inline' }} />
                                         Loading...
+                                    </td>
+                                </tr>
+                            ) : isError ? (
+                                <tr>
+                                    <td colSpan={6} className="table-empty-state">
+                                        <AlertCircle size={20} style={{ marginRight: '0.5rem', display: 'inline' }} />
+                                        Failed to load carrier data
                                     </td>
                                 </tr>
                             ) : filteredStats.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="table-empty-state">
-                                        {fetchError
-                                            ? "Could not retrieve data from API"
-                                            : searchTerm
-                                                ? "No carrier found"
-                                                : "No data available"}
+                                        {searchTerm ? "No carrier found" : "No data available"}
                                     </td>
                                 </tr>
                             ) : (

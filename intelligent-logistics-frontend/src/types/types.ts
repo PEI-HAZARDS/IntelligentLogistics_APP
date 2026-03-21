@@ -5,7 +5,7 @@
 
 // ==================== ENUMS ====================
 
-export type AppointmentStatusEnum = 'in_transit' | 'in_process' | 'canceled' | 'delayed' | 'completed';
+export type AppointmentStatusEnum = 'in_transit' | 'in_process' | 'unloading' | 'canceled' | 'delayed' | 'completed';
 export type DeliveryStatusEnum = 'not_started' | 'unloading' | 'completed';
 export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
 export type DirectionEnum = 'inbound' | 'outbound';
@@ -138,6 +138,7 @@ export interface ArrivalsQueryParams {
     limit?: number;
     status?: string;
     search?: string;
+    highway_infraction?: boolean;
 }
 
 // ==================== ALERTS ====================
@@ -287,6 +288,7 @@ export interface ArrivalsQueryParams {
     shift_date?: string;
     status?: AppointmentStatusEnum;
     scheduled_date?: string;
+    highway_infraction?: boolean;
 }
 
 export interface AlertsQueryParams {

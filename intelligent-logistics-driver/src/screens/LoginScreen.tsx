@@ -25,7 +25,7 @@ import { haptics } from '../components/AnimatedComponents';
 import type { UserInfo } from '../types/types';
 
 // ===== MOCK MODE - REMOVER DEPOIS DE TESTAR =====
-const DEV_MOCK_MODE = true; // Mudar para false para usar API real
+const DEV_MOCK_MODE = false; // Mudar para false para usar API real
 
 const MOCK_USER: UserInfo = {
     drivers_license: 'AB-123456',

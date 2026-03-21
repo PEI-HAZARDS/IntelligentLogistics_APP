@@ -29,6 +29,7 @@ function mapStatusToLabel(status: string): string {
     const statusMap: Record<string, string> = {
         in_transit: 'In Transit',
         in_process: 'In Process',
+        unloading: 'Unloading',
         delayed: 'Delayed',
         completed: 'Completed',
         canceled: 'Canceled',
@@ -47,6 +48,8 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: colors.status.canceledBg, text: colors.status.canceled };
         case 'in_process':
             return { bg: colors.status.inProcessBg, text: colors.status.inProcess };
+        case 'unloading':
+            return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
         default:
             return { bg: colors.status.inTransitBg, text: colors.status.inTransit };
     }
