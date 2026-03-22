@@ -227,13 +227,12 @@ export default function ActiveArrivalScreen() {
 
     // WebSocket: listen for gate approval while in_transit
     useEffect(() => {
-        if (deliveryPhase !== 'in_transit' || !activeArrival?.gate_in_id) {
+        if (deliveryPhase !== 'in_transit' || !driversLicense) {
             setIsWsConnected(false);
             return;
         }
 
-        const gateId = activeArrival.gate_in_id;
-        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/gate/${gateId}`);
+        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}`);
 
         ws.onopen = () => setIsWsConnected(true);
 
@@ -251,7 +250,7 @@ export default function ActiveArrivalScreen() {
                 ]);
                 if (
                     data.message_type === 'status_changed' &&
-                    data.appointment_id === activeArrival.id &&
+                    data.appointment_id === activeArrival?.id &&
                     data.new_status === 'in_process'
                 ) {
                     handleArriveAtGate();
@@ -263,7 +262,7 @@ export default function ActiveArrivalScreen() {
         ws.onclose = () => setIsWsConnected(false);
 
         return () => ws.close();
-    }, [deliveryPhase, activeArrival?.gate_in_id, activeArrival?.id]);
+    }, [deliveryPhase, driversLicense, activeArrival?.id]);
 
     const onRefresh = () => {
         setIsRefreshing(true);
