@@ -92,6 +92,16 @@ export async function updateArrivalStatus(
 }
 
 /**
+ * Start trip — transition appointment from 'scheduled' to 'in_transit'
+ */
+export async function startTrip(appointmentId: number): Promise<void> {
+    await api.patch(`/arrivals/${appointmentId}/status`, {
+        status: 'in_transit',
+        notes: 'Driver started trip',
+    });
+}
+
+/**
  * Start unloading — transition appointment to 'unloading' state
  */
 export async function startUnloading(appointmentId: number): Promise<void> {

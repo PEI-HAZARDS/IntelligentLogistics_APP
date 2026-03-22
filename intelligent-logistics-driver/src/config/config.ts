@@ -9,6 +9,9 @@ export const API_CONFIG = {
     // TODO: Change this to your production URL for release builds
     baseUrl: 'http://10.255.32.70:8000/api',
 
+    // WebSocket base URL (derived from baseUrl)
+    wsUrl: 'ws://10.255.32.70:8000/api',
+
     // Request timeout in milliseconds
     timeout: 30000,
 };

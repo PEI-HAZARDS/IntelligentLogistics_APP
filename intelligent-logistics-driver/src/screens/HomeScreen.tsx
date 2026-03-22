@@ -27,6 +27,7 @@ import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 // Map status to English
 function mapStatusToLabel(status: string): string {
     const statusMap: Record<string, string> = {
+        scheduled: 'Scheduled',
         in_transit: 'In Transit',
         in_process: 'In Process',
         unloading: 'Unloading',
@@ -50,6 +51,8 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: colors.status.inProcessBg, text: colors.status.inProcess };
         case 'unloading':
             return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
+        case 'scheduled':
+            return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8' };
         default:
             return { bg: colors.status.inTransitBg, text: colors.status.inTransit };
     }
@@ -71,7 +74,7 @@ export default function HomeScreen() {
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date().toISOString(),
-        status: 'in_transit',
+        status: 'scheduled',
         notes: 'Container ABC-123',
     };
 
@@ -84,7 +87,7 @@ export default function HomeScreen() {
             truck_license_plate: '00-AA-00',
             terminal_id: 1,
             scheduled_start_time: new Date().toISOString(),
-            status: 'in_transit',
+            status: 'scheduled',
             notes: 'Container ABC-123',
         },
         {

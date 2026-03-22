@@ -25,7 +25,7 @@ const MOCK_ARRIVALS: Appointment[] = [
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date().toISOString(),
-        status: 'in_transit',
+        status: 'scheduled',
         notes: 'Container ABC-123',
     },
     {
@@ -65,6 +65,8 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' };
         case 'unloading':
             return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
+        case 'scheduled':
+            return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8' };
         default:
             return { bg: 'rgba(234, 179, 8, 0.15)', text: '#eab308' };
     }
@@ -72,6 +74,7 @@ function getStatusColors(status: string): { bg: string; text: string } {
 
 function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
+        scheduled: 'Scheduled',
         in_transit: 'In Transit',
         in_process: 'At Port',
         unloading: 'Unloading',
