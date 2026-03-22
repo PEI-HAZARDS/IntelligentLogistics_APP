@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login as workerLogin } from "@/services/workers";
+import { login as authLogin } from "@/services/auth";
 import "./Login.css";
 
 export default function Login() {
@@ -20,27 +20,15 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Worker (operator/manager) login - uses email
-      const response = await workerLogin({
-        email: email,
-        password: password,
-      });
+      // Worker (operator/manager) login via Keycloak
+      const response = await authLogin(email, password);
 
-      // Store token and worker info
-      localStorage.setItem("auth_token", response.token);
-      localStorage.setItem(
-        "user_info",
-        JSON.stringify({
-          num_worker: response.num_worker,
-          name: response.name,
-          email: response.email,
-          active: response.active,
-          role: "operator",
-        })
-      );
+      // Tokens and user_info are stored by authLogin().
+      // Determine role from user_info for redirect.
+      const role = response.user_info?.role || "operator";
 
       // Redirect based on mode
-      if (mode === 'manager') {
+      if (mode === 'manager' || role === 'manager') {
         nav("/manager");
       } else {
         nav("/gate/1");

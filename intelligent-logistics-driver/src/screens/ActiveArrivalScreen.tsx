@@ -219,8 +219,8 @@ export default function ActiveArrivalScreen() {
 
             // Fetch active arrival and today's schedule in parallel
             const [active, todayArrivals] = await Promise.all([
-                getMyActiveArrival(driversLicense),
-                getMyTodayArrivals(driversLicense).catch(() => []),
+                getMyActiveArrival(),
+                getMyTodayArrivals().catch(() => []),
             ]);
 
             // Show pending/upcoming deliveries on the dashboard
@@ -266,7 +266,7 @@ export default function ActiveArrivalScreen() {
             // was not yet connected: fetch the current status and react if
             // the transition already happened.
             try {
-                const current = await getMyActiveArrival(driversLicense);
+                const current = await getMyActiveArrival();
                 if (current?.id === activeArrival?.id && current?.status === 'in_process') {
                     handleArriveAtGate();
                 }
@@ -334,7 +334,7 @@ export default function ActiveArrivalScreen() {
                 haptics.success();
                 return;
             }
-            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
+            const result = await claimArrival({ arrival_id: pinCode.trim() });
             // Transition from scheduled → in_transit
             if (result.appointment_id) {
                 try {

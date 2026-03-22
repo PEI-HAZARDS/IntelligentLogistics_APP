@@ -100,7 +100,7 @@ export default function ArrivalsScreen() {
                 setArrivals(MOCK_ARRIVALS);
                 return;
             }
-            const data = await getMyTodayArrivals(driversLicense);
+            const data = await getMyTodayArrivals();
             setArrivals(data);
         } catch (err) {
             console.error('Failed to fetch arrivals:', err);

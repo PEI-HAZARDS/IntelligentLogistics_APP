@@ -148,8 +148,8 @@ export default function HomeScreen() {
             // ===== FIM MOCK DATA =====
 
             const [active, today] = await Promise.all([
-                getMyActiveArrival(driversLicense),
-                getMyTodayArrivals(driversLicense),
+                getMyActiveArrival(),
+                getMyTodayArrivals(),
             ]);
 
             setActiveArrival(active);
@@ -186,7 +186,7 @@ export default function HomeScreen() {
         setSuccessMessage(null);
 
         try {
-            const result = await claimArrival(driversLicense, {
+            const result = await claimArrival({
                 arrival_id: pinCode.trim(),
             });
 
