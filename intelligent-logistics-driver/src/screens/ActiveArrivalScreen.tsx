@@ -24,7 +24,10 @@ import {
     Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
+import Animated, {
+    FadeIn, FadeInDown, FadeInUp, ZoomIn,
+    useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, cancelAnimation,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeAppointment } from '../services/drivers';
@@ -170,6 +173,29 @@ export default function ActiveArrivalScreen() {
     // Simulation State
     const [deliveryPhase, setDeliveryPhase] = useState<DeliveryPhase>('idle');
     const [showGatePopup, setShowGatePopup] = useState(false);
+    const [showInfractionPopup, setShowInfractionPopup] = useState(false);
+    const infractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const infractionFlash = useSharedValue(1);
+
+    useEffect(() => {
+        if (showInfractionPopup) {
+            infractionFlash.value = withRepeat(
+                withSequence(
+                    withTiming(0.3, { duration: 400 }),
+                    withTiming(1, { duration: 400 }),
+                ),
+                -1,
+                true,
+            );
+        } else {
+            cancelAnimation(infractionFlash);
+            infractionFlash.value = 1;
+        }
+    }, [showInfractionPopup]);
+
+    const infractionFlashStyle = useAnimatedStyle(() => ({
+        opacity: infractionFlash.value,
+    }));
 
     // WebSocket Debug Panel
     const [showDebug, setShowDebug] = useState(false);
@@ -265,6 +291,12 @@ export default function ActiveArrivalScreen() {
                     data.new_status === 'in_process'
                 ) {
                     handleArriveAtGate();
+                }
+                if (data.message_type === 'infraction_warning') {
+                    haptics.error();
+                    setShowInfractionPopup(true);
+                    if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+                    infractionTimerRef.current = setTimeout(() => setShowInfractionPopup(false), 10000);
                 }
             } catch {}
         };
@@ -471,6 +503,44 @@ export default function ActiveArrivalScreen() {
                         color={colors.primary} 
                         style={{ marginTop: spacing.xl }} 
                     />
+                </Animated.View>
+            </View>
+        </Modal>
+    );
+
+    // Infraction Warning Popup
+    const renderInfractionPopup = () => (
+        <Modal
+            visible={showInfractionPopup}
+            transparent
+            animationType="fade"
+        >
+            <View style={styles.gatePopupOverlay}>
+                <Animated.View
+                    entering={ZoomIn.duration(300)}
+                    style={[styles.gatePopupContent, styles.infractionPopupContent]}
+                >
+                    <TouchableOpacity
+                        style={styles.infractionCloseBtn}
+                        onPress={() => {
+                            if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+                            setShowInfractionPopup(false);
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Ionicons name="close" size={28} color={colors.text.primary} />
+                    </TouchableOpacity>
+
+                    <Animated.View style={[styles.gatePopupIcon, infractionFlashStyle]}>
+                        <Ionicons name="warning" size={80} color="#ef4444" />
+                    </Animated.View>
+                    <Animated.Text style={[styles.infractionTitle, infractionFlashStyle]}>INFRACTION</Animated.Text>
+                    <Text style={styles.infractionSubtitle}>
+                        Possible hazard violation detected
+                    </Text>
+                    <Text style={styles.gatePopupInstructions}>
+                        Please verify your cargo documentation and placards immediately.
+                    </Text>
                 </Animated.View>
             </View>
         </Modal>
@@ -1059,6 +1129,9 @@ export default function ActiveArrivalScreen() {
 
             {/* Gate opening simulated popup */}
             {renderGatePopup()}
+
+            {/* Infraction warning popup */}
+            {renderInfractionPopup()}
 
             {/* WebSocket Debug Panel */}
             {renderDebugPanel()}
@@ -1744,6 +1817,31 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
         textAlign: 'center',
     },
+    // Infraction Popup
+    infractionPopupContent: {
+        borderColor: '#ef4444',
+        borderWidth: 2,
+    },
+    infractionCloseBtn: {
+        position: 'absolute',
+        top: spacing.md,
+        right: spacing.md,
+        zIndex: 10,
+        padding: 4,
+    },
+    infractionTitle: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#ef4444',
+        letterSpacing: 2,
+    },
+    infractionSubtitle: {
+        fontSize: fontSize.xl,
+        color: '#ef4444',
+        marginTop: spacing.sm,
+        fontWeight: '700',
+    },
+
     modalCloseIcon: {
         position: 'absolute',
         top: spacing.md,
