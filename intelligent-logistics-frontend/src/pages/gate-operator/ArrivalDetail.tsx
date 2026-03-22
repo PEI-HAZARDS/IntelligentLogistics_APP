@@ -17,6 +17,7 @@ import "./ArrivalDetail.css";
 
 function statusLabel(s: string): string {
   const map: Record<string, string> = {
+    scheduled:   "Scheduled",
     in_transit:  "In Transit",
     in_process:  "In Process",
     unloading:   "Unloading",
