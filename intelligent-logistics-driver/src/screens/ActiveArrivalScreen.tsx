@@ -517,8 +517,8 @@ export default function ActiveArrivalScreen() {
         >
             <View style={styles.gatePopupOverlay}>
                 <Animated.View
-                    entering={ZoomIn.duration(300)}
-                    style={[styles.gatePopupContent, styles.infractionPopupContent]}
+                    entering={ZoomIn.duration(400)}
+                    style={styles.gatePopupContent}
                 >
                     <TouchableOpacity
                         style={styles.infractionCloseBtn}
@@ -528,14 +528,14 @@ export default function ActiveArrivalScreen() {
                         }}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                        <Ionicons name="close" size={28} color={colors.text.primary} />
+                        <Ionicons name="close" size={24} color={colors.text.secondary} />
                     </TouchableOpacity>
 
                     <Animated.View style={[styles.gatePopupIcon, infractionFlashStyle]}>
                         <Ionicons name="warning" size={80} color="#ef4444" />
                     </Animated.View>
-                    <Animated.Text style={[styles.infractionTitle, infractionFlashStyle]}>INFRACTION</Animated.Text>
-                    <Text style={styles.infractionSubtitle}>
+                    <Animated.Text style={[styles.gatePopupTitle, { color: '#ef4444' }, infractionFlashStyle]}>INFRACTION</Animated.Text>
+                    <Text style={styles.gatePopupSubtitle}>
                         Possible hazard violation detected
                     </Text>
                     <Text style={styles.gatePopupInstructions}>
@@ -1818,28 +1818,12 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     // Infraction Popup
-    infractionPopupContent: {
-        borderColor: '#ef4444',
-        borderWidth: 2,
-    },
     infractionCloseBtn: {
         position: 'absolute',
         top: spacing.md,
         right: spacing.md,
         zIndex: 10,
         padding: 4,
-    },
-    infractionTitle: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: '#ef4444',
-        letterSpacing: 2,
-    },
-    infractionSubtitle: {
-        fontSize: fontSize.xl,
-        color: '#ef4444',
-        marginTop: spacing.sm,
-        fontWeight: '700',
     },
 
     modalCloseIcon: {
