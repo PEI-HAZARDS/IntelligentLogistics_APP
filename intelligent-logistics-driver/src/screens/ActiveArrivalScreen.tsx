@@ -234,7 +234,18 @@ export default function ActiveArrivalScreen() {
 
         const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}`);
 
-        ws.onopen = () => setIsWsConnected(true);
+        ws.onopen = async () => {
+            setIsWsConnected(true);
+            // Guard against the race where the operator accepted while the WS
+            // was not yet connected: fetch the current status and react if
+            // the transition already happened.
+            try {
+                const current = await getMyActiveArrival(driversLicense);
+                if (current?.id === activeArrival?.id && current?.status === 'in_process') {
+                    handleArriveAtGate();
+                }
+            } catch {}
+        };
 
         ws.onmessage = (event) => {
             try {
