@@ -15,10 +15,12 @@ import {
     Clock,
     CheckCircle,
     Gauge,
+    ShieldAlert,
+    BarChart3,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import KPICard from "@/components/logistics-manager/KPICard";
-import { useSummaryStats, useVolumeData, useActiveAlerts } from "@/hooks/useStatistics";
+import { useSummaryStats, useVolumeData, useActiveAlerts, useDecisionAnalytics, useTransportStats } from "@/hooks/useStatistics";
 import { exportToPDF, exportToCSV } from "@/services/exportService";
 import type { Alert } from "@/types/types";
 
@@ -31,7 +33,6 @@ const alertConfig: Record<string, { icon: ReactNode; color: string; label: strin
     generic: { icon: <AlertTriangle size={16} />, color: "#8b5cf6", label: "General" },
 };
 
-const PORT_CAPACITY = 120;
 
 export default function ManagerDashboard() {
     const [timeRange, setTimeRange] = useState<TimeRange>("today");
@@ -56,7 +57,16 @@ export default function ManagerDashboard() {
         isError: alertsError,
     } = useActiveAlerts(5);
 
-    const isLoading = summaryLoading || volumeLoading || alertsLoading;
+    const {
+        data: decisions,
+        isLoading: decisionsLoading,
+    } = useDecisionAnalytics();
+
+    const {
+        data: transportStats = [],
+    } = useTransportStats();
+
+    const isLoading = summaryLoading || volumeLoading || alertsLoading || decisionsLoading;
     const hasError = summaryError || volumeError || alertsError;
 
     const handleRefresh = () => {
@@ -68,19 +78,17 @@ export default function ManagerDashboard() {
         if (!summary || isExporting) return;
         setIsExporting(true);
         try {
-            await exportToPDF({ summary, transportStats: [], timeRange, generatedAt: new Date() });
+            await exportToPDF({ summary, decisions: decisions ?? null, transportStats, timeRange, generatedAt: new Date() });
         } catch (error) { console.error("PDF export failed:", error); }
         finally { setIsExporting(false); }
     };
 
     const handleExportCSV = () => {
         if (!summary) return;
-        exportToCSV({ summary, transportStats: [], timeRange, generatedAt: new Date() });
+        exportToCSV({ summary, decisions: decisions ?? null, transportStats, timeRange, generatedAt: new Date() });
     };
 
-    const congestionRate = summary
-        ? Math.min(100, Math.round((summary.totalTrucks / PORT_CAPACITY) * 100))
-        : null;
+    const congestionRate = summary?.congestionRate ?? null;
 
     const chartData = volumeData.slice(-12);
     const maxVolume = Math.max(...chartData.map(d => Math.max(d.entries, d.exits)), 1);
@@ -130,17 +138,19 @@ export default function ManagerDashboard() {
             <div className="kpi-grid kpi-grid-primary">
                 <KPICard
                     title="Trucks in Port"
-                    value={summary?.totalTrucks ?? "--"}
+                    value={summary?.trucksInPort ?? "--"}
+                    status={summary ? (summary.trucksInPort > 0 ? "ok" : undefined) : undefined}
+                    statusLabel={summary?.trucksInPort !== undefined ? `${summary.unloadingCount} unloading` : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="In Transit"
+                    value={summary?.trucksInTransit ?? "--"}
                     isLoading={summaryLoading}
                 />
                 <KPICard
                     title="Entries Today"
                     value={summary?.entriesCount ?? "--"}
-                    isLoading={summaryLoading}
-                />
-                <KPICard
-                    title="Exits Today"
-                    value={summary?.exitsCount ?? "--"}
                     isLoading={summaryLoading}
                 />
             </div>
@@ -181,18 +191,39 @@ export default function ManagerDashboard() {
                 />
                 <KPICard
                     title="Avg. Waiting Time"
-                    value={summary ? Math.round(summary.avgPermanenceMinutes * 0.35) : "--"}
+                    value={summary ? Math.round(summary.avgWaitingMinutes) : "--"}
                     unit="min"
-                    status={summary ? (summary.avgPermanenceMinutes * 0.35 <= 15 ? "ok" : summary.avgPermanenceMinutes * 0.35 <= 25 ? "warning" : "danger") : undefined}
-                    statusLabel={summary ? (summary.avgPermanenceMinutes * 0.35 <= 15 ? "Good" : summary.avgPermanenceMinutes * 0.35 <= 25 ? "Acceptable" : "High") : undefined}
+                    status={summary ? (summary.avgWaitingMinutes <= 15 ? "ok" : summary.avgWaitingMinutes <= 25 ? "warning" : "danger") : undefined}
+                    statusLabel={summary ? (summary.avgWaitingMinutes <= 15 ? "Good" : summary.avgWaitingMinutes <= 25 ? "Acceptable" : "High") : undefined}
                     isLoading={summaryLoading}
                 />
                 <KPICard
                     title="Vehicles / Hour"
-                    value={summary ? Math.round((summary.entriesCount + summary.exitsCount) / Math.max(new Date().getHours(), 1)) : "--"}
-                    status={summary ? ((summary.entriesCount + summary.exitsCount) / Math.max(new Date().getHours(), 1) >= 5 ? "ok" : "warning") : undefined}
-                    statusLabel={summary ? ((summary.entriesCount + summary.exitsCount) / Math.max(new Date().getHours(), 1) >= 5 ? "Normal" : "Low") : undefined}
+                    value={summary?.vehiclesPerHour ?? "--"}
+                    status={summary ? (summary.vehiclesPerHour >= 5 ? "ok" : "warning") : undefined}
+                    statusLabel={summary?.peakHour ? `Peak: ${summary.peakHour.hour}h (${summary.peakHour.count})` : undefined}
                     isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Infractions"
+                    value={summary?.infractionCount ?? "--"}
+                    status={summary ? (summary.infractionCount === 0 ? "ok" : summary.infractionCount <= 3 ? "warning" : "danger") : undefined}
+                    statusLabel={summary ? (summary.infractionCount === 0 ? "Clear" : "Highway") : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Completed"
+                    value={summary?.completedCount ?? "--"}
+                    statusLabel={summary?.scheduledCount !== undefined ? `${summary.scheduledCount} scheduled` : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Acceptance Rate"
+                    value={decisions ? decisions.acceptanceRate.toFixed(1) : "--"}
+                    unit="%"
+                    status={decisions ? (decisions.acceptanceRate >= 80 ? "ok" : decisions.acceptanceRate >= 60 ? "warning" : "danger") : undefined}
+                    statusLabel={decisions ? `${decisions.totalDecisions} decisions` : undefined}
+                    isLoading={decisionsLoading}
                 />
             </div>
 

@@ -230,53 +230,6 @@ export interface ManagerOverview {
     statistics: Record<string, number>;
 }
 
-// ==================== DECISIONS / EVENTS ====================
-
-export interface DecisionIncomingRequest {
-    license_plate: string;
-    gate_id: number;
-    appointment_id: number;
-    decision: string;
-    status: string;
-    notes?: string | null;
-    alerts?: object[] | null;
-    extra_data?: object | null;
-}
-
-export interface QueryAppointmentsRequest {
-    time_frame?: number;
-    gate_id: number;
-}
-
-export interface DetectionEventRequest {
-    type: string;
-    license_plate?: string | null;
-    gate_id: number;
-    confidence?: number | null;
-    agent: string;
-    raw_data?: object | null;
-}
-
-export interface DetectionEvent {
-    _id?: string;
-    type: string;
-    license_plate?: string | null;
-    gate_id: number;
-    confidence?: number | null;
-    agent: string;
-    timestamp?: string;
-    raw_data?: object | null;
-}
-
-export interface DecisionEvent {
-    _id?: string;
-    license_plate: string;
-    gate_id: number;
-    decision: string;
-    timestamp?: string;
-    appointment_id?: number;
-}
-
 // ==================== API QUERY PARAMS ====================
 
 export interface ArrivalsQueryParams {
@@ -298,16 +251,3 @@ export interface AlertsQueryParams {
     visit_id?: number;
 }
 
-export interface DetectionEventsQueryParams {
-    license_plate?: string;
-    gate_id?: number;
-    event_type?: string;
-    limit?: number;
-}
-
-export interface DecisionEventsQueryParams {
-    license_plate?: string;
-    gate_id?: number;
-    decision?: string;
-    limit?: number;
-}

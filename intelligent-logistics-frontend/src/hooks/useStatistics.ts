@@ -8,10 +8,12 @@ import {
     getVolumeData,
     getAlertsBreakdown,
     getTransportStats,
+    getDecisionAnalytics,
     type DashboardSummary,
     type VolumeDataPoint,
     type AlertsBreakdown,
     type TransportStats,
+    type DecisionAnalytics,
 } from '@/services/statistics';
 import { getActiveAlerts } from '@/services/alerts';
 import type { Alert } from '@/types/types';
@@ -53,6 +55,15 @@ export function useTransportStats(from?: string, to?: string) {
         queryFn: () => getTransportStats(from, to),
         refetchInterval: 60_000,
         staleTime: 30_000,
+    });
+}
+
+export function useDecisionAnalytics(date?: string) {
+    return useQuery<DecisionAnalytics>({
+        queryKey: ['statistics', 'decision-analytics', date],
+        queryFn: () => getDecisionAnalytics(date),
+        refetchInterval: 30_000,
+        staleTime: 15_000,
     });
 }
 

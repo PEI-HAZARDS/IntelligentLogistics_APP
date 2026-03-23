@@ -11,12 +11,32 @@ const api = axios.create({
 });
 
 export interface DashboardSummary {
-    totalTrucks: number;
+    trucksInPort: number;
+    trucksInTransit: number;
+    scheduledCount: number;
+    unloadingCount: number;
+    completedCount: number;
     entriesCount: number;
     exitsCount: number;
     avgPermanenceMinutes: number;
+    avgWaitingMinutes: number;
     delayRate: number;
     slaCompliance: number;
+    infractionCount: number;
+    peakHour: { hour: number; count: number } | null;
+    portCapacity: number;
+    congestionRate: number;
+    vehiclesPerHour: number;
+}
+
+export interface DecisionAnalytics {
+    totalDecisions: number;
+    accepted: number;
+    rejected: number;
+    manualReview: number;
+    acceptanceRate: number;
+    avgPipelineMs: number;
+    avgDetectionToDecisionMs: number;
 }
 
 export interface TransportStats {
@@ -77,6 +97,15 @@ export async function getVolumeData(
     if (to) params.to = to;
 
     const response = await api.get('/statistics/volume', { params });
+    return response.data;
+}
+
+/**
+ * Get decision analytics from MongoDB
+ */
+export async function getDecisionAnalytics(date?: string): Promise<DecisionAnalytics> {
+    const params = date ? { date } : {};
+    const response = await api.get('/statistics/decision-analytics', { params });
     return response.data;
 }
 

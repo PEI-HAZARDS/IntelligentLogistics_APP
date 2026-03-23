@@ -539,7 +539,7 @@ export default function ActiveArrivalScreen() {
                         Possible hazard violation detected
                     </Text>
                     <Text style={styles.gatePopupInstructions}>
-                        Please verify your cargo documentation and placards immediately.
+                        Please return to the highway. Continuing may result in a fine.
                     </Text>
                 </Animated.View>
             </View>
