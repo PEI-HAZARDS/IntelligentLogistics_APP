@@ -1023,7 +1023,7 @@
 /* Stats Cards */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
 }
@@ -1724,6 +1724,12 @@ html {
 }
 
 /* English status classes */
+.status-badge.status-scheduled {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
+}
+
 .status-badge.status-in-transit {
   background: var(--badge-info-bg);
   color: var(--badge-info-text);
@@ -1752,6 +1758,12 @@ html {
   background: var(--badge-success-bg);
   color: var(--badge-success-text);
   border: 1px solid var(--badge-success-border);
+}
+
+.status-badge.status-unloading {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .status-badge.status-highway-infraction {

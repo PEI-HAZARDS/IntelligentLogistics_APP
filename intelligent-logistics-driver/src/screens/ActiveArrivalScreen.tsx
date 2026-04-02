@@ -5,7 +5,7 @@
  * - in_transit: Route map to port
  * - in_process: Port map with dock destination
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -21,22 +21,27 @@ import {
     Alert,
     TouchableWithoutFeedback,
     Keyboard,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
+import Animated, {
+    FadeIn, FadeInDown, FadeInUp, ZoomIn,
+    useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, cancelAnimation,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
-import { getMyActiveArrival, claimArrival } from '../services/drivers';
+import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeAppointment } from '../services/drivers';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import RouteMap from '../components/RouteMap';
 import PortMap from '../components/PortMap';
 import type { Appointment, ClaimAppointmentResponse } from '../types/types';
+import { API_CONFIG } from '../config/config';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ===== MOCK MODE - REMOVE AFTER TESTING =====
-const DEV_MOCK_MODE = true;
+const DEV_MOCK_MODE = false;
 
 const MOCK_ACTIVE: Appointment = {
     id: 1001,
@@ -69,7 +74,7 @@ const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        status: 'pending',
+        status: 'scheduled',
         notes: 'Container ABC-123',
         gate_in_id: 1,
     },
@@ -81,7 +86,7 @@ const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
         truck_license_plate: '00-AA-00',
         terminal_id: 2,
         scheduled_start_time: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
-        status: 'pending',
+        status: 'scheduled',
         notes: 'Steel Pallets',
         gate_in_id: 2,
     },
@@ -93,7 +98,7 @@ const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
-        status: 'pending',
+        status: 'scheduled',
         notes: 'General Cargo',
         gate_in_id: 1,
     },
@@ -168,6 +173,35 @@ export default function ActiveArrivalScreen() {
     // Simulation State
     const [deliveryPhase, setDeliveryPhase] = useState<DeliveryPhase>('idle');
     const [showGatePopup, setShowGatePopup] = useState(false);
+    const [showInfractionPopup, setShowInfractionPopup] = useState(false);
+    const infractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const infractionFlash = useSharedValue(1);
+
+    useEffect(() => {
+        if (showInfractionPopup) {
+            infractionFlash.value = withRepeat(
+                withSequence(
+                    withTiming(0.3, { duration: 400 }),
+                    withTiming(1, { duration: 400 }),
+                ),
+                -1,
+                true,
+            );
+        } else {
+            cancelAnimation(infractionFlash);
+            infractionFlash.value = 1;
+        }
+    }, [showInfractionPopup]);
+
+    const infractionFlashStyle = useAnimatedStyle(() => ({
+        opacity: infractionFlash.value,
+    }));
+
+    // WebSocket Debug Panel
+    const [showDebug, setShowDebug] = useState(false);
+    const [debugMessages, setDebugMessages] = useState<Array<{ id: string; timestamp: string; type: string; data: unknown }>>([]);
+    const [isWsConnected, setIsWsConnected] = useState(false);
+    const debugMsgIdRef = useRef(0);
 
     const fetchData = useCallback(async () => {
         setError(null);
@@ -175,7 +209,6 @@ export default function ActiveArrivalScreen() {
             if (DEV_MOCK_MODE) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 setAssignedDeliveries(MOCK_ASSIGNED_DELIVERIES);
-                // If we are already in a simulation, don't reset to null
                 if (deliveryPhase === 'idle') {
                     setActiveArrival(null);
                 }
@@ -183,12 +216,27 @@ export default function ActiveArrivalScreen() {
                 setIsRefreshing(false);
                 return;
             }
-            const active = await getMyActiveArrival(driversLicense);
-            setActiveArrival(active);
-            if (active) {
-                if (active.status === 'in_process') setDeliveryPhase('in_port');
+
+            // Fetch active arrival and today's schedule in parallel
+            const [active, todayArrivals] = await Promise.all([
+                getMyActiveArrival(driversLicense),
+                getMyTodayArrivals(driversLicense).catch(() => []),
+            ]);
+
+            // Show pending/upcoming deliveries on the dashboard
+            const pending = (todayArrivals || []).filter(
+                (a) => a.status === 'scheduled' || a.status === 'in_transit' || a.status === 'delayed' || a.status === 'in_process' || a.status === 'unloading' || (a.status as string) === 'pending'
+            );
+            setAssignedDeliveries(pending);
+
+            if (active && deliveryPhase === 'idle') {
+                setActiveArrival(active);
+                if (active.status === 'unloading') setDeliveryPhase('unloading');
+                else if (active.status === 'in_process') setDeliveryPhase('in_port');
                 else if (active.status === 'completed') setDeliveryPhase('completed');
                 else setDeliveryPhase('in_transit');
+            } else if (!active && deliveryPhase === 'idle') {
+                setActiveArrival(null);
             }
         } catch (err) {
             console.error('Failed to load arrival:', err);
@@ -203,6 +251,62 @@ export default function ActiveArrivalScreen() {
         fetchData();
     }, [fetchData]);
 
+    // WebSocket: listen for gate approval while in_transit
+    useEffect(() => {
+        if (deliveryPhase !== 'in_transit' || !driversLicense) {
+            setIsWsConnected(false);
+            return;
+        }
+
+        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}`);
+
+        ws.onopen = async () => {
+            setIsWsConnected(true);
+            // Guard against the race where the operator accepted while the WS
+            // was not yet connected: fetch the current status and react if
+            // the transition already happened.
+            try {
+                const current = await getMyActiveArrival(driversLicense);
+                if (current?.id === activeArrival?.id && current?.status === 'in_process') {
+                    handleArriveAtGate();
+                }
+            } catch {}
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                setDebugMessages(prev => [
+                    {
+                        id: String(++debugMsgIdRef.current),
+                        timestamp: new Date().toISOString(),
+                        type: (data.message_type as string) || 'unknown',
+                        data,
+                    },
+                    ...prev.slice(0, 49), // keep last 50
+                ]);
+                if (
+                    data.message_type === 'status_changed' &&
+                    data.appointment_id === activeArrival?.id &&
+                    data.new_status === 'in_process'
+                ) {
+                    handleArriveAtGate();
+                }
+                if (data.message_type === 'infraction_warning') {
+                    haptics.error();
+                    setShowInfractionPopup(true);
+                    if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+                    infractionTimerRef.current = setTimeout(() => setShowInfractionPopup(false), 10000);
+                }
+            } catch {}
+        };
+
+        ws.onerror = (e) => console.warn('Driver WS error:', e);
+        ws.onclose = () => setIsWsConnected(false);
+
+        return () => ws.close();
+    }, [deliveryPhase, driversLicense, activeArrival?.id]);
+
     const onRefresh = () => {
         setIsRefreshing(true);
         haptics.light();
@@ -216,48 +320,45 @@ export default function ActiveArrivalScreen() {
             return;
         }
 
-        Alert.alert(
-            'Confirm Arrival',
-            `Do you want to register delivery with PIN ${pinCode}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Confirm', 
-                    onPress: async () => {
-                        setIsClaiming(true);
-                        setError(null);
-                        try {
-                            if (DEV_MOCK_MODE) {
-                                await new Promise(resolve => setTimeout(resolve, 800));
-                                setClaimResult(MOCK_CLAIM_RESULT);
-                                setActiveArrival(MOCK_ACTIVE);
-                                setDeliveryPhase('in_transit');
-                                setSuccessMessage('Arrival registered! Ready to drive.');
-                                setPinCode('');
-                                setSelectedForPin(null); // Close modal on success
-                                haptics.success();
-                                setIsClaiming(false);
-
-                                // Simulation: Timer removed for manual trigger below map
-                                return;
-                            }
-                            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
-                            haptics.success();
-                            setClaimResult(result);
-                            setSuccessMessage('Arrival registered!');
-                            setPinCode('');
-                            setSelectedForPin(null); // Close modal on success
-                            fetchData();
-                        } catch (err) {
-                            setError('Invalid PIN code.');
-                            haptics.error();
-                        } finally {
-                            setIsClaiming(false);
-                        }
-                    }
+        setIsClaiming(true);
+        setError(null);
+        try {
+            if (DEV_MOCK_MODE) {
+                await new Promise(resolve => setTimeout(resolve, 800));
+                setClaimResult(MOCK_CLAIM_RESULT);
+                setActiveArrival(MOCK_ACTIVE);
+                setDeliveryPhase('in_transit');
+                setSuccessMessage('Arrival registered! Ready to drive.');
+                setPinCode('');
+                setSelectedForPin(null);
+                haptics.success();
+                return;
+            }
+            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
+            // Transition from scheduled → in_transit
+            if (result.appointment_id) {
+                try {
+                    await startTrip(result.appointment_id);
+                } catch (err) {
+                    console.warn('Failed to update status to in_transit:', err);
                 }
-            ]
-        );
+            }
+            haptics.success();
+            setClaimResult(result);
+            setSuccessMessage('Arrival registered!');
+            // Transition immediately using the appointment we already have.
+            // Do NOT call fetchData() here — it runs with a stale deliveryPhase='idle'
+            // closure and would overwrite activeArrival with null.
+            setActiveArrival(selectedForPin);
+            setDeliveryPhase('in_transit');
+            setPinCode('');
+            setSelectedForPin(null);
+        } catch (err) {
+            setError('Invalid PIN code.');
+            haptics.error();
+        } finally {
+            setIsClaiming(false);
+        }
     };
 
     // Expand map modal
@@ -270,12 +371,21 @@ export default function ActiveArrivalScreen() {
         setIsMapExpanded(false);
     };
 
-    // Simulation: Arrive at Gate
-    const handleArriveAtGate = () => {
+    // Arrive at Gate — update backend status to in_process
+    const handleArriveAtGate = async () => {
         haptics.medium();
         setDeliveryPhase('gate_opening');
         setShowGatePopup(true);
-        
+
+        // Notify backend that truck arrived at gate
+        if (activeArrival?.id) {
+            try {
+                await updateArrivalStatus(activeArrival.id, 'in_process');
+            } catch (err) {
+                console.warn('Failed to update status to in_process:', err);
+            }
+        }
+
         // Auto close popup and move to internal navigation after 3 seconds
         setTimeout(() => {
             setShowGatePopup(false);
@@ -291,10 +401,18 @@ export default function ActiveArrivalScreen() {
             'Are you positioned at the dock and ready to start unloading?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Start', 
-                    onPress: () => {
+                {
+                    text: 'Start',
+                    onPress: async () => {
                         haptics.medium();
+                        // Notify backend of unloading state transition
+                        if (activeArrival?.id) {
+                            try {
+                                await startUnloading(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to update status to unloading:', err);
+                            }
+                        }
                         setDeliveryPhase('unloading');
                         setSuccessMessage('Unloading started!');
                     }
@@ -303,16 +421,24 @@ export default function ActiveArrivalScreen() {
         );
     };
 
-    // TRIGGER: Driver finishes unloading
+    // TRIGGER: Driver finishes unloading — marks appointment as completed on backend
     const handleFinishDelivery = () => {
         Alert.alert(
             'Complete Delivery',
             'Has all cargo been unloaded and processed?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Complete', 
-                    onPress: () => {
+                {
+                    text: 'Complete',
+                    onPress: async () => {
+                        // Call backend to mark appointment completed
+                        if (activeArrival?.id) {
+                            try {
+                                await completeAppointment(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to complete appointment on backend:', err);
+                            }
+                        }
                         haptics.success();
                         setDeliveryPhase('completed');
                         setSuccessMessage('Delivery completed!');
@@ -377,6 +503,44 @@ export default function ActiveArrivalScreen() {
                         color={colors.primary} 
                         style={{ marginTop: spacing.xl }} 
                     />
+                </Animated.View>
+            </View>
+        </Modal>
+    );
+
+    // Infraction Warning Popup
+    const renderInfractionPopup = () => (
+        <Modal
+            visible={showInfractionPopup}
+            transparent
+            animationType="fade"
+        >
+            <View style={styles.gatePopupOverlay}>
+                <Animated.View
+                    entering={ZoomIn.duration(400)}
+                    style={styles.gatePopupContent}
+                >
+                    <TouchableOpacity
+                        style={styles.infractionCloseBtn}
+                        onPress={() => {
+                            if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+                            setShowInfractionPopup(false);
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Ionicons name="close" size={24} color={colors.text.secondary} />
+                    </TouchableOpacity>
+
+                    <Animated.View style={[styles.gatePopupIcon, infractionFlashStyle]}>
+                        <Ionicons name="warning" size={80} color="#ef4444" />
+                    </Animated.View>
+                    <Animated.Text style={[styles.gatePopupTitle, { color: '#ef4444' }, infractionFlashStyle]}>INFRACTION</Animated.Text>
+                    <Text style={styles.gatePopupSubtitle}>
+                        Possible hazard violation detected
+                    </Text>
+                    <Text style={styles.gatePopupInstructions}>
+                        Please return to the highway. Continuing may result in a fine.
+                    </Text>
                 </Animated.View>
             </View>
         </Modal>
@@ -646,8 +810,9 @@ export default function ActiveArrivalScreen() {
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.gatePopupOverlay}>
-                    <Animated.View 
-                        entering={ZoomIn.duration(400)} 
+                    <TouchableWithoutFeedback onPress={() => {}}>
+                    <Animated.View
+                        entering={ZoomIn.duration(400)}
                         style={styles.gatePopupContent}
                     >
                         <TouchableOpacity 
@@ -689,7 +854,7 @@ export default function ActiveArrivalScreen() {
                                 autoCorrect={false}
                                 editable={!isClaiming}
                                 maxLength={10}
-                                autoFocus={false}
+                                autoFocus={Platform.OS === 'web'}
                             />
                         </View>
 
@@ -708,6 +873,7 @@ export default function ActiveArrivalScreen() {
                             )}
                         </TouchableOpacity>
                     </Animated.View>
+                    </TouchableWithoutFeedback>
                 </View>
             </TouchableWithoutFeedback>
         </Modal>
@@ -874,6 +1040,62 @@ export default function ActiveArrivalScreen() {
         </Modal>
     );
 
+    const renderDebugPanel = () => (
+        <View style={styles.debugPanelWrapper} pointerEvents="box-none">
+            {/* Toggle button */}
+            <TouchableOpacity
+                style={[styles.debugToggleBtn, isWsConnected && styles.debugToggleBtnActive]}
+                onPress={() => setShowDebug(v => !v)}
+                activeOpacity={0.8}
+            >
+                <Ionicons name="bug-outline" size={14} color={isWsConnected ? '#000' : '#fff'} />
+                <Text style={[styles.debugToggleBtnText, isWsConnected && { color: '#000' }]}>
+                    WS Debug ({debugMessages.length})
+                </Text>
+                <Ionicons name={showDebug ? 'chevron-down' : 'chevron-up'} size={13} color={isWsConnected ? '#000' : '#fff'} />
+            </TouchableOpacity>
+
+            {/* Panel */}
+            {showDebug && (
+                <View style={styles.debugPanel}>
+                    {/* Header row */}
+                    <View style={styles.debugHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="wifi" size={14} color={isWsConnected ? '#4ade80' : '#ef4444'} />
+                            <Text style={styles.debugHeaderText}>
+                                Gate {activeArrival?.gate_in_id ?? '—'} | {isWsConnected ? 'Connected' : 'Disconnected'}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setDebugMessages([])}
+                            style={styles.debugClearBtn}
+                        >
+                            <Text style={styles.debugClearBtnText}>Clear</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Messages */}
+                    <ScrollView style={styles.debugScrollView} nestedScrollEnabled>
+                        {debugMessages.length === 0 ? (
+                            <Text style={styles.debugEmpty}>No WebSocket messages received yet...</Text>
+                        ) : (
+                            debugMessages.map(msg => (
+                                <View key={msg.id} style={styles.debugMessage}>
+                                    <Text style={styles.debugMessageMeta}>
+                                        {new Date(msg.timestamp).toLocaleTimeString()} — {msg.type}
+                                    </Text>
+                                    <Text style={styles.debugMessageBody}>
+                                        {JSON.stringify(msg.data, null, 2)}
+                                    </Text>
+                                </View>
+                            ))
+                        )}
+                    </ScrollView>
+                </View>
+            )}
+        </View>
+    );
+
     return (
         <View style={styles.container}>
             <ScrollView
@@ -901,12 +1123,18 @@ export default function ActiveArrivalScreen() {
 
             {/* Expanded Map Modal */}
             {renderMapModal()}
-            
+
             {/* PIN Entry simulated popup */}
             {renderPinModal()}
-            
+
             {/* Gate opening simulated popup */}
             {renderGatePopup()}
+
+            {/* Infraction warning popup */}
+            {renderInfractionPopup()}
+
+            {/* WebSocket Debug Panel */}
+            {renderDebugPanel()}
         </View>
     );
 }
@@ -1589,6 +1817,15 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
         textAlign: 'center',
     },
+    // Infraction Popup
+    infractionCloseBtn: {
+        position: 'absolute',
+        top: spacing.md,
+        right: spacing.md,
+        zIndex: 10,
+        padding: 4,
+    },
+
     modalCloseIcon: {
         position: 'absolute',
         top: spacing.md,
@@ -1708,5 +1945,96 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         fontWeight: '600',
         color: '#ef4444',
+    },
+
+    // WebSocket Debug Panel
+    debugPanelWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+    },
+    debugToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        alignSelf: 'flex-end',
+        backgroundColor: '#374151',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        marginRight: 16,
+    },
+    debugToggleBtnActive: {
+        backgroundColor: '#4ade80',
+    },
+    debugToggleBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    debugPanel: {
+        backgroundColor: 'rgba(15, 20, 35, 0.97)',
+        borderTopWidth: 2,
+        borderTopColor: '#4ade80',
+        height: 260,
+        flexDirection: 'column',
+    },
+    debugHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    debugHeaderText: {
+        fontSize: 11,
+        color: '#9ca3af',
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    },
+    debugClearBtn: {
+        backgroundColor: '#374151',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+    },
+    debugClearBtnText: {
+        fontSize: 10,
+        color: '#fff',
+    },
+    debugScrollView: {
+        flex: 1,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+    },
+    debugEmpty: {
+        color: '#6b7280',
+        fontSize: 11,
+        textAlign: 'center',
+        paddingVertical: 20,
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    },
+    debugMessage: {
+        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+        borderRadius: 6,
+        padding: 8,
+        marginBottom: 6,
+        borderLeftWidth: 3,
+        borderLeftColor: '#4ade80',
+    },
+    debugMessageMeta: {
+        fontSize: 10,
+        color: '#9ca3af',
+        marginBottom: 3,
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    },
+    debugMessageBody: {
+        fontSize: 10,
+        color: '#e5e7eb',
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     },
 });

@@ -10,7 +10,17 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  preview: {
+    headers: {
+      // Modern replacement for deprecated Feature-Policy.
+      'Permissions-Policy': 'autoplay=(self), camera=(), microphone=(), geolocation=()',
+    },
+  },
   server: {
+    headers: {
+      // Modern replacement for deprecated Feature-Policy.
+      'Permissions-Policy': 'autoplay=(self), camera=(), microphone=(), geolocation=()',
+    },
     proxy: {
       '/api': {
         target: 'http://10.255.32.70:8000', // Update this IP to your API Gateway VM IP if different

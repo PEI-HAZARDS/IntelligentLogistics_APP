@@ -18,8 +18,10 @@ interface ExtendedAppointment extends Appointment {
 // Map API status to English display
 function mapStatusToLabel(status: string): string {
   const statusMap: Record<string, string> = {
+    scheduled: "Scheduled",
     in_transit: "In Transit",
     in_process: "In Process",
+    unloading: "Unloading",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -175,8 +177,22 @@ export default function Dashboard() {
     }
 
     // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
-    // Also skip infraction_decision as it's processed by the WarningSign component
-    if (data.message_type === "scale_network" || data.message_type === "infraction_decision") return;
+    if (data.message_type === "scale_network") return;
+
+    // Infraction decisions are visually handled by the WarningSign component,
+    // but we still need to re-fetch the upcoming arrivals so the infraction
+    // badge and stats update in real-time.
+    if (data.message_type === "infraction_decision") {
+      fetchData();
+      return;
+    }
+
+    // Status changes (e.g. driver claimed appointment → in_transit) need a refetch
+    // so the dashboard's upcoming arrivals list reflects the new status immediately.
+    if (data.message_type === "status_changed") {
+      fetchData();
+      return;
+    }
 
 
 

@@ -102,8 +102,9 @@ export default function ManualReviewModal({
         setIsLoading(true);
         setError(null);
         try {
-            // Fetch all in_transit arrivals (like ArrivalsList does)
-            const results = await getArrivals({ status: 'in_transit', limit: 100 });
+            // Fetch in_transit arrivals filtered by this operator's gate
+            const gateFilter = gateId ? Number(gateId) : undefined;
+            const results = await getArrivals({ status: 'in_transit', limit: 100, gate_id: gateFilter });
             const appointments = results.items || [];
             setAllCandidates(appointments);
             // Apply initial filter if there's a detected plate

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Clock,
@@ -18,16 +18,21 @@ import {
   ShieldAlert,
   Pin,
   PinOff,
-  Container
+  Container,
+  CalendarClock,
+  PackageOpen,
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
+import { getGateWebSocket } from "@/lib/websocket";
 import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
 
 // Map API status to English display
 function mapStatusToLabel(status: AppointmentStatusEnum): string {
   const statusMap: Record<AppointmentStatusEnum, string> = {
+    scheduled: "Scheduled",
     in_transit: "In Transit",
     in_process: "In Process",
+    unloading: "Unloading",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -38,10 +43,11 @@ function mapStatusToLabel(status: AppointmentStatusEnum): string {
 // Map English status back to API status
 function mapStatusToAPI(status: string): AppointmentStatusEnum {
   const statusMap: Record<string, AppointmentStatusEnum> = {
+    "Scheduled": "scheduled",
     "Pending": "in_transit",
     "In Transit": "in_transit",
     "In Process": "in_process",
-    "Unloading": "in_process",
+    "Unloading": "unloading",
     "Delayed": "delayed",
     "Completed": "completed",
     "Canceled": "canceled",
@@ -67,10 +73,11 @@ function ArrivalsList() {
 
   // API data states
   const [arrivals, setArrivals] = useState<UIArrival[]>([]);
+  const arrivalsRef = useRef<UIArrival[]>(arrivals);
+  arrivalsRef.current = arrivals;
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Debug: apenas console.log para statsData
 
   // Filter states
   const [dockFilter, setDockFilter] = useState("all");
@@ -137,7 +144,7 @@ function ArrivalsList() {
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
-    apiStatus: (arrival.status ?? "in_transit"),
+    apiStatus: (arrival.status ?? "scheduled"),
     highwayInfraction: arrival.highway_infraction || false,
   });
 
@@ -150,8 +157,9 @@ function ArrivalsList() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       };
-      // statusFilter "Violators" has no backend param — filter client-side after fetch
-      if (statusFilter !== "all" && statusFilter !== "Violators") {
+      if (statusFilter === "Violators") {
+        arrivalsParams.highway_infraction = true;
+      } else if (statusFilter !== "all") {
         arrivalsParams.status = mapStatusToAPI(statusFilter);
       }
       if (debouncedSearch) arrivalsParams.search = debouncedSearch;
@@ -194,10 +202,6 @@ function ArrivalsList() {
         mapped = [...mapped, ...mappedMissing];
       }
 
-      if (statusFilter === "Violators") {
-        mapped = mapped.filter(a => a.highwayInfraction || pinnedArrivals.some(p => p.id === a.id));
-      }
-
       setArrivals(mapped);
       setServerPages(arrivalsData.pages);
       setServerTotal(arrivalsData.total);
@@ -228,6 +232,98 @@ function ArrivalsList() {
     return () => clearInterval(refreshTimer);
   }, [fetchData]);
 
+  // Real-time WebSocket: apply local deltas to stats + arrivals list
+  useEffect(() => {
+    const ws = getGateWebSocket(gateId);
+    ws.connect();
+
+    const unsubscribe = ws.onMessage((data: Record<string, unknown>) => {
+      const messageType = data.message_type as string | undefined;
+
+      // ── status_changed: appointment_id + new_status ──
+      if (messageType === "status_changed") {
+        const appointmentId = data.appointment_id as number;
+        const newStatus = data.new_status as AppointmentStatusEnum;
+        const target = arrivalsRef.current.find(a => a.id === appointmentId);
+
+        if (target && target.apiStatus !== newStatus) {
+          const oldStatus = target.apiStatus;
+          setStats(prev => {
+            const next = { ...prev };
+            next[oldStatus] = Math.max(0, (next[oldStatus] || 0) - 1);
+            next[newStatus] = (next[newStatus] || 0) + 1;
+            return next;
+          });
+          setArrivals(prev => prev.map(a =>
+            a.id === appointmentId
+              ? { ...a, apiStatus: newStatus, status: mapStatusToLabel(newStatus) }
+              : a
+          ));
+        } else if (!target) {
+          // Appointment not on current page — can't compute delta, refetch stats
+          fetchData();
+        }
+        return;
+      }
+
+      // ── decision_results ACCEPTED: license_plate → in_process ──
+      if (messageType === "decision_results" && data.decision === "ACCEPTED") {
+        const plate = data.license_plate as string;
+        const target = arrivalsRef.current.find(a => a.plate === plate);
+
+        if (target && target.apiStatus !== "in_process") {
+          const oldStatus = target.apiStatus;
+          setStats(prev => {
+            const next = { ...prev };
+            next[oldStatus] = Math.max(0, (next[oldStatus] || 0) - 1);
+            next["in_process"] = (next["in_process"] || 0) + 1;
+            return next;
+          });
+          setArrivals(prev => prev.map(a =>
+            a.plate === plate && a.apiStatus === oldStatus
+              ? { ...a, apiStatus: "in_process" as AppointmentStatusEnum, status: mapStatusToLabel("in_process" as AppointmentStatusEnum) }
+              : a
+          ));
+        } else if (!target) {
+          fetchData();
+        }
+        return;
+      }
+
+      // ── infraction_decision: flag arrival + increment infractions count ──
+      if (messageType === "infraction_decision") {
+        const plate = (data.license_plate || data.truck_id) as string;
+        const target = plate ? arrivalsRef.current.find(a => a.plate === plate) : null;
+
+        if (target && !target.highwayInfraction) {
+          setStats(prev => ({ ...prev, infractions: (prev.infractions || 0) + 1 }));
+          setArrivals(prev => prev.map(a =>
+            a.plate === plate ? { ...a, highwayInfraction: true } : a
+          ));
+        } else if (!target) {
+          fetchData();
+        }
+        return;
+      }
+
+      // ── Other decision_results (REJECTED, etc.) — refetch for full update ──
+      if (messageType === "decision_results") {
+        fetchData();
+      }
+    });
+
+    // Reconcile on WS reconnect (covers missed messages during disconnect)
+    const unsubReconnect = ws.onConnect(() => {
+      console.log("[ArrivalsList] WS reconnected — reconciling stats");
+      fetchData();
+    });
+
+    return () => {
+      unsubscribe();
+      unsubReconnect();
+    };
+  }, [gateId, fetchData]);
+
   // Filter Logic — dock is the only remaining client-side dimension
   // Pinned items always bypass client-side filters
   const filteredArrivals = dockFilter !== "all"
@@ -248,11 +344,13 @@ function ArrivalsList() {
   useEffect(() => { setCurrentPage(1); }, [statusFilter]);
 
   // All stats come from the /stats endpoint (full gate population, not current page)
-  const statsTotal = (stats.in_transit ?? 0) + (stats.in_process ?? 0) + (stats.delayed ?? 0) + (stats.completed ?? 0);
+  const statsTotal = (stats.scheduled ?? 0) + (stats.in_transit ?? 0) + (stats.in_process ?? 0) + (stats.unloading ?? 0) + (stats.delayed ?? 0) + (stats.completed ?? 0);
   const dynamicStats = {
     total: statsTotal || serverTotal,
+    scheduled: stats.scheduled ?? 0,
     pending: stats.in_transit ?? 0,
     inProcess: stats.in_process ?? 0,
+    unloading: stats.unloading ?? 0,
     inProgress: stats.delayed ?? 0,
     completed: stats.completed ?? 0,
     infractions: stats.infractions ?? 0,
@@ -320,9 +418,9 @@ function ArrivalsList() {
         )}
 
         {/* Estatísticas (Clickable Filters) */}
-        {/* Estatísticas — compact 2×3 pill grid */}
+        {/* Estatísticas — compact pill grid */}
         <div className="stats-grid">
-          {/* Row 1: Total · Delayed · Infractions */}
+          {/* Row 1: Total · Scheduled · Delayed · Infractions */}
           <div
             className={`stat-card ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter("all")}
@@ -331,6 +429,16 @@ function ArrivalsList() {
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.total}</span>
               <span className="stat-label">Total Arrivals</span>
+            </div>
+          </div>
+          <div
+            className={`stat-card ${statusFilter === 'Scheduled' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Scheduled")}
+          >
+            <div className="stat-icon"><CalendarClock size={20} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.scheduled}</span>
+              <span className="stat-label">Scheduled</span>
             </div>
           </div>
           <div
@@ -353,7 +461,7 @@ function ArrivalsList() {
               <span className="stat-label">Infractions</span>
             </div>
           </div>
-          {/* Row 2: In Transit · In Process · Completed */}
+          {/* Row 2: In Transit · In Process · Unloading · Completed */}
           <div
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
@@ -372,6 +480,16 @@ function ArrivalsList() {
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
+            </div>
+          </div>
+          <div
+            className={`stat-card ${statusFilter === 'Unloading' ? 'active' : ''}`}
+            onClick={() => setStatusFilter("Unloading")}
+          >
+            <div className="stat-icon"><PackageOpen size={20} /></div>
+            <div className="stat-content">
+              <span className="stat-value">{dynamicStats.unloading}</span>
+              <span className="stat-label">Unloading</span>
             </div>
           </div>
           <div
