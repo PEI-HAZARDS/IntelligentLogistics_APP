@@ -27,8 +27,29 @@ export default function Login() {
       // Determine role from user_info for redirect.
       const role = response.user_info?.role || "operator";
 
-      // Redirect based on mode
-      if (mode === 'manager' || role === 'manager') {
+      // Enforce role-mode matching: managers can only use the manager app,
+      // operators can only use the gate app.
+      if (mode === 'manager' && role !== 'manager') {
+        // Operator tried to log in to the manager app
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        setError("Access denied. This application is for managers only.");
+        return;
+      }
+      if (mode === 'gate' && role === 'manager') {
+        // Manager tried to log in to the gate app
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        setError("Access denied. This application is for gate operators only.");
+        return;
+      }
+
+      // Redirect based on role
+      if (role === 'manager') {
         nav("/manager");
       } else {
         nav("/gate/1");

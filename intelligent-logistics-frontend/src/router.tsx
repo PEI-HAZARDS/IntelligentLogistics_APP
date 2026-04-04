@@ -36,31 +36,31 @@ const commonRoutes = [
 const gateRoutes = [
   ...commonRoutes,
   // Redirect bare /gate to /gate/1 for backwards compat
-  { path: '/gate', element: <ProtectedRoute><Navigate to="/gate/1" replace /></ProtectedRoute> },
+  { path: '/gate', element: <ProtectedRoute allowedRoles={['operator']}><Navigate to="/gate/1" replace /></ProtectedRoute> },
   {
     path: '/gate/:gateId',
-    element: <ProtectedRoute><GateQuickLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateQuickLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Dashboard /> },
     ],
   },
   {
     path: '/gate/:gateId/arrivals',
-    element: <ProtectedRoute><GateDetailLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ArrivalsList /> },
     ],
   },
   {
     path: '/gate/:gateId/arrival/:id',
-    element: <ProtectedRoute><GateDetailLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ArrivalDetail /> },
     ],
   },
   {
     path: '/gate/:gateId/alerts',
-    element: <ProtectedRoute><GateDetailLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <AlertsPage /> },
     ],
@@ -74,7 +74,7 @@ const managerRoutes = [
   ...commonRoutes,
   {
     path: '/manager',
-    element: <ProtectedRoute><ManagerLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['manager']}><ManagerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'shifts', element: <ShiftsPage /> },
