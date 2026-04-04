@@ -154,7 +154,7 @@ function getStatusColors(phase: DeliveryPhase): { bg: string; text: string; acce
 }
 
 export default function ActiveArrivalScreen() {
-    const { user } = useAuthStore();
+    const { user, token } = useAuthStore();
     const driversLicense = user?.drivers_license || '';
     const driverName = user?.name || 'Driver';
 
@@ -219,8 +219,8 @@ export default function ActiveArrivalScreen() {
 
             // Fetch active arrival and today's schedule in parallel
             const [active, todayArrivals] = await Promise.all([
-                getMyActiveArrival(driversLicense),
-                getMyTodayArrivals(driversLicense).catch(() => []),
+                getMyActiveArrival(),
+                getMyTodayArrivals().catch(() => []),
             ]);
 
             // Show pending/upcoming deliveries on the dashboard
@@ -253,12 +253,12 @@ export default function ActiveArrivalScreen() {
 
     // WebSocket: listen for gate approval while in_transit
     useEffect(() => {
-        if (deliveryPhase !== 'in_transit' || !driversLicense) {
+        if (deliveryPhase !== 'in_transit' || !driversLicense || !token) {
             setIsWsConnected(false);
             return;
         }
 
-        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}`);
+        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}?token=${encodeURIComponent(token || '')}`);
 
         ws.onopen = async () => {
             setIsWsConnected(true);
@@ -266,7 +266,7 @@ export default function ActiveArrivalScreen() {
             // was not yet connected: fetch the current status and react if
             // the transition already happened.
             try {
-                const current = await getMyActiveArrival(driversLicense);
+                const current = await getMyActiveArrival();
                 if (current?.id === activeArrival?.id && current?.status === 'in_process') {
                     handleArriveAtGate();
                 }
@@ -305,7 +305,7 @@ export default function ActiveArrivalScreen() {
         ws.onclose = () => setIsWsConnected(false);
 
         return () => ws.close();
-    }, [deliveryPhase, driversLicense, activeArrival?.id]);
+    }, [deliveryPhase, driversLicense, activeArrival?.id, token]);
 
     const onRefresh = () => {
         setIsRefreshing(true);
@@ -334,7 +334,7 @@ export default function ActiveArrivalScreen() {
                 haptics.success();
                 return;
             }
-            const result = await claimArrival(driversLicense, { arrival_id: pinCode.trim() });
+            const result = await claimArrival({ arrival_id: pinCode.trim() });
             // Transition from scheduled → in_transit
             if (result.appointment_id) {
                 try {

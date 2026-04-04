@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
+import { logout as authLogout } from "@/services/auth";
 import config from "@/config/appConfig";
 import {
     Sun,
@@ -39,9 +40,8 @@ export default function ManagerHeader() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("user_info");
+    const handleLogout = async () => {
+        await authLogout();
         navigate("/login");
     };
 

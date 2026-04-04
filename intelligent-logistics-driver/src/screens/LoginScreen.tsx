@@ -53,7 +53,7 @@ export default function LoginScreen() {
         // Simular delay de rede
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        await authLogin('mock-token-for-testing', MOCK_USER);
+        await authLogin('mock-token-for-testing', 'mock-refresh-token', MOCK_USER);
         haptics.success();
         setIsLoading(false);
     };
@@ -75,14 +75,14 @@ export default function LoginScreen() {
             });
 
             const userInfo: UserInfo = {
-                drivers_license: response.drivers_license,
-                name: response.name,
-                company_nif: response.company_nif,
-                company_name: response.company_name,
+                drivers_license: response.user_info.drivers_license,
+                name: response.user_info.name,
+                company_nif: response.user_info.company_nif,
+                company_name: response.user_info.company_name,
                 role: 'driver',
             };
 
-            await authLogin(response.token, userInfo);
+            await authLogin(response.access_token, response.refresh_token, userInfo);
             haptics.success();
         } catch (err: unknown) {
             console.error('Login error:', err);

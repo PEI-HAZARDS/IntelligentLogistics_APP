@@ -15,46 +15,57 @@ import type {
 
 const BASE_PATH = '/drivers';
 
+/** Keycloak auth response shape */
+interface AuthDriverLoginResponse {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    token_type: string;
+    user_info: {
+        drivers_license: string;
+        name: string;
+        company_nif?: string | null;
+        company_name?: string | null;
+    };
+}
+
 /**
- * Driver login
+ * Driver login via Keycloak-mediated auth endpoint.
  */
-export async function login(credentials: DriverLoginRequest): Promise<DriverLoginResponse> {
-    const response = await api.post<DriverLoginResponse>(`${BASE_PATH}/login`, credentials);
+export async function login(credentials: DriverLoginRequest): Promise<AuthDriverLoginResponse> {
+    const response = await api.post<AuthDriverLoginResponse>('/auth/drivers/login', credentials);
     return response.data;
 }
 
 /**
- * Claim an arrival using PIN
+ * Claim an arrival using PIN.
+ * Driver identity is extracted from the JWT token on the server.
  */
 export async function claimArrival(
-    driversLicense: string,
     claimData: ClaimAppointmentRequest
 ): Promise<ClaimAppointmentResponse> {
     const response = await api.post<ClaimAppointmentResponse>(
         `${BASE_PATH}/claim`,
         claimData,
-        { params: { drivers_license: driversLicense } }
     );
     return response.data;
 }
 
 /**
- * Get driver's active arrival/appointment
+ * Get driver's active arrival/appointment.
+ * Driver identity is extracted from the JWT token on the server.
  */
-export async function getMyActiveArrival(driversLicense: string): Promise<Appointment | null> {
-    const response = await api.get<Appointment | null>(`${BASE_PATH}/me/active`, {
-        params: { drivers_license: driversLicense },
-    });
+export async function getMyActiveArrival(): Promise<Appointment | null> {
+    const response = await api.get<Appointment | null>(`${BASE_PATH}/me/active`);
     return response.data;
 }
 
 /**
- * Get driver's today arrivals
+ * Get driver's today arrivals.
+ * Driver identity is extracted from the JWT token on the server.
  */
-export async function getMyTodayArrivals(driversLicense: string): Promise<Appointment[]> {
-    const response = await api.get<Appointment[]>(`${BASE_PATH}/me/today`, {
-        params: { drivers_license: driversLicense },
-    });
+export async function getMyTodayArrivals(): Promise<Appointment[]> {
+    const response = await api.get<Appointment[]>(`${BASE_PATH}/me/today`);
     return response.data;
 }
 

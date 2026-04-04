@@ -2,13 +2,7 @@
  * Statistics Service
  * API calls for manager dashboard data
  */
-import axios from 'axios';
-import config from '@/config/appConfig';
-
-const api = axios.create({
-    baseURL: config.apiBaseUrl,
-    timeout: 10000,
-});
+import api from '@/lib/api';
 
 export interface DashboardSummary {
     trucksInPort: number;

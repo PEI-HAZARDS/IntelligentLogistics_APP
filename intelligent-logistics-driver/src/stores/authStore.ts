@@ -1,9 +1,10 @@
 /**
  * Auth Store using Zustand
- * Handles authentication state for the Driver app
+ * Handles authentication state for the Driver app with Keycloak tokens.
  */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, { AuthStorage } from '../services/api';
 import type { UserInfo } from '../types/types';
 
 interface AuthState {
@@ -13,7 +14,7 @@ interface AuthState {
     token: string | null;
 
     // Actions
-    login: (token: string, user: UserInfo) => Promise<void>;
+    login: (accessToken: string, refreshToken: string, user: UserInfo) => Promise<void>;
     logout: () => Promise<void>;
     checkAuth: () => Promise<void>;
 }
@@ -24,11 +25,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     token: null,
 
-    login: async (token: string, user: UserInfo) => {
+    login: async (accessToken: string, refreshToken: string, user: UserInfo) => {
         try {
-            await AsyncStorage.setItem('auth_token', token);
-            await AsyncStorage.setItem('user_info', JSON.stringify(user));
-            set({ isAuthenticated: true, user, token, isLoading: false });
+            await AuthStorage.setToken(accessToken);
+            await AuthStorage.setRefreshToken(refreshToken);
+            await AuthStorage.setUserInfo(user);
+            set({ isAuthenticated: true, user, token: accessToken, isLoading: false });
         } catch (error) {
             console.error('Failed to save auth data:', error);
             throw error;
@@ -37,7 +39,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     logout: async () => {
         try {
-            await AsyncStorage.multiRemove(['auth_token', 'user_info']);
+            // Best-effort server-side logout
+            const refreshToken = await AuthStorage.getRefreshToken();
+            if (refreshToken) {
+                try {
+                    await api.post('/auth/logout', { refresh_token: refreshToken });
+                } catch {
+                    // Ignore — still clear local state
+                }
+            }
+            await AuthStorage.clear();
             set({ isAuthenticated: false, user: null, token: null, isLoading: false });
         } catch (error) {
             console.error('Failed to clear auth data:', error);
@@ -47,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     checkAuth: async () => {
         try {
             const [token, userJson] = await Promise.all([
-                AsyncStorage.getItem('auth_token'),
+                AsyncStorage.getItem('access_token') || AsyncStorage.getItem('auth_token'),
                 AsyncStorage.getItem('user_info'),
             ]);
 

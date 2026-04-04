@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Login from '@/pages/Login/Login';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 // Layouts e Componentes do Operador de Portaria
 const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorQuick'));
@@ -35,31 +36,31 @@ const commonRoutes = [
 const gateRoutes = [
   ...commonRoutes,
   // Redirect bare /gate to /gate/1 for backwards compat
-  { path: '/gate', element: <Navigate to="/gate/1" replace /> },
+  { path: '/gate', element: <ProtectedRoute allowedRoles={['operator']}><Navigate to="/gate/1" replace /></ProtectedRoute> },
   {
     path: '/gate/:gateId',
-    element: <GateQuickLayout />,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateQuickLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Dashboard /> },
     ],
   },
   {
     path: '/gate/:gateId/arrivals',
-    element: <GateDetailLayout />,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ArrivalsList /> },
     ],
   },
   {
     path: '/gate/:gateId/arrival/:id',
-    element: <GateDetailLayout />,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ArrivalDetail /> },
     ],
   },
   {
     path: '/gate/:gateId/alerts',
-    element: <GateDetailLayout />,
+    element: <ProtectedRoute allowedRoles={['operator']}><GateDetailLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <AlertsPage /> },
     ],
@@ -73,7 +74,7 @@ const managerRoutes = [
   ...commonRoutes,
   {
     path: '/manager',
-    element: <ManagerLayout />,
+    element: <ProtectedRoute allowedRoles={['manager']}><ManagerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'shifts', element: <ShiftsPage /> },

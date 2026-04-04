@@ -119,8 +119,13 @@ class GateWebSocket {
             }
         }
 
-        const url = `${this.baseUrl}/ws/gate/${this.gateId}`;
-        console.log(`[WS] Connecting to ${url}...`);
+        const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token');
+        if (!token) {
+            console.warn('[WS] No auth token available, skipping connection');
+            return;
+        }
+        const url = `${this.baseUrl}/ws/gate/${this.gateId}?token=${encodeURIComponent(token)}`;
+        console.log(`[WS] Connecting to ${this.baseUrl}/ws/gate/${this.gateId}...`);
 
         try {
             this.ws = new WebSocket(url);
