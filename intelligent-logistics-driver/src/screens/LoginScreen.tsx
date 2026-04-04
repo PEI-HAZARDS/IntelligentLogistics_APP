@@ -53,7 +53,7 @@ export default function LoginScreen() {
         // Simular delay de rede
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        await authLogin('mock-token-for-testing', MOCK_USER);
+        await authLogin('mock-token-for-testing', 'mock-refresh-token', MOCK_USER);
         haptics.success();
         setIsLoading(false);
     };

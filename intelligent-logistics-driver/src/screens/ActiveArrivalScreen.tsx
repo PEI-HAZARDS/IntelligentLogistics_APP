@@ -154,7 +154,7 @@ function getStatusColors(phase: DeliveryPhase): { bg: string; text: string; acce
 }
 
 export default function ActiveArrivalScreen() {
-    const { user } = useAuthStore();
+    const { user, token } = useAuthStore();
     const driversLicense = user?.drivers_license || '';
     const driverName = user?.name || 'Driver';
 
@@ -253,12 +253,12 @@ export default function ActiveArrivalScreen() {
 
     // WebSocket: listen for gate approval while in_transit
     useEffect(() => {
-        if (deliveryPhase !== 'in_transit' || !driversLicense) {
+        if (deliveryPhase !== 'in_transit' || !driversLicense || !token) {
             setIsWsConnected(false);
             return;
         }
 
-        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}`);
+        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}?token=${encodeURIComponent(token || '')}`);
 
         ws.onopen = async () => {
             setIsWsConnected(true);
@@ -305,7 +305,7 @@ export default function ActiveArrivalScreen() {
         ws.onclose = () => setIsWsConnected(false);
 
         return () => ws.close();
-    }, [deliveryPhase, driversLicense, activeArrival?.id]);
+    }, [deliveryPhase, driversLicense, activeArrival?.id, token]);
 
     const onRefresh = () => {
         setIsRefreshing(true);
