@@ -17,6 +17,7 @@ const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/Mana
 const ShiftsPage = React.lazy(() => import('@/pages/logistics-manager/ShiftsPage'));
 const AnalyticsPage = React.lazy(() => import('@/pages/logistics-manager/AnalyticsPage'));
 const TransportPage = React.lazy(() => import('@/pages/logistics-manager/TransportPage'));
+const InfractionsPage = React.lazy(() => import('@/pages/logistics-manager/InfractionsPage'));
 const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
 const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
@@ -79,6 +80,7 @@ const managerRoutes = [
       { index: true, element: <ManagerDashboard /> },
       { path: 'shifts', element: <ShiftsPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'infractions', element: <InfractionsPage /> },
       { path: 'transport', element: <TransportPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'settings', element: <SettingsPage /> },

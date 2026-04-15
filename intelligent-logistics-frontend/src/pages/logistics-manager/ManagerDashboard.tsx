@@ -18,6 +18,7 @@ import {
     ShieldAlert,
     BarChart3,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import KPICard from "@/components/logistics-manager/KPICard";
 import { useSummaryStats, useVolumeData, useActiveAlerts, useDecisionAnalytics, useTransportStats } from "@/hooks/useStatistics";
@@ -38,6 +39,7 @@ export default function ManagerDashboard() {
     const [timeRange, setTimeRange] = useState<TimeRange>("today");
     const [isExporting, setIsExporting] = useState(false);
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
 
     const {
         data: summary,
@@ -166,30 +168,6 @@ export default function ManagerDashboard() {
                     isLoading={summaryLoading}
                 />
                 <KPICard
-                    title="Delay Index"
-                    value={summary ? summary.delayRate.toFixed(1) : "--"}
-                    unit="%"
-                    status={summary ? (summary.delayRate < 10 ? "ok" : summary.delayRate < 20 ? "warning" : "danger") : undefined}
-                    statusLabel={summary ? (summary.delayRate < 10 ? "Good" : summary.delayRate < 20 ? "Attention" : "Critical") : undefined}
-                    isLoading={summaryLoading}
-                />
-                <KPICard
-                    title="SLA Compliance"
-                    value={summary ? summary.slaCompliance.toFixed(1) : "--"}
-                    unit="%"
-                    status={summary ? (summary.slaCompliance >= 90 ? "ok" : "danger") : undefined}
-                    statusLabel={summary ? (summary.slaCompliance >= 90 ? "OK" : "Critical") : undefined}
-                    isLoading={summaryLoading}
-                />
-                <KPICard
-                    title="Avg. Turnaround"
-                    value={summary?.avgPermanenceMinutes ?? "--"}
-                    unit="min"
-                    status={summary ? (summary.avgPermanenceMinutes <= 45 ? "ok" : summary.avgPermanenceMinutes <= 75 ? "warning" : "danger") : undefined}
-                    statusLabel={summary ? (summary.avgPermanenceMinutes <= 45 ? "Efficient" : summary.avgPermanenceMinutes <= 75 ? "Normal" : "Slow") : undefined}
-                    isLoading={summaryLoading}
-                />
-                <KPICard
                     title="Avg. Waiting Time"
                     value={summary ? Math.round(summary.avgWaitingMinutes) : "--"}
                     unit="min"
@@ -204,19 +182,19 @@ export default function ManagerDashboard() {
                     statusLabel={summary?.peakHour ? `Peak: ${summary.peakHour.hour}h (${summary.peakHour.count})` : undefined}
                     isLoading={summaryLoading}
                 />
-                <KPICard
-                    title="Infractions"
-                    value={summary?.infractionCount ?? "--"}
-                    status={summary ? (summary.infractionCount === 0 ? "ok" : summary.infractionCount <= 3 ? "warning" : "danger") : undefined}
-                    statusLabel={summary ? (summary.infractionCount === 0 ? "Clear" : "Highway") : undefined}
-                    isLoading={summaryLoading}
-                />
-                <KPICard
-                    title="Completed"
-                    value={summary?.completedCount ?? "--"}
-                    statusLabel={summary?.scheduledCount !== undefined ? `${summary.scheduledCount} scheduled` : undefined}
-                    isLoading={summaryLoading}
-                />
+                <div
+                    onClick={() => navigate("/manager/infractions")}
+                    style={{ cursor: "pointer" }}
+                    title="View infraction details"
+                >
+                    <KPICard
+                        title="Infractions"
+                        value={summary?.infractionCount ?? "--"}
+                        status={summary ? (summary.infractionCount === 0 ? "ok" : summary.infractionCount <= 3 ? "warning" : "danger") : undefined}
+                        statusLabel={summary ? (summary.infractionCount === 0 ? "Clear" : "View details →") : undefined}
+                        isLoading={summaryLoading}
+                    />
+                </div>
                 <KPICard
                     title="Acceptance Rate"
                     value={decisions ? decisions.acceptanceRate.toFixed(1) : "--"}

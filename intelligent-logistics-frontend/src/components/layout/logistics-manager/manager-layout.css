@@ -202,9 +202,9 @@
     font-size: 2rem;
 }
 
-/* Secondary KPIs: 3 columns, compact */
+/* Secondary KPIs: 5 columns, compact */
 .kpi-grid-secondary {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     margin-bottom: 1.5rem;
 }
 
@@ -1120,6 +1120,60 @@
     width: 1px;
     height: 40px;
     background: var(--border-color);
+}
+
+/* ============================================================
+   INFRACTIONS PAGE
+   ============================================================ */
+
+.infractions-page {
+    min-height: 0;
+}
+
+.row-infraction td {
+    background: rgba(239, 68, 68, 0.04);
+}
+
+.row-infraction:hover td {
+    background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.infractions-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.pagination-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
 
 /* ============================================================
