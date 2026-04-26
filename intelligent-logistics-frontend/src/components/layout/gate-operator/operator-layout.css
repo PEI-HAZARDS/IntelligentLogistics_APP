@@ -1737,9 +1737,9 @@ html {
 }
 
 .status-badge.status-delayed {
-  background: var(--badge-warning-bg);
-  color: var(--badge-warning-text);
-  border: 1px solid var(--badge-warning-border);
+  background: rgba(234, 179, 8, 0.18);
+  color: #FDE047;
+  border: 1px solid rgba(234, 179, 8, 0.45);
 }
 
 .status-badge.status-completed {
