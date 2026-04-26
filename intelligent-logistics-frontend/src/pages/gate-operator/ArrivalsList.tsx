@@ -152,10 +152,12 @@ function ArrivalsList() {
   const fetchData = useCallback(async () => {
     setError(null);
     try {
+      const today = new Date().toISOString().split("T")[0];
       const arrivalsParams: ArrivalsQueryParams = {
         gate_id: Number(gateId),
         page: currentPage,
         limit: ITEMS_PER_PAGE,
+        scheduled_date: today,
       };
       if (statusFilter === "Violators") {
         arrivalsParams.highway_infraction = true;

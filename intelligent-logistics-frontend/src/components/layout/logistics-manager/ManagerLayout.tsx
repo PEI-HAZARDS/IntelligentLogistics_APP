@@ -9,6 +9,7 @@ import {
     LayoutDashboard,
     Calendar,
     TrendingUp,
+    ShieldAlert,
     Truck,
     FileText,
     Settings,
@@ -24,6 +25,7 @@ const navigationItems: NavItem[] = [
     { path: "/manager", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { path: "/manager/shifts", label: "Shifts", icon: <Calendar size={18} /> },
     { path: "/manager/analytics", label: "Analytics", icon: <TrendingUp size={18} /> },
+    { path: "/manager/infractions", label: "Infractions", icon: <ShieldAlert size={18} /> },
     { path: "/manager/transport", label: "Carriers", icon: <Truck size={18} /> },
 ];
 

@@ -17,7 +17,8 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
-import { useVolumeData, useAlertsBreakdown, useTransportStats } from "@/hooks/useStatistics";
+import { useVolumeData, useAlertsBreakdown, useTransportStats, useSummaryStats, useDecisionAnalytics } from "@/hooks/useStatistics";
+import KPICard from "@/components/logistics-manager/KPICard";
 
 type AnalyticsRange = "week" | "month" | "quarter" | "year";
 
@@ -62,6 +63,8 @@ export default function AnalyticsPage() {
     const { data: volumeData = [], isLoading: volLoading, isError: volError } = useVolumeData(from, to, "day");
     const { data: alertsBreakdown = [], isLoading: alertsLoading, isError: alertsError } = useAlertsBreakdown(from, to);
     const { data: transportStats = [], isLoading: transportLoading, isError: transportError } = useTransportStats(from, to);
+    const { data: summary, isLoading: summaryLoading } = useSummaryStats();
+    const { data: decisions, isLoading: decisionsLoading } = useDecisionAnalytics();
 
     const isLoading = volLoading || alertsLoading || transportLoading;
 
@@ -142,6 +145,48 @@ export default function AnalyticsPage() {
                         <RefreshCw size={16} className={isLoading ? "spinning" : ""} />
                     </button>
                 </div>
+            </div>
+
+            {/* Performance KPIs */}
+            <div className="kpi-grid kpi-grid-transport" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+                <KPICard
+                    title="Delay Index"
+                    value={summary ? summary.delayRate.toFixed(1) : "--"}
+                    unit="%"
+                    status={summary ? (summary.delayRate < 10 ? "ok" : summary.delayRate < 20 ? "warning" : "danger") : undefined}
+                    statusLabel={summary ? (summary.delayRate < 10 ? "Good" : summary.delayRate < 20 ? "Attention" : "Critical") : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="SLA Compliance"
+                    value={summary ? summary.slaCompliance.toFixed(1) : "--"}
+                    unit="%"
+                    status={summary ? (summary.slaCompliance >= 90 ? "ok" : "danger") : undefined}
+                    statusLabel={summary ? (summary.slaCompliance >= 90 ? "OK" : "Critical") : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Avg. Turnaround"
+                    value={summary?.avgPermanenceMinutes ?? "--"}
+                    unit="min"
+                    status={summary ? (summary.avgPermanenceMinutes <= 45 ? "ok" : summary.avgPermanenceMinutes <= 75 ? "warning" : "danger") : undefined}
+                    statusLabel={summary ? (summary.avgPermanenceMinutes <= 45 ? "Efficient" : summary.avgPermanenceMinutes <= 75 ? "Normal" : "Slow") : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Completed"
+                    value={summary?.completedCount ?? "--"}
+                    statusLabel={summary?.scheduledCount !== undefined ? `${summary.scheduledCount} scheduled` : undefined}
+                    isLoading={summaryLoading}
+                />
+                <KPICard
+                    title="Acceptance Rate"
+                    value={decisions ? decisions.acceptanceRate.toFixed(1) : "--"}
+                    unit="%"
+                    status={decisions ? (decisions.acceptanceRate >= 80 ? "ok" : decisions.acceptanceRate >= 60 ? "warning" : "danger") : undefined}
+                    statusLabel={decisions ? `${decisions.totalDecisions} decisions` : undefined}
+                    isLoading={decisionsLoading}
+                />
             </div>
 
             {/* Analytics Cards Row */}

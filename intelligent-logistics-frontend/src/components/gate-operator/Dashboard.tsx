@@ -87,7 +87,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [expandedArrivalId, setExpandedArrivalId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
-  const [arrivalFilter, setArrivalFilter] = useState<"in_transit" | "delayed">("in_transit");
+  const [arrivalFilter, setArrivalFilter] = useState<"scheduled" | "in_transit">("scheduled");
 
   // API data states
   const [arrivals, setArrivals] = useState<ReturnType<typeof mapArrivalToUI>[]>([]);
@@ -150,15 +150,31 @@ export default function Dashboard() {
   const fetchData = useCallback(async () => {
     setArrivalsError(null);
     try {
-      const statusFilter = arrivalFilter === "delayed" ? "delayed" : "in_transit";
+      const today = new Date().toISOString().split("T")[0];
       const { getArrivals } = await import('@/services/arrivals');
-      const arrivalsData = await getArrivals({
-        gate_id: Number(gateId),
-        status: statusFilter,
-        page: 1,
-        limit: 10
-      });
-      setArrivals(arrivalsData.items.map(mapArrivalToUI));
+      const baseParams = { gate_id: Number(gateId), scheduled_date: today, page: 1, limit: 15 };
+
+      let items;
+      if (arrivalFilter === "scheduled") {
+        // Fetch scheduled + delayed in parallel, merge and sort
+        const [scheduledRes, delayedRes] = await Promise.all([
+          getArrivals({ ...baseParams, status: "scheduled" }),
+          getArrivals({ ...baseParams, status: "delayed" }),
+        ]);
+        const merged = [...scheduledRes.items, ...delayedRes.items].map(mapArrivalToUI);
+        // Delayed first, then by arrival time ascending
+        merged.sort((a, b) => {
+          const aD = a.status === "Delayed" ? 0 : 1;
+          const bD = b.status === "Delayed" ? 0 : 1;
+          if (aD !== bD) return aD - bD;
+          return a.arrivalTime.localeCompare(b.arrivalTime);
+        });
+        items = merged;
+      } else {
+        const res = await getArrivals({ ...baseParams, status: "in_transit" });
+        items = res.items.map(mapArrivalToUI);
+      }
+      setArrivals(items);
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setArrivalsError("Failed to load arrivals. Click refresh to try again.");
@@ -847,16 +863,16 @@ export default function Dashboard() {
 
         <div className="arrival-filter-toggle">
           <button
+            className={`arrival-filter-btn ${arrivalFilter === "scheduled" ? "active" : ""}`}
+            onClick={() => setArrivalFilter("scheduled")}
+          >
+            Scheduled
+          </button>
+          <button
             className={`arrival-filter-btn ${arrivalFilter === "in_transit" ? "active" : ""}`}
             onClick={() => setArrivalFilter("in_transit")}
           >
             In Transit
-          </button>
-          <button
-            className={`arrival-filter-btn ${arrivalFilter === "delayed" ? "active" : ""}`}
-            onClick={() => setArrivalFilter("delayed")}
-          >
-            Delayed
           </button>
         </div>
 
@@ -875,10 +891,10 @@ export default function Dashboard() {
             </div>
           ) : arrivals.length === 0 ? (
             <div className="empty-state">
-              {arrivalFilter === "in_transit" ? (
+              {arrivalFilter === "scheduled" ? (
                 <span>No scheduled arrivals.</span>
               ) : (
-                <span>No delayed arrivals.</span>
+                <span>No arrivals in transit.</span>
               )}
             </div>
           ) : (

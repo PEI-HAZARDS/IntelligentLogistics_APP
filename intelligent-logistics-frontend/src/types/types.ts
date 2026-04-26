@@ -136,9 +136,14 @@ export interface ArrivalsQueryParams {
     gate_id?: number;
     page?: number;
     limit?: number;
-    status?: string;
+    status?: AppointmentStatusEnum;
+    statuses?: string;
     search?: string;
     highway_infraction?: boolean;
+    scheduled_date?: string;
+    shift_gate_id?: number;
+    shift_type?: string;
+    shift_date?: string;
 }
 
 // ==================== ALERTS ====================
@@ -231,18 +236,6 @@ export interface ManagerOverview {
 }
 
 // ==================== API QUERY PARAMS ====================
-
-export interface ArrivalsQueryParams {
-    skip?: number;
-    limit?: number;
-    gate_id?: number;
-    shift_gate_id?: number;
-    shift_type?: string;
-    shift_date?: string;
-    status?: AppointmentStatusEnum;
-    scheduled_date?: string;
-    highway_infraction?: boolean;
-}
 
 export interface AlertsQueryParams {
     skip?: number;
