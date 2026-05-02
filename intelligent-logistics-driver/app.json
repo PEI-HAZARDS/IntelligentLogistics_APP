@@ -27,7 +27,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "This app uses your location to navigate to delivery destinations.",
+          "locationWhenInUsePermission": "This app uses your location to navigate to delivery destinations.",
+          "isIosBackgroundLocationEnabled": false
+        }
+      ]
     ]
   }
 }
