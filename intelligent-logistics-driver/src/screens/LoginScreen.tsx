@@ -24,18 +24,6 @@ import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/co
 import { haptics } from '../components/AnimatedComponents';
 import type { UserInfo } from '../types/types';
 
-// ===== MOCK MODE - REMOVER DEPOIS DE TESTAR =====
-const DEV_MOCK_MODE = false; // Mudar para false para usar API real
-
-const MOCK_USER: UserInfo = {
-    drivers_license: 'AB-123456',
-    name: 'João Silva (MOCK)',
-    company_nif: '501234567',
-    company_name: 'TransLogis',
-    role: 'driver',
-};
-// ===== FIM MOCK MODE =====
-
 export default function LoginScreen() {
     const [driversLicense, setDriversLicense] = useState('');
     const [password, setPassword] = useState('');
@@ -44,20 +32,6 @@ export default function LoginScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const authLogin = useAuthStore((state) => state.login);
-
-    // ===== MOCK LOGIN - REMOVER DEPOIS DE TESTAR =====
-    const handleMockLogin = async () => {
-        setIsLoading(true);
-        haptics.medium();
-
-        // Simular delay de rede
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        await authLogin('mock-token-for-testing', 'mock-refresh-token', MOCK_USER);
-        haptics.success();
-        setIsLoading(false);
-    };
-    // ===== FIM MOCK LOGIN =====
 
     const handleLogin = async () => {
         if (!driversLicense.trim() || !password.trim()) {
