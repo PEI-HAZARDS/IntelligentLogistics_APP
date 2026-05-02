@@ -182,18 +182,6 @@ export default function LoginScreen() {
                             )}
                         </TouchableOpacity>
 
-                        {/* ===== MOCK LOGIN BUTTON - REMOVER DEPOIS DE TESTAR ===== */}
-                        {DEV_MOCK_MODE && (
-                            <TouchableOpacity
-                                style={[styles.loginButton, styles.mockLoginButton, isLoading && styles.loginButtonDisabled]}
-                                onPress={handleMockLogin}
-                                disabled={isLoading}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.loginButtonText}>ENTRAR SEM API (TESTE)</Text>
-                            </TouchableOpacity>
-                        )}
-                        {/* ===== FIM MOCK LOGIN BUTTON ===== */}
                     </Animated.View>
 
                     {/* Footer */}
@@ -289,13 +277,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: spacing.sm,
     },
-    // ===== MOCK STYLE - REMOVER DEPOIS DE TESTAR =====
-    mockLoginButton: {
-        backgroundColor: '#f97316', // Orange for visibility
-        borderWidth: 2,
-        borderColor: '#ea580c',
-    },
-    // ===== FIM MOCK STYLE =====
     loginButtonDisabled: {
         opacity: 0.6,
     },
