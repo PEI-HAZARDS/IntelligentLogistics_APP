@@ -5,7 +5,7 @@
 
 // ==================== ENUMS ====================
 
-export type AppointmentStatusEnum = 'in_transit' | 'in_process' | 'canceled' | 'delayed' | 'completed';
+export type AppointmentStatusEnum = 'scheduled' | 'in_transit' | 'in_process' | 'unloading' | 'canceled' | 'delayed' | 'completed';
 export type DeliveryStatusEnum = 'not_started' | 'unloading' | 'completed';
 export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
 export type DirectionEnum = 'inbound' | 'outbound';
@@ -136,8 +136,14 @@ export interface ArrivalsQueryParams {
     gate_id?: number;
     page?: number;
     limit?: number;
-    status?: string;
+    status?: AppointmentStatusEnum;
+    statuses?: string;
     search?: string;
+    highway_infraction?: boolean;
+    scheduled_date?: string;
+    shift_gate_id?: number;
+    shift_type?: string;
+    shift_date?: string;
 }
 
 // ==================== ALERTS ====================
@@ -229,65 +235,7 @@ export interface ManagerOverview {
     statistics: Record<string, number>;
 }
 
-// ==================== DECISIONS / EVENTS ====================
-
-export interface DecisionIncomingRequest {
-    license_plate: string;
-    gate_id: number;
-    appointment_id: number;
-    decision: string;
-    status: string;
-    notes?: string | null;
-    alerts?: object[] | null;
-    extra_data?: object | null;
-}
-
-export interface QueryAppointmentsRequest {
-    time_frame?: number;
-    gate_id: number;
-}
-
-export interface DetectionEventRequest {
-    type: string;
-    license_plate?: string | null;
-    gate_id: number;
-    confidence?: number | null;
-    agent: string;
-    raw_data?: object | null;
-}
-
-export interface DetectionEvent {
-    _id?: string;
-    type: string;
-    license_plate?: string | null;
-    gate_id: number;
-    confidence?: number | null;
-    agent: string;
-    timestamp?: string;
-    raw_data?: object | null;
-}
-
-export interface DecisionEvent {
-    _id?: string;
-    license_plate: string;
-    gate_id: number;
-    decision: string;
-    timestamp?: string;
-    appointment_id?: number;
-}
-
 // ==================== API QUERY PARAMS ====================
-
-export interface ArrivalsQueryParams {
-    skip?: number;
-    limit?: number;
-    gate_id?: number;
-    shift_gate_id?: number;
-    shift_type?: string;
-    shift_date?: string;
-    status?: AppointmentStatusEnum;
-    scheduled_date?: string;
-}
 
 export interface AlertsQueryParams {
     skip?: number;
@@ -296,16 +244,3 @@ export interface AlertsQueryParams {
     visit_id?: number;
 }
 
-export interface DetectionEventsQueryParams {
-    license_plate?: string;
-    gate_id?: number;
-    event_type?: string;
-    limit?: number;
-}
-
-export interface DecisionEventsQueryParams {
-    license_plate?: string;
-    gate_id?: number;
-    decision?: string;
-    limit?: number;
-}

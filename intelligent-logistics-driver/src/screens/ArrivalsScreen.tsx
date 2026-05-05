@@ -14,7 +14,7 @@ import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import type { Appointment } from '../types/types';
 
 // ===== MOCK MODE - REMOVE AFTER TESTING =====
-const DEV_MOCK_MODE = true;
+const DEV_MOCK_MODE = false;
 
 const MOCK_ARRIVALS: Appointment[] = [
     {
@@ -25,7 +25,7 @@ const MOCK_ARRIVALS: Appointment[] = [
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date().toISOString(),
-        status: 'in_transit',
+        status: 'scheduled',
         notes: 'Container ABC-123',
     },
     {
@@ -63,6 +63,10 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' };
         case 'in_process':
             return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' };
+        case 'unloading':
+            return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
+        case 'scheduled':
+            return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8' };
         default:
             return { bg: 'rgba(234, 179, 8, 0.15)', text: '#eab308' };
     }
@@ -70,8 +74,10 @@ function getStatusColors(status: string): { bg: string; text: string } {
 
 function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
+        scheduled: 'Scheduled',
         in_transit: 'In Transit',
         in_process: 'At Port',
+        unloading: 'Unloading',
         delayed: 'Delayed',
         completed: 'Completed',
         canceled: 'Canceled',
@@ -94,7 +100,7 @@ export default function ArrivalsScreen() {
                 setArrivals(MOCK_ARRIVALS);
                 return;
             }
-            const data = await getMyTodayArrivals(driversLicense);
+            const data = await getMyTodayArrivals();
             setArrivals(data);
         } catch (err) {
             console.error('Failed to fetch arrivals:', err);
@@ -120,12 +126,7 @@ export default function ArrivalsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Animated.View style={styles.header} entering={FadeIn.duration(400)}>
-                <Text style={styles.title}>Today's Arrivals</Text>
-                <Text style={styles.subtitle}>{arrivals.length} scheduled</Text>
-            </Animated.View>
-
+        <View style={styles.container}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -193,7 +194,7 @@ export default function ArrivalsScreen() {
                     })
                 )}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -221,6 +222,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
         paddingBottom: spacing.xl,
     },
     card: {

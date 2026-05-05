@@ -27,8 +27,10 @@ import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 // Map status to English
 function mapStatusToLabel(status: string): string {
     const statusMap: Record<string, string> = {
+        scheduled: 'Scheduled',
         in_transit: 'In Transit',
         in_process: 'In Process',
+        unloading: 'Unloading',
         delayed: 'Delayed',
         completed: 'Completed',
         canceled: 'Canceled',
@@ -47,6 +49,10 @@ function getStatusColors(status: string): { bg: string; text: string } {
             return { bg: colors.status.canceledBg, text: colors.status.canceled };
         case 'in_process':
             return { bg: colors.status.inProcessBg, text: colors.status.inProcess };
+        case 'unloading':
+            return { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' };
+        case 'scheduled':
+            return { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8' };
         default:
             return { bg: colors.status.inTransitBg, text: colors.status.inTransit };
     }
@@ -68,7 +74,7 @@ export default function HomeScreen() {
         truck_license_plate: '00-AA-00',
         terminal_id: 1,
         scheduled_start_time: new Date().toISOString(),
-        status: 'in_transit',
+        status: 'scheduled',
         notes: 'Container ABC-123',
     };
 
@@ -81,7 +87,7 @@ export default function HomeScreen() {
             truck_license_plate: '00-AA-00',
             terminal_id: 1,
             scheduled_start_time: new Date().toISOString(),
-            status: 'in_transit',
+            status: 'scheduled',
             notes: 'Container ABC-123',
         },
         {
@@ -142,8 +148,8 @@ export default function HomeScreen() {
             // ===== FIM MOCK DATA =====
 
             const [active, today] = await Promise.all([
-                getMyActiveArrival(driversLicense),
-                getMyTodayArrivals(driversLicense),
+                getMyActiveArrival(),
+                getMyTodayArrivals(),
             ]);
 
             setActiveArrival(active);
@@ -180,7 +186,7 @@ export default function HomeScreen() {
         setSuccessMessage(null);
 
         try {
-            const result = await claimArrival(driversLicense, {
+            const result = await claimArrival({
                 arrival_id: pinCode.trim(),
             });
 
@@ -232,33 +238,6 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Ionicons name="car" size={28} color={colors.primary} />
-                    <View style={styles.headerText}>
-                        <Text style={styles.headerTitle}>Intelligent Logistics</Text>
-                        <Text style={styles.driverName}>Hello, {driverName}</Text>
-                    </View>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        onPress={onRefresh}
-                        disabled={isLoading || isRefreshing}
-                    >
-                        {isLoading || isRefreshing ? (
-                            <ActivityIndicator size="small" color={colors.text.primary} />
-                        ) : (
-                            <Ionicons name="refresh" size={20} color={colors.text.primary} />
-                        )}
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.iconButton, styles.logoutButton]} onPress={logout}>
-                        <Ionicons name="log-out-outline" size={20} color="#f87171" />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
             <ScrollView
                 style={styles.main}
                 contentContainerStyle={styles.mainContent}

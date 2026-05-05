@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login as workerLogin } from "@/services/workers";
+import { login as authLogin } from "@/services/auth";
 import "./Login.css";
 
 export default function Login() {
@@ -20,27 +20,36 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Worker (operator/manager) login - uses email
-      const response = await workerLogin({
-        email: email,
-        password: password,
-      });
+      // Worker (operator/manager) login via Keycloak
+      const response = await authLogin(email, password);
 
-      // Store token and worker info
-      localStorage.setItem("auth_token", response.token);
-      localStorage.setItem(
-        "user_info",
-        JSON.stringify({
-          num_worker: response.num_worker,
-          name: response.name,
-          email: response.email,
-          active: response.active,
-          role: "operator",
-        })
-      );
+      // Tokens and user_info are stored by authLogin().
+      // Determine role from user_info for redirect.
+      const role = response.user_info?.role || "operator";
 
-      // Redirect based on mode
-      if (mode === 'manager') {
+      // Enforce role-mode matching: managers can only use the manager app,
+      // operators can only use the gate app.
+      if (mode === 'manager' && role !== 'manager') {
+        // Operator tried to log in to the manager app
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        setError("Access denied. This application is for managers only.");
+        return;
+      }
+      if (mode === 'gate' && role === 'manager') {
+        // Manager tried to log in to the gate app
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        setError("Access denied. This application is for gate operators only.");
+        return;
+      }
+
+      // Redirect based on role
+      if (role === 'manager') {
         nav("/manager");
       } else {
         nav("/gate/1");

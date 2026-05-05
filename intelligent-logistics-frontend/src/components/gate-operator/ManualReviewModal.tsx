@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck, Clock } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Truck } from 'lucide-react';
 import { getArrivals } from '@/services/arrivals';
 import { submitManualReview } from '@/services/decisions';
 import type { Appointment } from '@/types/types';
@@ -23,6 +23,7 @@ export interface ManualReviewData {
 interface ManualReviewModalProps {
     isOpen: boolean;
     reviewData: ManualReviewData | null;
+    gateId?: string;
     onClose: () => void;
     onHold: (data: ManualReviewData) => void;
     onDecisionComplete: (licensePlate: string, decision: 'accepted' | 'rejected') => void;
@@ -31,6 +32,7 @@ interface ManualReviewModalProps {
 export default function ManualReviewModal({
     isOpen,
     reviewData,
+    gateId,
     onClose,
     onHold,
     onDecisionComplete,
@@ -42,6 +44,7 @@ export default function ManualReviewModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchPlate, setSearchPlate] = useState('');
+    const [pendingDecision, setPendingDecision] = useState<'accepted' | 'rejected' | null>(null);
 
     // Load candidates when modal opens or reviewData changes
     useEffect(() => {
@@ -60,9 +63,26 @@ export default function ManualReviewModal({
             setSelectedAppointment(null);
             setError(null);
             setSearchPlate('');
+            setPendingDecision(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, reviewData?.id]);
+
+    // Handle ESC key to close modal with auto-hold
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen && reviewData) {
+                e.preventDefault();
+                onHold(reviewData);
+                onClose();
+            }
+        };
+
+        if (isOpen) {
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isOpen, reviewData, onHold, onClose]);
 
     // Filter candidates when search changes (client-side, like ArrivalsList)
     useEffect(() => {
@@ -82,11 +102,11 @@ export default function ManualReviewModal({
         setIsLoading(true);
         setError(null);
         try {
-            // Fetch all in_transit arrivals (like ArrivalsList does)
-            const results = await getArrivals({ status: 'in_transit', limit: 100 });
+            // Fetch in_transit arrivals filtered by this operator's gate
+            const gateFilter = gateId ? Number(gateId) : undefined;
+            const results = await getArrivals({ status: 'in_transit', limit: 100, gate_id: gateFilter });
             const appointments = results.items || [];
             setAllCandidates(appointments);
-
             // Apply initial filter if there's a detected plate
             const plate = reviewData?.licensePlate || '';
             if (plate && plate !== 'N/A') {
@@ -111,49 +131,19 @@ export default function ManualReviewModal({
         // The actual filtering happens in the useEffect above
     };
 
-    const handleApprove = async () => {
+    const submitDecision = async (decision: 'accepted' | 'rejected') => {
         setIsSubmitting(true);
         setError(null);
         try {
             const lp = (selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '').toUpperCase();
             const orig = reviewData?.originalPayload;
-
-            await submitManualReview({
-                // Preserve every field from the original agent-decision payload
-                license_plate: lp,
-                license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
-                un: orig?.un || reviewData?.UN || '',
-                kemler: orig?.kemler || reviewData?.kemler || '',
-                hazard_crop_url: orig?.hazard_crop_url || reviewData?.hzCropUrl || '',
-                alerts: orig?.alerts,
-                route: orig?.route || '',
-                truck_id: reviewData?.truckId,
-                // Override only the decision fields
-                decision: 'ACCEPTED',
-                decision_reason: `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment.id}`,
-                decision_source: 'operator',
-            });
-            onDecisionComplete(lp, 'accepted');
-            onClose();
-        } catch (err) {
-            console.error('Failed to approve:', err);
-            setError('Failed to submit decision. Try again.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleReject = async () => {
-        setIsSubmitting(true);
-        setError(null);
-        try {
-            const lp = selectedAppointment?.truck_license_plate || reviewData?.licensePlate || '';
-            const reason = selectedAppointment
+            const isApprove = decision === 'accepted';
+            const rejectReason = selectedAppointment
                 ? `OPERATOR_REJECTED_FOR_APPOINTMENT_${selectedAppointment.id}`
                 : 'OPERATOR_REJECTED';
-            const orig = reviewData?.originalPayload;
 
             await submitManualReview({
+                gate_id: gateId || String(orig?.gate_id || 1),
                 // Preserve every field from the original agent-decision payload
                 license_plate: lp,
                 license_crop_url: orig?.license_crop_url || reviewData?.lpCropUrl || '',
@@ -164,14 +154,17 @@ export default function ManualReviewModal({
                 route: orig?.route || '',
                 truck_id: reviewData?.truckId,
                 // Override only the decision fields
-                decision: 'REJECTED',
-                decision_reason: reason,
+                decision: isApprove ? 'ACCEPTED' : 'REJECTED',
+                decision_reason: isApprove
+                    ? `OPERATOR_ACCEPTED_FOR_APPOINTMENT_${selectedAppointment?.id || 'UNKNOWN'}`
+                    : rejectReason,
                 decision_source: 'operator',
             });
-            onDecisionComplete(lp, 'rejected');
+            onDecisionComplete(lp, decision);
+            setPendingDecision(null);
             onClose();
         } catch (err) {
-            console.error('Failed to reject:', err);
+            console.error('Failed to submit manual review decision:', err);
             setError('Failed to submit decision. Try again.');
         } finally {
             setIsSubmitting(false);
@@ -196,7 +189,6 @@ export default function ManualReviewModal({
 
                 {/* Body */}
                 <div className="modal-body">
-                    {/* Detection Info Section - Text Only */}
                     <div className="detection-info-section">
                         <div className="detected-data">
                             <div className="data-field">
@@ -294,14 +286,6 @@ export default function ManualReviewModal({
                 {/* Footer */}
                 <div className="modal-footer">
                     <button
-                        className="btn-reject"
-                        onClick={handleReject}
-                        disabled={isSubmitting}
-                    >
-                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <XCircle size={16} />}
-                        Reject
-                    </button>
-                    <button
                         className="btn-hold"
                         onClick={() => {
                             if (reviewData) onHold(reviewData);
@@ -310,18 +294,99 @@ export default function ManualReviewModal({
                         disabled={isSubmitting}
                         title="Hold and check camera feed"
                     >
-                        <Clock size={16} />
                         Hold
                     </button>
                     <button
+                        className="btn-reject"
+                        onClick={() => setPendingDecision('rejected')}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting && <Loader2 size={16} className="spin" />}
+                        Reject
+                    </button>
+                    <button
                         className="btn-approve"
-                        onClick={handleApprove}
+                        onClick={() => setPendingDecision('accepted')}
                         disabled={!selectedAppointment || isSubmitting}
                     >
-                        {isSubmitting ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />}
+                        {isSubmitting && <Loader2 size={16} className="spin" />}
                         Approve
                     </button>
                 </div>
+
+                {pendingDecision && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            backdropFilter: 'blur(4px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 40,
+                            padding: '1rem',
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '100%',
+                                maxWidth: '430px',
+                                background: 'var(--bg-dropdown)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '12px',
+                                padding: '1.5rem',
+                                boxShadow: 'var(--shadow-lg)',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                {pendingDecision === 'accepted' ? (
+                                    <CheckCircle size={18} color="#22c55e" />
+                                ) : (
+                                    <XCircle size={18} color="#ef4444" />
+                                )}
+                                <strong style={{ color: 'var(--text-primary)' }}>
+                                    Confirm {pendingDecision === 'accepted' ? 'Approve' : 'Reject'}
+                                </strong>
+                            </div>
+
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.85rem' }}>
+                                Plate: <strong>{(selectedAppointment?.truck_license_plate || reviewData.licensePlate || 'N/A').toUpperCase()}</strong>
+                            </p>
+
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                                {pendingDecision === 'accepted'
+                                    ? 'This will submit ACCEPTED and close this review.'
+                                    : 'This will submit REJECTED and close this review.'}
+                            </p>
+
+                            {error && (
+                                <div className="error-message" style={{ marginBottom: '1rem' }}>
+                                    <AlertTriangle size={16} />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                                <button
+                                    className="btn-hold"
+                                    onClick={() => setPendingDecision(null)}
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className={pendingDecision === 'accepted' ? 'btn-approve' : 'btn-reject'}
+                                    onClick={() => submitDecision(pendingDecision)}
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? <Loader2 size={16} className="spin" /> : null}
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>,
         document.body

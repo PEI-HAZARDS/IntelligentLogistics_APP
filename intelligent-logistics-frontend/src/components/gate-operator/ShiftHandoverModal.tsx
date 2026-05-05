@@ -15,6 +15,7 @@ interface ShiftHandoverModalProps {
 // Map API status to display label
 function getStatusLabel(status: string): string {
     const map: Record<string, string> = {
+        scheduled: 'Scheduled',
         in_transit: 'In Transit',
         delayed: 'Delayed',
         completed: 'Completed',

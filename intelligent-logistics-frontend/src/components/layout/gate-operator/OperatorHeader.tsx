@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
+import { logout as authLogout } from "@/services/auth";
 import ShiftHandoverModal from "@/components/gate-operator/ShiftHandoverModal";
 import {
     Bell,
@@ -128,8 +129,8 @@ export default function OperatorHeader() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem("auth_token");
+    const handleLogout = async () => {
+        await authLogout();
         navigate("/login");
     };
 

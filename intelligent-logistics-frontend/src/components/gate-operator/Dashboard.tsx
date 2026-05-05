@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
+import StreamPlayer from "./StreamPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
@@ -17,8 +18,10 @@ interface ExtendedAppointment extends Appointment {
 // Map API status to English display
 function mapStatusToLabel(status: string): string {
   const statusMap: Record<string, string> = {
+    scheduled: "Scheduled",
     in_transit: "In Transit",
     in_process: "In Process",
+    unloading: "Unloading",
     delayed: "Delayed",
     completed: "Completed",
     canceled: "Canceled",
@@ -84,7 +87,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [expandedArrivalId, setExpandedArrivalId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
-  const [arrivalFilter, setArrivalFilter] = useState<"in_transit" | "delayed">("in_transit");
+  const [arrivalFilter, setArrivalFilter] = useState<"scheduled" | "in_transit">("scheduled");
 
   // API data states
   const [arrivals, setArrivals] = useState<ReturnType<typeof mapArrivalToUI>[]>([]);
@@ -126,22 +129,52 @@ export default function Dashboard() {
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
   const gateId = rawGateId || "1";
 
-  // Stream quality switching via unified gate WebSocket (/ws/gate/{gate_id})
+  // Stream quality switching via unified WebSocket (/ws/gate/{gate_id})
   const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const isScalingTransition = Boolean(scalingDirection);
+  const scalingUp = scalingDirection === 'up';
+  const streamBadgeLabel = isScalingTransition
+    ? (scalingUp ? 'Up -> HD' : 'Down -> SD')
+    : (streamQuality === 'high' ? 'HD' : 'SD');
+  const streamBadgeBackground = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.2)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)');
+  const streamBadgeBorder = isScalingTransition
+    ? (scalingUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.5)')
+    : (streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)');
+  const streamBadgeColor = isScalingTransition
+    ? (scalingUp ? '#34d399' : '#fbbf24')
+    : (streamQuality === 'high' ? '#34d399' : '#94a3b8');
 
   // Fetch data function - only fetches arrivals (alerts come from WebSocket only)
   const fetchData = useCallback(async () => {
     setArrivalsError(null);
     try {
-      const statusFilter = arrivalFilter === "delayed" ? "delayed" : "in_transit";
+      const today = new Date().toISOString().split("T")[0];
       const { getArrivals } = await import('@/services/arrivals');
-      const arrivalsData = await getArrivals({
-        gate_id: Number(gateId),
-        status: statusFilter,
-        page: 1,
-        limit: 10
-      });
-      setArrivals(arrivalsData.items.map(mapArrivalToUI));
+      const baseParams = { gate_id: Number(gateId), scheduled_date: today, page: 1, limit: 15 };
+
+      let items;
+      if (arrivalFilter === "scheduled") {
+        // Fetch scheduled + delayed in parallel, merge and sort
+        const [scheduledRes, delayedRes] = await Promise.all([
+          getArrivals({ ...baseParams, status: "scheduled" }),
+          getArrivals({ ...baseParams, status: "delayed" }),
+        ]);
+        const merged = [...scheduledRes.items, ...delayedRes.items].map(mapArrivalToUI);
+        // Delayed first, then by arrival time ascending
+        merged.sort((a, b) => {
+          const aD = a.status === "Delayed" ? 0 : 1;
+          const bD = b.status === "Delayed" ? 0 : 1;
+          if (aD !== bD) return aD - bD;
+          return a.arrivalTime.localeCompare(b.arrivalTime);
+        });
+        items = merged;
+      } else {
+        const res = await getArrivals({ ...baseParams, status: "in_transit" });
+        items = res.items.map(mapArrivalToUI);
+      }
+      setArrivals(items);
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setArrivalsError("Failed to load arrivals. Click refresh to try again.");
@@ -161,6 +194,21 @@ export default function Dashboard() {
 
     // Skip non-decision messages (e.g. scale_network) — they are handled by other hooks
     if (data.message_type === "scale_network") return;
+
+    // Infraction decisions are visually handled by the WarningSign component,
+    // but we still need to re-fetch the upcoming arrivals so the infraction
+    // badge and stats update in real-time.
+    if (data.message_type === "infraction_decision") {
+      fetchData();
+      return;
+    }
+
+    // Status changes (e.g. driver claimed appointment → in_transit) need a refetch
+    // so the dashboard's upcoming arrivals list reflects the new status immediately.
+    if (data.message_type === "status_changed") {
+      fetchData();
+      return;
+    }
 
 
 
@@ -523,78 +571,20 @@ export default function Dashboard() {
         <div className="camera-section">
           <div className="video-area">
             {streamUrl ? (
-              <iframe
-                src={streamUrl}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  background: '#000',
-                }}
-                allow="autoplay; fullscreen"
-                title={`Gate ${gateId} Stream (${streamQuality})`}
+              <StreamPlayer
+                streamUrl={streamUrl}
+                quality={streamQuality}
+                autoPlay={true}
               />
             ) : (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#000',
-                color: '#666',
-              }}>
-                Loading stream...
-              </div>
+              <StreamPlayer
+                streamUrl=""
+                quality="low"
+                autoPlay={false}
+              />
             )}
 
-            {/* Stream Scaling Overlay */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                zIndex: 30,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'none',
-                opacity: scalingDirection ? 1 : 0,
-                transition: 'opacity 0.4s ease-in-out',
-              }}
-            >
-              <div
-                style={{
-                  padding: '0.6rem 1.5rem',
-                  borderRadius: '0.75rem',
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  letterSpacing: '0.03em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid',
-                  background: scalingDirection === 'up'
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'rgba(245, 158, 11, 0.2)',
-                  borderColor: scalingDirection === 'up'
-                    ? 'rgba(16, 185, 129, 0.5)'
-                    : 'rgba(245, 158, 11, 0.5)',
-                  color: scalingDirection === 'up' ? '#34d399' : '#fbbf24',
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {scalingDirection === 'up' ? (
-                    <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
-                  ) : (
-                    <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
-                  )}
-                </svg>
-                {scalingDirection === 'up' ? 'Scaling Up — HD' : 'Scaling Down — SD'}
-              </div>
-            </div>
-
-            {/* Top Left — Stream Quality Badge */}
+            {/* Top Left — Unified Stream Badge */}
             <div
               style={{
                 position: 'absolute',
@@ -615,20 +605,34 @@ export default function Dashboard() {
                   alignItems: 'center',
                   gap: '0.4rem',
                   border: '1px solid',
-                  background: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
-                  borderColor: streamQuality === 'high' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(100, 116, 139, 0.4)',
-                  color: streamQuality === 'high' ? '#34d399' : '#94a3b8',
+                  background: streamBadgeBackground,
+                  borderColor: streamBadgeBorder,
+                  color: streamBadgeColor,
+                  minWidth: isScalingTransition ? '104px' : '56px',
+                  justifyContent: 'center',
+                  transform: isScalingTransition ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'min-width 0.35s ease, transform 0.35s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
                 }}
               >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: streamQuality === 'high' ? '#34d399' : '#94a3b8',
-                  }}
-                />
-                {streamQuality === 'high' ? 'HD' : 'SD'}
+                {isScalingTransition ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {scalingUp ? (
+                      <><polyline points="18 15 12 9 6 15" /><line x1="12" y1="9" x2="12" y2="21" /></>
+                    ) : (
+                      <><polyline points="6 9 12 15 18 9" /><line x1="12" y1="3" x2="12" y2="15" /></>
+                    )}
+                  </svg>
+                ) : (
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: streamBadgeColor,
+                    }}
+                  />
+                )}
+                {streamBadgeLabel}
               </div>
             </div>
           </div>
@@ -720,7 +724,9 @@ export default function Dashboard() {
                     <span className="decision-badge decision-manual-review">
                       HELD
                     </span>
-                    <span className="detection-time">{held.timestamp}</span>
+                    <span className="detection-time">
+                      {new Date(held.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
                   <div className="detection-fields">
                     <div className="detection-field">
@@ -791,7 +797,7 @@ export default function Dashboard() {
                   <div className="detection-header">
                     {detection.decision ? (
                       <span className={`decision-badge decision-${detection.decision.toLowerCase().replace('_', '-')}`}>
-                        {detection.decision}
+                        {detection.decision.replace('_', ' ')}
                       </span>
                     ) : (
                       <span className="decision-badge decision-manual-review">UNKNOWN</span>
@@ -801,7 +807,7 @@ export default function Dashboard() {
                         {detection.decisionSource === 'automated' ? 'Automated' : 'Operator'}
                       </span>
                     )}
-                    {detection.decisionReason && <span className="decision-reason">{detection.decisionReason}</span>}
+                    {detection.decisionReason && <span className="decision-reason">{detection.decisionReason.replace(/_/g, ' ')}</span>}
                     <span className="detection-time">{detection.time}</span>
                   </div>
 
@@ -857,16 +863,16 @@ export default function Dashboard() {
 
         <div className="arrival-filter-toggle">
           <button
+            className={`arrival-filter-btn ${arrivalFilter === "scheduled" ? "active" : ""}`}
+            onClick={() => setArrivalFilter("scheduled")}
+          >
+            Scheduled
+          </button>
+          <button
             className={`arrival-filter-btn ${arrivalFilter === "in_transit" ? "active" : ""}`}
             onClick={() => setArrivalFilter("in_transit")}
           >
             In Transit
-          </button>
-          <button
-            className={`arrival-filter-btn ${arrivalFilter === "delayed" ? "active" : ""}`}
-            onClick={() => setArrivalFilter("delayed")}
-          >
-            Delayed
           </button>
         </div>
 
@@ -885,10 +891,10 @@ export default function Dashboard() {
             </div>
           ) : arrivals.length === 0 ? (
             <div className="empty-state">
-              {arrivalFilter === "in_transit" ? (
+              {arrivalFilter === "scheduled" ? (
                 <span>No scheduled arrivals.</span>
               ) : (
-                <span>No delayed arrivals.</span>
+                <span>No arrivals in transit.</span>
               )}
             </div>
           ) : (
@@ -908,7 +914,7 @@ export default function Dashboard() {
                       <span className="arrival-time">{arrival.arrivalTime}</span>
                     </div>
                     <div className="header-status">
-                      <span className="status-badge-wrapper" style={{ display: 'flex', gap: '0.5rem' }}>
+                      <span className="status-badge-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                         <span
                           className={`status-badge status-${arrival.status
                             .toLowerCase()

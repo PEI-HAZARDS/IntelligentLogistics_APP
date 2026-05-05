@@ -24,18 +24,6 @@ import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/co
 import { haptics } from '../components/AnimatedComponents';
 import type { UserInfo } from '../types/types';
 
-// ===== MOCK MODE - REMOVER DEPOIS DE TESTAR =====
-const DEV_MOCK_MODE = true; // Mudar para false para usar API real
-
-const MOCK_USER: UserInfo = {
-    drivers_license: 'AB-123456',
-    name: 'João Silva (MOCK)',
-    company_nif: '501234567',
-    company_name: 'TransLogis',
-    role: 'driver',
-};
-// ===== FIM MOCK MODE =====
-
 export default function LoginScreen() {
     const [driversLicense, setDriversLicense] = useState('');
     const [password, setPassword] = useState('');
@@ -44,20 +32,6 @@ export default function LoginScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const authLogin = useAuthStore((state) => state.login);
-
-    // ===== MOCK LOGIN - REMOVER DEPOIS DE TESTAR =====
-    const handleMockLogin = async () => {
-        setIsLoading(true);
-        haptics.medium();
-
-        // Simular delay de rede
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        await authLogin('mock-token-for-testing', MOCK_USER);
-        haptics.success();
-        setIsLoading(false);
-    };
-    // ===== FIM MOCK LOGIN =====
 
     const handleLogin = async () => {
         if (!driversLicense.trim() || !password.trim()) {
@@ -75,14 +49,14 @@ export default function LoginScreen() {
             });
 
             const userInfo: UserInfo = {
-                drivers_license: response.drivers_license,
-                name: response.name,
-                company_nif: response.company_nif,
-                company_name: response.company_name,
+                drivers_license: response.user_info.drivers_license,
+                name: response.user_info.name,
+                company_nif: response.user_info.company_nif,
+                company_name: response.user_info.company_name,
                 role: 'driver',
             };
 
-            await authLogin(response.token, userInfo);
+            await authLogin(response.access_token, response.refresh_token, userInfo);
             haptics.success();
         } catch (err: unknown) {
             console.error('Login error:', err);
@@ -208,18 +182,6 @@ export default function LoginScreen() {
                             )}
                         </TouchableOpacity>
 
-                        {/* ===== MOCK LOGIN BUTTON - REMOVER DEPOIS DE TESTAR ===== */}
-                        {DEV_MOCK_MODE && (
-                            <TouchableOpacity
-                                style={[styles.loginButton, styles.mockLoginButton, isLoading && styles.loginButtonDisabled]}
-                                onPress={handleMockLogin}
-                                disabled={isLoading}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.loginButtonText}>ENTRAR SEM API (TESTE)</Text>
-                            </TouchableOpacity>
-                        )}
-                        {/* ===== FIM MOCK LOGIN BUTTON ===== */}
                     </Animated.View>
 
                     {/* Footer */}
@@ -315,13 +277,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: spacing.sm,
     },
-    // ===== MOCK STYLE - REMOVER DEPOIS DE TESTAR =====
-    mockLoginButton: {
-        backgroundColor: '#f97316', // Orange for visibility
-        borderWidth: 2,
-        borderColor: '#ea580c',
-    },
-    // ===== FIM MOCK STYLE =====
     loginButtonDisabled: {
         opacity: 0.6,
     },

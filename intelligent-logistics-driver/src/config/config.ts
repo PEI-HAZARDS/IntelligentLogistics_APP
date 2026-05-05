@@ -7,7 +7,10 @@
 export const API_CONFIG = {
     // Base URL for the API Gateway
     // TODO: Change this to your production URL for release builds
-    baseUrl: 'http://10.255.32.70:8000/api',
+    baseUrl: 'http://localhost:8000/api',
+
+    // WebSocket base URL (derived from baseUrl)
+    wsUrl: 'ws://localhost:8000/api',
 
     // Request timeout in milliseconds
     timeout: 30000,
