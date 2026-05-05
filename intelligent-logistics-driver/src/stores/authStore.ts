@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     checkAuth: async () => {
         try {
             const [token, userJson] = await Promise.all([
-                AsyncStorage.getItem('access_token') || AsyncStorage.getItem('auth_token'),
+                AuthStorage.getToken(),
                 AsyncStorage.getItem('user_info'),
             ]);
 

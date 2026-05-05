@@ -21,6 +21,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import KPICard from "@/components/logistics-manager/KPICard";
+import GrafanaPanel from "@/components/common/GrafanaPanel";
+
 import { useSummaryStats, useVolumeData, useActiveAlerts, useDecisionAnalytics, useTransportStats } from "@/hooks/useStatistics";
 import { exportToPDF, exportToCSV } from "@/services/exportService";
 import type { Alert } from "@/types/types";
@@ -45,6 +47,7 @@ export default function ManagerDashboard() {
         data: summary,
         isLoading: summaryLoading,
         isError: summaryError,
+        dataUpdatedAt: summaryUpdatedAt,
     } = useSummaryStats();
 
     const {
@@ -102,7 +105,7 @@ export default function ManagerDashboard() {
                 <div>
                     <h1 className="dashboard-title">Dashboard</h1>
                     <span className="dashboard-subtitle">
-                        Last updated: {new Date().toLocaleTimeString('en-GB')}
+                        Last updated: {summaryUpdatedAt ? new Date(summaryUpdatedAt).toLocaleTimeString('en-GB') : '--:--:--'}
                         {hasError && (
                             <span className="dashboard-api-error"> · API error</span>
                         )}
@@ -325,12 +328,11 @@ export default function ManagerDashboard() {
                     <span className="dashboard-subtitle">5G network metrics</span>
                 </div>
                 <div className="w-full h-56 md:h-72 lg:h-80">
-                    <iframe
-                        src="http://10.255.32.141:3000/d-solo/adcptvw/new-dashboard?orgId=1&timezone=browser&refresh=5s&panelId=panel-1&__feature.dashboardScene=true"
-                        className="w-full h-full border-0"
-                        frameBorder="0"
+                    <GrafanaPanel
+                        dashboardId="adcptvw/new-dashboard"
+                        panelId="panel-1"
                         title="Energy consumption panel"
-                    ></iframe>
+                    />
                 </div>
             </div>
         </div>

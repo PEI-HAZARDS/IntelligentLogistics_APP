@@ -17,6 +17,8 @@ export interface AppConfig {
     apiBaseUrl: string;
     /** WebSocket base URL */
     wsBaseUrl: string;
+    /** Grafana base URL for embedded panels */
+    grafanaUrl: string;
 }
 
 // Default configuration - customize per installation
@@ -25,8 +27,9 @@ const config: AppConfig = {
     subtitle: import.meta.env.VITE_SUBTITLE || 'Intelligent Logistics',
     logoPath: import.meta.env.VITE_LOGO_PATH || '/logo.png',
     supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@intelligentlogistics.com',
-    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://10.255.32.70:8000/api',
-    wsBaseUrl: import.meta.env.VITE_WS_URL || 'ws://10.255.32.70:8000/api',
+    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+    wsBaseUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api',
+    grafanaUrl: import.meta.env.VITE_GRAFANA_URL || 'http://localhost:3000',
 };
 
 export default config;
@@ -40,5 +43,6 @@ declare global {
         VITE_SUPPORT_EMAIL?: string;
         VITE_API_URL?: string;
         VITE_WS_URL?: string;
+        VITE_GRAFANA_URL?: string;
     }
 }

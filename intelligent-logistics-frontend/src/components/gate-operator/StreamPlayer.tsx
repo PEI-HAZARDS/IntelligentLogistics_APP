@@ -40,7 +40,7 @@ export default function StreamPlayer({ streamUrl, autoPlay = true }: StreamPlaye
         className="camera-feed"
         style={{ border: "none" }}
         allowFullScreen
-        allow="fullscreen; picture-in-picture"
+        allow="autoplay; fullscreen; picture-in-picture"
         title="Live stream"
       />
     </div>

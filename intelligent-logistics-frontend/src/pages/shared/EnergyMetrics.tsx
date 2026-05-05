@@ -1,4 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext';
+import GrafanaPanel from '@/components/common/GrafanaPanel';
 import { Sun, Moon } from 'lucide-react';
 
 export default function EnergyMetrics() {
@@ -11,7 +12,6 @@ export default function EnergyMetrics() {
             : "bg-slate-50 text-slate-900"
         }`}
       >
-        {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
           className={`absolute top-6 right-6 p-3 rounded-lg border transition-all ${
@@ -49,12 +49,11 @@ export default function EnergyMetrics() {
             }`}
           >
             <div className="w-full h-32 sm:h-52 md:h-64 lg:h-80">
-            <iframe
-              src="http://10.255.32.141:3000/d-solo/adcptvw/new-dashboard?orgId=1&timezone=browser&refresh=5s&panelId=panel-1&__feature.dashboardScene=true"
-              className="w-full h-full border-0"
-              frameBorder="0"
-              title="Energy consumption panel"
-            ></iframe>
+                <GrafanaPanel
+                    dashboardId="adcptvw/new-dashboard"
+                    panelId="panel-1"
+                    title="Energy consumption panel"
+                />
             </div>
           </div>
         </div>
