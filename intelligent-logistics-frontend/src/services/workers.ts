@@ -4,8 +4,6 @@
  */
 import api from '@/lib/api';
 import type {
-    WorkerLoginRequest,
-    WorkerLoginResponse,
     WorkerInfo,
     OperatorDashboard,
     ManagerOverview,
@@ -15,14 +13,6 @@ import type {
 } from '@/types/types';
 
 const BASE_PATH = '/workers';
-
-/**
- * Worker login (operator or manager)
- */
-export async function login(credentials: WorkerLoginRequest): Promise<WorkerLoginResponse> {
-    const response = await api.post<WorkerLoginResponse>(`${BASE_PATH}/login`, credentials);
-    return response.data;
-}
 
 /**
  * List all operators
