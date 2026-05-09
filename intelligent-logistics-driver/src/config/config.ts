@@ -7,10 +7,10 @@
 export const API_CONFIG = {
     // Base URL for the API Gateway
     // TODO: Change this to your production URL for release builds
-    baseUrl: 'http://localhost:8000/api',
+    baseUrl: process.env.EXPO_PUBLIC_API_URL,
 
     // WebSocket base URL (derived from baseUrl)
-    wsUrl: 'ws://localhost:8000/api',
+    wsUrl: process.env.EXPO_PUBLIC_WS_URL,
 
     // Request timeout in milliseconds
     timeout: 30000,
