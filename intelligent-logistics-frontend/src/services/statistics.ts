@@ -6,9 +6,10 @@ import api from '@/lib/api';
 
 export interface DashboardSummary {
     trucksInPort: number;
-    trucksInTransit: number;
+    trucksInTransit: number;          // on-time in_transit (not yet delayed)
+    trucksInTransitDelayed?: number;  // in_transit past scheduled time
     scheduledCount: number;
-    unloadingCount: number;
+    unloadingCount: number;           // in_process with active unloading Visit
     completedCount: number;
     entriesCount: number;
     exitsCount: number;
