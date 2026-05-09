@@ -233,8 +233,16 @@ export default function InfractionsPage() {
                                             <td>{dateTime}</td>
                                             <td>{gate}</td>
                                             <td>
-                                                <span className={`status-badge ${statusBadgeClass(item.status)}`}>
-                                                    {statusLabel(item.status)}
+                                                <span style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                    <span className={`status-badge ${statusBadgeClass((item as any).primary_status ?? item.status)}`}>
+                                                        {statusLabel((item as any).primary_status ?? item.status)}
+                                                    </span>
+                                                    {((item as any).is_delayed ?? item.status === 'delayed') && (
+                                                        <span className="status-badge status-delayed-substate">Delayed</span>
+                                                    )}
+                                                    {((item as any).is_unloading ?? item.status === 'unloading') && (
+                                                        <span className="status-badge status-unloading-substate">Unloading</span>
+                                                    )}
                                                 </span>
                                             </td>
                                         </tr>

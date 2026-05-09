@@ -336,3 +336,18 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* Sub-state badges — shown alongside the primary status badge */
+.status-badge.status-delayed-substate {
+  background: rgba(234, 179, 8, 0.12);
+  color: #FDE047;
+  border: 1px dashed rgba(234, 179, 8, 0.5);
+  font-size: 0.7rem;
+}
+
+.status-badge.status-unloading-substate {
+  background: rgba(59, 130, 246, 0.12);
+  color: #93C5FD;
+  border: 1px dashed rgba(59, 130, 246, 0.45);
+  font-size: 0.7rem;
+}

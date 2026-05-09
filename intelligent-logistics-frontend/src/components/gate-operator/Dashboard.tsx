@@ -10,9 +10,13 @@ import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import type { Appointment } from "@/types/types";
 
-// Extended Appointment type with highway_infraction property
+// Extended Appointment type with all orthogonal state flags
 interface ExtendedAppointment extends Appointment {
   highway_infraction?: boolean;
+  is_delayed?: boolean;
+  is_unloading?: boolean;
+  primary_status?: string;
+  display_status?: string;
 }
 
 // Map API status to English display
@@ -69,6 +73,7 @@ function generateUniqueId(prefix: string): string {
 
 // Map API arrival to UI format  
 function mapArrivalToUI(arrival: ExtendedAppointment) {
+  const primaryStatus = arrival.primary_status ?? arrival.status;
   return {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
@@ -77,7 +82,10 @@ function mapArrivalToUI(arrival: ExtendedAppointment) {
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     cargoAmount: arrival.notes || "",
-    status: mapStatusToLabel(arrival.status) as string,
+    status: mapStatusToLabel(arrival.status) as string,        // display_status (compat)
+    primaryStatus: mapStatusToLabel(primaryStatus) as string,  // primary for new badge
+    isDelayed: arrival.is_delayed ?? arrival.status === "delayed",
+    isUnloading: arrival.is_unloading ?? arrival.status === "unloading",
     dock: arrival.gate_in?.label || "N/A",
     highwayInfraction: arrival.highway_infraction || false,
   };
@@ -916,12 +924,18 @@ export default function Dashboard() {
                     <div className="header-status">
                       <span className="status-badge-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                         <span
-                          className={`status-badge status-${arrival.status
+                          className={`status-badge status-${(arrival.primaryStatus ?? arrival.status)
                             .toLowerCase()
                             .replace(/\s/g, "-")}`}
                         >
-                          {arrival.status}
+                          {arrival.primaryStatus ?? arrival.status}
                         </span>
+                        {arrival.isDelayed && (
+                          <span className="status-badge status-delayed-substate">Delayed</span>
+                        )}
+                        {arrival.isUnloading && (
+                          <span className="status-badge status-unloading-substate">Unloading</span>
+                        )}
                         {arrival.highwayInfraction && (
                           <span className="status-badge status-highway-infraction">
                             Infraction

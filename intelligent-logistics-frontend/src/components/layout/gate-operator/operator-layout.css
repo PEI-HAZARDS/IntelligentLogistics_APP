@@ -1773,6 +1773,7 @@ html {
   font-weight: 700;
 }
 
+
 /* Portuguese status classes (legacy) */
 .status-badge.status-pendente {
   background: var(--badge-warning-bg);
