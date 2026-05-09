@@ -60,9 +60,12 @@ type UIArrival = {
   dock: string;
   arrivalTime: string;
   cargo: string;
-  status: string;
+  status: string;           // display_status label (compat)
+  primaryStatus: string;    // primary state label (never Delayed/Unloading)
   apiStatus: AppointmentStatusEnum;
   highwayInfraction?: boolean;
+  isDelayed?: boolean;
+  isUnloading?: boolean;
 };
 
 export const ITEMS_PER_PAGE = 10;
@@ -135,18 +138,24 @@ function ArrivalsList() {
   const gateId = rawGateId || "1";
 
   // Map API arrival to UI
-  const mapArrivalToUI = (arrival: Appointment): UIArrival => ({
-    id: arrival.id,
-    plate: arrival.truck_license_plate,
-    dock: arrival.gate_in?.label || "N/A",
-    arrivalTime: arrival.scheduled_start_time
-      ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
-      : "--:--",
-    cargo: arrival.booking?.reference || "N/A",
-    status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
-    apiStatus: (arrival.status ?? "scheduled"),
-    highwayInfraction: arrival.highway_infraction || false,
-  });
+  const mapArrivalToUI = (arrival: Appointment): UIArrival => {
+    const primaryStatus = (arrival as any).primary_status ?? arrival.status;
+    return {
+      id: arrival.id,
+      plate: arrival.truck_license_plate,
+      dock: arrival.gate_in?.label || "N/A",
+      arrivalTime: arrival.scheduled_start_time
+        ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+        : "--:--",
+      cargo: arrival.booking?.reference || "N/A",
+      status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
+      primaryStatus: primaryStatus ? mapStatusToLabel(primaryStatus) : "Unknown",
+      apiStatus: (arrival.status ?? "scheduled"),
+      highwayInfraction: arrival.highway_infraction || false,
+      isDelayed: (arrival as any).is_delayed ?? arrival.status === "delayed",
+      isUnloading: (arrival as any).is_unloading ?? arrival.status === "unloading",
+    };
+  };
 
   // Fetch data function
   const fetchData = useCallback(async () => {
@@ -592,14 +601,20 @@ function ArrivalsList() {
                           <td>{arrival.arrivalTime}</td>
                           <td>{arrival.cargo}</td>
                           <td>
-                            <span className={`status-badge status-${(arrival.status || 'unknown').toLowerCase().replace(/\s/g, "-")}`}>
-                              {arrival.status || 'Unknown'}
-                            </span>
-                            {arrival.highwayInfraction && (
-                              <span className="status-badge status-highway-infraction" style={{ marginLeft: '4px' }}>
-                                Infraction
+                            <span style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                              <span className={`status-badge status-${((arrival.primaryStatus || arrival.status) || 'unknown').toLowerCase().replace(/\s/g, "-")}`}>
+                                {arrival.primaryStatus || arrival.status || 'Unknown'}
                               </span>
-                            )}
+                              {arrival.isDelayed && (
+                                <span className="status-badge status-delayed-substate">Delayed</span>
+                              )}
+                              {arrival.isUnloading && (
+                                <span className="status-badge status-unloading-substate">Unloading</span>
+                              )}
+                              {arrival.highwayInfraction && (
+                                <span className="status-badge status-highway-infraction">Infraction</span>
+                              )}
+                            </span>
                           </td>
                           <td>
                             <button

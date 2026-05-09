@@ -116,7 +116,19 @@ export default function ArrivalDetail() {
             <Row label="Reference"      value={appointment.booking_reference} />
             <Row
               label="Status"
-              value={statusLabel(appointment.status)}
+              value={
+                <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
+                  <span className={`status-badge status-${((appointment as any).primary_status ?? appointment.status).toLowerCase().replace(/\s/g, '-')}`}>
+                    {statusLabel((appointment as any).primary_status ?? appointment.status)}
+                  </span>
+                  {((appointment as any).is_delayed ?? appointment.status === 'delayed') && (
+                    <span className="status-badge status-delayed-substate">Delayed</span>
+                  )}
+                  {((appointment as any).is_unloading ?? appointment.status === 'unloading') && (
+                    <span className="status-badge status-unloading-substate">Unloading</span>
+                  )}
+                </span>
+              }
             />
             <Row
               label="Scheduled"

@@ -151,6 +151,8 @@ export default function ManagerDashboard() {
                 <KPICard
                     title="In Transit"
                     value={summary?.trucksInTransit ?? "--"}
+                    statusLabel={summary?.trucksInTransitDelayed ? `${summary.trucksInTransitDelayed} delayed` : undefined}
+                    status={summary?.trucksInTransitDelayed ? "warning" : undefined}
                     isLoading={summaryLoading}
                 />
                 <KPICard

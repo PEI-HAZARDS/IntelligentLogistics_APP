@@ -5,7 +5,10 @@
 
 // ==================== ENUMS ====================
 
-export type AppointmentStatusEnum = 'scheduled' | 'in_transit' | 'in_process' | 'unloading' | 'canceled' | 'delayed' | 'completed';
+// Primary flow states stored in DB (never 'delayed' or 'unloading')
+export type PrimaryAppointmentStatus = 'scheduled' | 'in_transit' | 'in_process' | 'canceled' | 'completed';
+// Display status includes computed sub-states for backward compat
+export type AppointmentStatusEnum = PrimaryAppointmentStatus | 'unloading' | 'delayed';
 export type DeliveryStatusEnum = 'not_started' | 'unloading' | 'completed';
 export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
 export type DirectionEnum = 'inbound' | 'outbound';
@@ -92,7 +95,11 @@ export interface Appointment {
     gate_out_id?: number | null;
     scheduled_start_time?: string | null;
     expected_duration?: number | null;
-    status: AppointmentStatusEnum;
+    status: AppointmentStatusEnum;       // display_status (compat) — may be 'delayed'/'unloading'
+    display_status?: AppointmentStatusEnum;
+    primary_status?: PrimaryAppointmentStatus; // raw DB state, never 'delayed'/'unloading'
+    is_delayed?: boolean;
+    is_unloading?: boolean;
     notes?: string | null;
     highway_infraction?: boolean;
     booking?: Booking | null;
