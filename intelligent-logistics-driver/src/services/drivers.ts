@@ -113,12 +113,11 @@ export async function startTrip(appointmentId: number): Promise<void> {
 }
 
 /**
- * Start unloading — transition appointment to 'unloading' state
+ * Start unloading — transition visit state to 'unloading' (driver-triggered at dock)
  */
 export async function startUnloading(appointmentId: number): Promise<void> {
-    await api.patch(`/arrivals/${appointmentId}/status`, {
-        status: 'unloading',
-        notes: 'Driver started unloading',
+    await api.patch(`/arrivals/${appointmentId}/visit`, {
+        state: 'unloading',
     });
 }
 

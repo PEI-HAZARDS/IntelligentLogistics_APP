@@ -44,15 +44,24 @@ export default function ShiftHandoverModal({
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [arrivals, statsData] = await Promise.all([
+            const [inTransitRes, delayedRes, statsData] = await Promise.all([
+                getArrivals({ status: 'in_transit' }),
                 getArrivals({ status: 'delayed' }),
                 getArrivalsStats(),
             ]);
 
-            // Also get in_transit arrivals
-            const inTransit = await getArrivals({ status: 'in_transit' });
-
-            setPendingArrivals([...arrivals.items, ...inTransit.items]);
+            // Merge: delayed rows are semantically in_transit past tolerance
+            const merged = [...inTransitRes.items, ...delayedRes.items];
+            // Delayed first, then by scheduled time ascending
+            merged.sort((a, b) => {
+                const aD = (a.is_delayed || a.status === 'delayed') ? 0 : 1;
+                const bD = (b.is_delayed || b.status === 'delayed') ? 0 : 1;
+                if (aD !== bD) return aD - bD;
+                if (!a.scheduled_start_time) return 1;
+                if (!b.scheduled_start_time) return -1;
+                return a.scheduled_start_time.localeCompare(b.scheduled_start_time);
+            });
+            setPendingArrivals(merged);
             setStats(statsData);
         } catch (err) {
             console.error('Failed to fetch handover data:', err);
@@ -64,8 +73,8 @@ export default function ShiftHandoverModal({
     if (!isOpen) return null;
 
     const completedCount = stats.completed || 0;
-    const delayedCount = pendingArrivals.filter(a => a.status === 'delayed').length;
-    const inTransitCount = pendingArrivals.filter(a => a.status === 'in_transit').length;
+    const delayedCount = pendingArrivals.filter(a => (a as any).is_delayed || a.status === 'delayed').length;
+    const inTransitCount = pendingArrivals.filter(a => a.status === 'in_transit' && !(a as any).is_delayed).length;
 
     // Use portal to render outside of header
     return createPortal(
