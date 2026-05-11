@@ -251,9 +251,16 @@ export default function ActiveArrivalScreen() {
         fetchData();
     }, [fetchData]);
 
-    // WebSocket: listen for gate approval while in_transit
+    const deliveryPhaseRef = useRef(deliveryPhase);
     useEffect(() => {
-        if (deliveryPhase !== 'in_transit' || !driversLicense || !token) {
+        deliveryPhaseRef.current = deliveryPhase;
+    }, [deliveryPhase]);
+
+    const isActivePhase = deliveryPhase !== 'idle' && deliveryPhase !== 'completed';
+
+    // WebSocket: listen for gate approval, status changes, and infractions
+    useEffect(() => {
+        if (!isActivePhase || !driversLicense || !token) {
             setIsWsConnected(false);
             return;
         }
@@ -268,7 +275,9 @@ export default function ActiveArrivalScreen() {
             try {
                 const current = await getMyActiveArrival();
                 if (current?.id === activeArrival?.id && current?.status === 'in_process') {
-                    handleArriveAtGate();
+                    if (deliveryPhaseRef.current === 'in_transit') {
+                        handleArriveAtGate(true); // skip backend update
+                    }
                 }
             } catch {}
         };
@@ -290,7 +299,9 @@ export default function ActiveArrivalScreen() {
                     data.appointment_id === activeArrival?.id &&
                     data.new_status === 'in_process'
                 ) {
-                    handleArriveAtGate();
+                    if (deliveryPhaseRef.current === 'in_transit') {
+                        handleArriveAtGate(true); // skip backend update
+                    }
                 }
                 if (data.message_type === 'infraction_warning') {
                     haptics.error();
@@ -305,7 +316,7 @@ export default function ActiveArrivalScreen() {
         ws.onclose = () => setIsWsConnected(false);
 
         return () => ws.close();
-    }, [deliveryPhase, driversLicense, activeArrival?.id, token]);
+    }, [isActivePhase, driversLicense, activeArrival?.id, token]);
 
     const onRefresh = () => {
         setIsRefreshing(true);
@@ -372,13 +383,17 @@ export default function ActiveArrivalScreen() {
     };
 
     // Arrive at Gate — update backend status to in_process
-    const handleArriveAtGate = async () => {
+    const handleArriveAtGate = async (skipBackendUpdate = false) => {
+        // Prevent calling if we already transitioned
+        if (deliveryPhase !== 'in_transit' && deliveryPhase !== 'scheduled') {
+            return;
+        }
         haptics.medium();
         setDeliveryPhase('gate_opening');
         setShowGatePopup(true);
 
         // Notify backend that truck arrived at gate
-        if (activeArrival?.id) {
+        if (!skipBackendUpdate && activeArrival?.id) {
             try {
                 await updateArrivalStatus(activeArrival.id, 'in_process');
             } catch (err) {

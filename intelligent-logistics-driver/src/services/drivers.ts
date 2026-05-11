@@ -99,14 +99,14 @@ export async function updateArrivalStatus(
     status: string,
     notes?: string,
 ): Promise<void> {
-    await api.patch(`/arrivals/${appointmentId}/status`, { status, notes });
+    await api.patch(`${BASE_PATH}/appointments/${appointmentId}/status`, { status, notes });
 }
 
 /**
  * Start trip — transition appointment from 'scheduled' to 'in_transit'
  */
 export async function startTrip(appointmentId: number): Promise<void> {
-    await api.patch(`/arrivals/${appointmentId}/status`, {
+    await api.patch(`${BASE_PATH}/appointments/${appointmentId}/status`, {
         status: 'in_transit',
         notes: 'Driver started trip',
     });
@@ -116,7 +116,7 @@ export async function startTrip(appointmentId: number): Promise<void> {
  * Start unloading — transition appointment to 'unloading' state
  */
 export async function startUnloading(appointmentId: number): Promise<void> {
-    await api.patch(`/arrivals/${appointmentId}/status`, {
+    await api.patch(`${BASE_PATH}/appointments/${appointmentId}/status`, {
         status: 'unloading',
         notes: 'Driver started unloading',
     });
@@ -126,7 +126,7 @@ export async function startUnloading(appointmentId: number): Promise<void> {
  * Complete an appointment (confirm delivery)
  */
 export async function completeAppointment(appointmentId: number): Promise<void> {
-    await api.patch(`/arrivals/${appointmentId}/status`, {
+    await api.patch(`${BASE_PATH}/appointments/${appointmentId}/status`, {
         status: 'completed',
     });
 }
