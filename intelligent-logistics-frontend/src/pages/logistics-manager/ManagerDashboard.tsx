@@ -27,7 +27,6 @@ import { useSummaryStats, useVolumeData, useActiveAlerts, useDecisionAnalytics, 
 import { exportToPDF, exportToCSV } from "@/services/exportService";
 import type { Alert } from "@/types/types";
 
-type TimeRange = "today" | "week" | "month" | "year";
 
 const alertConfig: Record<string, { icon: ReactNode; color: string; label: string }> = {
     safety: { icon: <Shield size={16} />, color: "#ef4444", label: "Safety" },
@@ -38,7 +37,6 @@ const alertConfig: Record<string, { icon: ReactNode; color: string; label: strin
 
 
 export default function ManagerDashboard() {
-    const [timeRange, setTimeRange] = useState<TimeRange>("today");
     const [isExporting, setIsExporting] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -83,14 +81,14 @@ export default function ManagerDashboard() {
         if (!summary || isExporting) return;
         setIsExporting(true);
         try {
-            await exportToPDF({ summary, decisions: decisions ?? null, transportStats, timeRange, generatedAt: new Date() });
+            await exportToPDF({ summary, decisions: decisions ?? null, transportStats, timeRange: "today", generatedAt: new Date() });
         } catch (error) { console.error("PDF export failed:", error); }
         finally { setIsExporting(false); }
     };
 
     const handleExportCSV = () => {
         if (!summary) return;
-        exportToCSV({ summary, decisions: decisions ?? null, transportStats, timeRange, generatedAt: new Date() });
+        exportToCSV({ summary, decisions: decisions ?? null, transportStats, timeRange: "today", generatedAt: new Date() });
     };
 
     const congestionRate = summary?.congestionRate ?? null;
@@ -112,17 +110,6 @@ export default function ManagerDashboard() {
                     </span>
                 </div>
                 <div className="dashboard-filters">
-                    {(["today", "week", "month", "year"] as TimeRange[]).map((range) => (
-                        <button
-                            key={range}
-                            className={`filter-btn ${timeRange === range ? "active" : ""}`}
-                            onClick={() => setTimeRange(range)}
-                        >
-                            {range === "today" ? "Today" :
-                                range === "week" ? "Week" :
-                                    range === "month" ? "Month" : "Year"}
-                        </button>
-                    ))}
                     <button className="filter-btn" onClick={handleRefresh} disabled={isLoading} title="Refresh data">
                         <RefreshCw size={16} className={isLoading ? "spinning" : ""} />
                     </button>
@@ -242,7 +229,6 @@ export default function ManagerDashboard() {
                     ) : (
                         <div className="mini-bar-chart">
                             {chartData.map((d, i) => {
-                                const hour = new Date(d.timestamp).getHours();
                                 return (
                                     <div key={i} className="bar-group">
                                         <div className="bar-container">
@@ -257,7 +243,7 @@ export default function ManagerDashboard() {
                                                 title={`${d.exits} exits`}
                                             />
                                         </div>
-                                        <span className="bar-label">{hour}h</span>
+                                        <span className="bar-label">{new Date(d.timestamp).getHours()}h</span>
                                     </div>
                                 );
                             })}

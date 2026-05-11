@@ -25,18 +25,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         borderRadius: borderRadius.lg,
-        backgroundColor: colors.surface ?? '#1e293b',
+        backgroundColor: colors.background.medium,
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.md,
     },
     label: {
-        color: colors.textSecondary ?? '#94a3b8',
+        color: colors.text.secondary,
         fontSize: fontSize.md ?? 14,
         marginBottom: spacing.xs,
     },
     sub: {
-        color: colors.textPrimary ?? '#f1f5f9',
+        color: colors.text.primary,
         fontSize: fontSize.sm ?? 12,
     },
 });

@@ -60,7 +60,8 @@ export default function AnalyticsPage() {
     const queryClient = useQueryClient();
     const { from, to } = getDateRange(timeRange);
 
-    const { data: volumeData = [], isLoading: volLoading, isError: volError } = useVolumeData(from, to, "day");
+    const volInterval = (timeRange === "quarter" || timeRange === "year") ? "week" : "day";
+    const { data: volumeData = [], isLoading: volLoading, isError: volError } = useVolumeData(from, to, volInterval);
     const { data: alertsBreakdown = [], isLoading: alertsLoading, isError: alertsError } = useAlertsBreakdown(from, to);
     const { data: transportStats = [], isLoading: transportLoading, isError: transportError } = useTransportStats(from, to);
     const { data: summary, isLoading: summaryLoading } = useSummaryStats();
