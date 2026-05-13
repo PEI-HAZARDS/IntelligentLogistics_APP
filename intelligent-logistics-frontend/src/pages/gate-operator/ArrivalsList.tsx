@@ -153,7 +153,7 @@ function ArrivalsList() {
       apiStatus: (arrival.status ?? "scheduled"),
       highwayInfraction: arrival.highway_infraction || false,
       isDelayed: (arrival as any).is_delayed ?? arrival.status === "delayed",
-      isUnloading: (arrival as any).is_unloading ?? arrival.status === "unloading",
+      isUnloading: (arrival as any).is_unloading || arrival.status === "unloading",
     };
   };
 

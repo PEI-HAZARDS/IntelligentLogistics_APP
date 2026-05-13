@@ -112,6 +112,7 @@ export interface DriverLoginResponse {
 
 export interface ClaimAppointmentRequest {
     arrival_id: string;
+    booking_reference: string;
 }
 
 export interface ClaimAppointmentResponse {

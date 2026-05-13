@@ -72,8 +72,16 @@ function generateUniqueId(prefix: string): string {
 
 
 // Map API arrival to UI format  
+// Mirror of backend DELAY_TOLERANCE_MINUTES (sql_models.py)
+const DELAY_TOLERANCE_MS = 1 * 60 * 1000;
+
 function mapArrivalToUI(arrival: ExtendedAppointment) {
   const primaryStatus = arrival.primary_status ?? arrival.status;
+  // For scheduled rows the backend never sets is_delayed; compute client-side.
+  const isDelayedScheduled =
+    arrival.status === "scheduled" &&
+    !!arrival.scheduled_start_time &&
+    new Date(arrival.scheduled_start_time).getTime() < Date.now() - DELAY_TOLERANCE_MS;
   return {
     id: String(arrival.id),
     plate: arrival.truck_license_plate,
@@ -84,8 +92,8 @@ function mapArrivalToUI(arrival: ExtendedAppointment) {
     cargoAmount: arrival.notes || "",
     status: mapStatusToLabel(arrival.status) as string,        // display_status (compat)
     primaryStatus: mapStatusToLabel(primaryStatus) as string,  // primary for new badge
-    isDelayed: arrival.is_delayed ?? arrival.status === "delayed",
-    isUnloading: arrival.is_unloading ?? arrival.status === "unloading",
+    isDelayed: arrival.is_delayed ?? (arrival.status === "delayed" || isDelayedScheduled),
+    isUnloading: arrival.is_unloading || arrival.status === "unloading",
     dock: arrival.gate_in?.label || "N/A",
     highwayInfraction: arrival.highway_infraction || false,
   };
@@ -164,23 +172,32 @@ export default function Dashboard() {
 
       let items;
       if (arrivalFilter === "scheduled") {
-        // Fetch scheduled + delayed in parallel, merge and sort
-        const [scheduledRes, delayedRes] = await Promise.all([
-          getArrivals({ ...baseParams, status: "scheduled" }),
+        // Scheduled only — isDelayed computed client-side in mapArrivalToUI
+        const scheduledRes = await getArrivals({ ...baseParams, status: "scheduled" });
+        const mapped = scheduledRes.items.map(mapArrivalToUI);
+        // Delayed first, then by arrival time ascending
+        mapped.sort((a, b) => {
+          const aD = a.isDelayed ? 0 : 1;
+          const bD = b.isDelayed ? 0 : 1;
+          if (aD !== bD) return aD - bD;
+          return a.arrivalTime.localeCompare(b.arrivalTime);
+        });
+        items = mapped;
+      } else {
+        // In Transit: merge on-time + delayed (delayed are semantically in_transit past tolerance)
+        const [inTransitRes, delayedRes] = await Promise.all([
+          getArrivals({ ...baseParams, status: "in_transit" }),
           getArrivals({ ...baseParams, status: "delayed" }),
         ]);
-        const merged = [...scheduledRes.items, ...delayedRes.items].map(mapArrivalToUI);
+        const merged = [...inTransitRes.items, ...delayedRes.items].map(mapArrivalToUI);
         // Delayed first, then by arrival time ascending
         merged.sort((a, b) => {
-          const aD = a.status === "Delayed" ? 0 : 1;
-          const bD = b.status === "Delayed" ? 0 : 1;
+          const aD = a.isDelayed ? 0 : 1;
+          const bD = b.isDelayed ? 0 : 1;
           if (aD !== bD) return aD - bD;
           return a.arrivalTime.localeCompare(b.arrivalTime);
         });
         items = merged;
-      } else {
-        const res = await getArrivals({ ...baseParams, status: "in_transit" });
-        items = res.items.map(mapArrivalToUI);
       }
       setArrivals(items);
     } catch (err) {
