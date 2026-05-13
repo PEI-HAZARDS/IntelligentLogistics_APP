@@ -93,7 +93,7 @@ function mapArrivalToUI(arrival: ExtendedAppointment) {
     status: mapStatusToLabel(arrival.status) as string,        // display_status (compat)
     primaryStatus: mapStatusToLabel(primaryStatus) as string,  // primary for new badge
     isDelayed: arrival.is_delayed ?? (arrival.status === "delayed" || isDelayedScheduled),
-    isUnloading: arrival.is_unloading ?? arrival.status === "unloading",
+    isUnloading: arrival.is_unloading || arrival.status === "unloading",
     dock: arrival.gate_in?.label || "N/A",
     highwayInfraction: arrival.highway_infraction || false,
   };

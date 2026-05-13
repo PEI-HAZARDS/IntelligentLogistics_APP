@@ -124,7 +124,7 @@ export default function ArrivalDetail() {
                   {((appointment as any).is_delayed ?? appointment.status === 'delayed') && (
                     <span className="status-badge status-delayed-substate">Delayed</span>
                   )}
-                  {((appointment as any).is_unloading ?? appointment.status === 'unloading') && (
+                  {((appointment as any).is_unloading || appointment.status === 'unloading') && (
                     <span className="status-badge status-unloading-substate">Unloading</span>
                   )}
                 </span>

@@ -345,7 +345,7 @@ export default function ActiveArrivalScreen() {
                 haptics.success();
                 return;
             }
-            const result = await claimArrival({ arrival_id: pinCode.trim() });
+            const result = await claimArrival({ arrival_id: pinCode.trim(), booking_reference: selectedForPin?.booking_reference ?? '' });
             // Transition from scheduled → in_transit
             if (result.appointment_id) {
                 try {
