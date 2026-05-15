@@ -51,7 +51,7 @@ export default function EnergyMetrics() {
             <div className="w-full h-32 sm:h-52 md:h-64 lg:h-80">
                 <GrafanaPanel
                     dashboardId="adcptvw/new-dashboard"
-                    panelId="panel-1"
+                    panelId="1"
                     title="Energy consumption panel"
                 />
             </div>
