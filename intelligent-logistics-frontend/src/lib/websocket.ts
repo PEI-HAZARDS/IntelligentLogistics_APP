@@ -71,6 +71,12 @@ function normalizeWsBaseUrl(rawBaseUrl?: string): string {
         }
     }
 
+    if (input.startsWith('/') && typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const path = input.replace(/\/+$/, '');
+        return `${protocol}//${window.location.host}${path}`;
+    }
+
     const sanitized = input.replace(/^\/+/, '').replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

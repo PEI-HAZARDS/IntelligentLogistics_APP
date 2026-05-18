@@ -26,6 +26,7 @@ export default defineConfig({
       '/api': {
         target: 'http://10.255.32.70:8000', // Update this IP to your API Gateway VM IP if different
         changeOrigin: true,
+        ws: true,
       },
       '/osrm': {
         target: 'https://router.project-osrm.org',
