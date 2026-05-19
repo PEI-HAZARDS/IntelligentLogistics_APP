@@ -146,7 +146,7 @@ export default function Dashboard() {
   const gateId = rawGateId || "1";
 
   // Stream quality switching via unified WebSocket (/ws/gate/{gate_id})
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const { hlsUrl, webrtcUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
   const isScalingTransition = Boolean(scalingDirection);
   const scalingUp = scalingDirection === 'up';
   const streamBadgeLabel = isScalingTransition
@@ -595,15 +595,16 @@ export default function Dashboard() {
       <div className="left-panel">
         <div className="camera-section">
           <div className="video-area">
-            {streamUrl ? (
+            {hlsUrl ? (
               <StreamPlayer
-                streamUrl={streamUrl}
+                hlsUrl={hlsUrl}
+                webrtcUrl={webrtcUrl}
                 quality={streamQuality}
                 autoPlay={true}
               />
             ) : (
               <StreamPlayer
-                streamUrl=""
+                hlsUrl={null}
                 quality="low"
                 autoPlay={false}
               />

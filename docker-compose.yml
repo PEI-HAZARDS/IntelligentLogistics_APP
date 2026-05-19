@@ -13,7 +13,7 @@ services:
         VITE_LOGO_PATH: ${VITE_LOGO_PATH}
         VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL}
     ports:
-      - "8080:80"
+      - "5173:80"
     networks:
       - logistics-network
 
@@ -41,6 +41,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:80"
+      - "8189:8189/udp"
     networks:
       - logistics-network
 

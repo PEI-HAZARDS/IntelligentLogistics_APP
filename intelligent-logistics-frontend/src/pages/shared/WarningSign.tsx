@@ -22,7 +22,7 @@ export default function WarningSign() {
   const gateId = rawGateId || "2";
 
   // Stream quality switching via unified WebSocket — gate camera
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const { hlsUrl, webrtcUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
   const isScalingTransition = Boolean(scalingDirection);
   const scalingUp = scalingDirection === 'up';
   const streamBadgeLabel = isScalingTransition
@@ -123,9 +123,10 @@ export default function WarningSign() {
                             .stream-wrapper .stream-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 10; color: white; }
                         `}</style>
             <div className="absolute inset-0 pointer-events-none opacity-80 mix-blend-screen scale-105 stream-wrapper">
-              {streamUrl ? (
+              {hlsUrl ? (
                 <StreamPlayer
-                  streamUrl={streamUrl}
+                  hlsUrl={hlsUrl}
+                  webrtcUrl={webrtcUrl}
                   quality={streamQuality}
                   autoPlay={true}
                 />

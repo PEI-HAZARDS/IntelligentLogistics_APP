@@ -1,8 +1,13 @@
 # --- Build stage ---
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+
+# Enable pnpm via corepack (version pinned in package.json "packageManager").
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
 
 ARG VITE_MODE=gate
@@ -22,7 +27,7 @@ ENV VITE_API_URL=$VITE_API_URL \
     VITE_LOGO_PATH=$VITE_LOGO_PATH \
     VITE_SUPPORT_EMAIL=$VITE_SUPPORT_EMAIL
 
-RUN npm run build -- --mode "$VITE_MODE"
+RUN pnpm run build --mode "$VITE_MODE"
 
 # --- Serve stage ---
 FROM nginx:1.27-alpine
