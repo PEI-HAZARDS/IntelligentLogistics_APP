@@ -13,7 +13,7 @@ RUN npm install
 COPY . .
 
 # Expose the port Expo uses
-EXPOSE 8081
+EXPOSE 8082
 
 # Command to start the Expo server
-CMD ["npm", "start"]
+CMD ["npm", "start", "--", "--port", "8082"]
