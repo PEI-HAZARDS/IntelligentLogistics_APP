@@ -6,8 +6,9 @@ import DetectionDetailsModal from "./DetectionDetailsModal";
 import ImagePreviewModal from "./ImagePreviewModal";
 import { AlertTriangle, ShieldAlert, RefreshCw, Loader2, Wifi, WifiOff, Bug, ChevronDown, ChevronUp } from "lucide-react";
 import { useStreamScale } from "@/hooks/useStreamScale";
-import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
+import { getGateWebSocket, toGatewayMediaUrl, type DecisionUpdatePayload } from "@/lib/websocket";
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
+import AuthedImage from "@/components/common/AuthedImage";
 import type { Appointment } from "@/types/types";
 
 // Extended Appointment type with all orthogonal state flags
@@ -146,7 +147,7 @@ export default function Dashboard() {
   const gateId = rawGateId || "1";
 
   // Stream quality switching via unified WebSocket (/ws/gate/{gate_id})
-  const { streamUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
+  const { hlsUrl, webrtcUrl, quality: streamQuality, scalingDirection } = useStreamScale({ gateId });
   const isScalingTransition = Boolean(scalingDirection);
   const scalingUp = scalingDirection === 'up';
   const streamBadgeLabel = isScalingTransition
@@ -237,8 +238,8 @@ export default function Dashboard() {
 
 
 
-    const lp_crop = data.license_crop_url;
-    const hz_crop = data.hazard_crop_url;
+    const lp_crop = toGatewayMediaUrl(data.license_crop_url);
+    const hz_crop = toGatewayMediaUrl(data.hazard_crop_url);
     const lp_result = data.license_plate;
     const decision = data.decision?.toUpperCase();
     const decision_source = data.decision_source;
@@ -422,11 +423,13 @@ export default function Dashboard() {
             const newCrops: CropImage[] = [];
             const now = newestData?.timestamp ? new Date(newestData.timestamp * 1000).toISOString() : new Date().toISOString();
 
-            if (newestData?.license_crop_url) {
-              newCrops.push({ id: generateUniqueId('init-lp'), url: newestData.license_crop_url, type: "lp", timestamp: now });
+            const initLp = toGatewayMediaUrl(newestData?.license_crop_url);
+            const initHz = toGatewayMediaUrl(newestData?.hazard_crop_url);
+            if (initLp) {
+              newCrops.push({ id: generateUniqueId('init-lp'), url: initLp, type: "lp", timestamp: now });
             }
-            if (newestData?.hazard_crop_url) {
-              newCrops.push({ id: generateUniqueId('init-hz'), url: newestData.hazard_crop_url, type: "hz", timestamp: now });
+            if (initHz) {
+              newCrops.push({ id: generateUniqueId('init-hz'), url: initHz, type: "hz", timestamp: now });
             }
             if (newCrops.length > 0) {
               setCrops(newCrops);
@@ -595,15 +598,16 @@ export default function Dashboard() {
       <div className="left-panel">
         <div className="camera-section">
           <div className="video-area">
-            {streamUrl ? (
+            {hlsUrl ? (
               <StreamPlayer
-                streamUrl={streamUrl}
+                hlsUrl={hlsUrl}
+                webrtcUrl={webrtcUrl}
                 quality={streamQuality}
                 autoPlay={true}
               />
             ) : (
               <StreamPlayer
-                streamUrl=""
+                hlsUrl={null}
                 quality="low"
                 autoPlay={false}
               />
@@ -675,11 +679,10 @@ export default function Dashboard() {
                   })}
                   style={{ cursor: 'pointer' }}
                 >
-                  <img
+                  <AuthedImage
                     src={crop.url}
                     alt={crop.type === 'lp' ? 'License plate crop' : 'Hazmat crop'}
                     onError={(e) => {
-                      // Hide image on error instead of showing placeholder
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />

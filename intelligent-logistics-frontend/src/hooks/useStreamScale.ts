@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { getStreamUrl } from "@/services/streams";
+import { getStreamUrls, type StreamUrls } from "@/services/streams";
 import { getGateWebSocket, type DecisionUpdatePayload } from "@/lib/websocket";
 
 type Quality = "low" | "high";
@@ -12,26 +12,25 @@ interface UseStreamScaleOptions {
  * Hook that manages stream quality switching via the unified
  * /ws/gate/{gate_id} WebSocket endpoint.
  *
- * - Starts in "low" quality (720p) to save bandwidth
+ * - Starts in "low" quality to save bandwidth.
  * - Listens for {"message_type":"scale_network","mode":"scale_up"|"scale_down"} events
- *   on the shared GateWebSocket
- * - Fetches the new WebRTC URL from the API Gateway on each switch
+ *   on the shared GateWebSocket.
+ * - Fetches both WebRTC and HLS URLs from the API Gateway on each switch so the
+ *   player can choose primary transport with HLS fallback.
  */
 export function useStreamScale({ gateId }: UseStreamScaleOptions) {
     const [quality, setQuality] = useState<Quality>("low");
-    const [streamUrl, setStreamUrl] = useState<string | null>(null);
+    const [urls, setUrls] = useState<StreamUrls | null>(null);
     const [scalingDirection, setScalingDirection] = useState<"up" | "down" | null>(null);
     const scalingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Fetch initial stream URL (low quality by default)
     useEffect(() => {
         const gateKey = `gate${gateId}`;
-        getStreamUrl(gateKey, "low")
-            .then((url) => setStreamUrl(url))
-            .catch((err) => console.error("[StreamScale] Failed to fetch initial stream URL:", err));
+        getStreamUrls(gateKey, "low")
+            .then(setUrls)
+            .catch((err) => console.error("[StreamScale] Failed to fetch initial stream URLs:", err));
     }, [gateId]);
 
-    // Subscribe to scale_network events on the shared GateWebSocket
     useEffect(() => {
         const ws = getGateWebSocket(gateId);
 
@@ -45,18 +44,17 @@ export function useStreamScale({ gateId }: UseStreamScaleOptions) {
             const direction = mode === "scale_up" ? "up" : "down";
             console.log(`[StreamScale] Switching to ${newQuality} (${mode})`);
 
-            // Show scaling direction overlay
             if (scalingTimerRef.current) clearTimeout(scalingTimerRef.current);
             setScalingDirection(direction);
             scalingTimerRef.current = setTimeout(() => setScalingDirection(null), 3500);
 
             const gateKey = `gate${gateId}`;
             try {
-                const newUrl = await getStreamUrl(gateKey, newQuality);
+                const next = await getStreamUrls(gateKey, newQuality);
                 setQuality(newQuality);
-                setStreamUrl(newUrl);
+                setUrls(next);
             } catch (err) {
-                console.error("[StreamScale] Failed to fetch new stream URL:", err);
+                console.error("[StreamScale] Failed to fetch new stream URLs:", err);
             }
         });
 
@@ -66,5 +64,10 @@ export function useStreamScale({ gateId }: UseStreamScaleOptions) {
         };
     }, [gateId]);
 
-    return { streamUrl, quality, scalingDirection };
+    return {
+        webrtcUrl: urls?.webrtcUrl ?? null,
+        hlsUrl: urls?.hlsUrl ?? null,
+        quality,
+        scalingDirection,
+    };
 }

@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, Truck, Clock } from 'lucide-react';
+import AuthedImage from '@/components/common/AuthedImage';
 
 interface DetectionDetailsProps {
     isOpen: boolean;
@@ -81,7 +82,7 @@ export default function DetectionDetailsModal({
                             {detection.lpCropUrl && (
                                 <div className="crop-container">
                                     <span className="crop-label">License Plate Crop</span>
-                                    <img
+                                    <AuthedImage
                                         src={detection.lpCropUrl}
                                         alt="License plate"
                                         className="crop-image"
@@ -92,7 +93,7 @@ export default function DetectionDetailsModal({
                             {detection.hzCropUrl && (
                                 <div className="crop-container hazmat">
                                     <span className="crop-label">Hazmat Crop</span>
-                                    <img
+                                    <AuthedImage
                                         src={detection.hzCropUrl}
                                         alt="Hazmat placard"
                                         className="crop-image"

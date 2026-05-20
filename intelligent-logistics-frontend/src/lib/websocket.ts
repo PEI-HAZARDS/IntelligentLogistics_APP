@@ -71,6 +71,12 @@ function normalizeWsBaseUrl(rawBaseUrl?: string): string {
         }
     }
 
+    if (input.startsWith('/') && typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const path = input.replace(/\/+$/, '');
+        return `${protocol}//${window.location.host}${path}`;
+    }
+
     const sanitized = input.replace(/^\/+/, '').replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -255,12 +261,37 @@ class GateWebSocket {
      */
     static extractCrops(payload: DecisionUpdatePayload): CropUpdate {
         return {
-            lpCrop: payload.license_crop_url,
-            hzCrop: payload.hazard_crop_url,
+            lpCrop: toGatewayMediaUrl(payload.license_crop_url),
+            hzCrop: toGatewayMediaUrl(payload.hazard_crop_url),
             lpResult: payload.license_plate,
             hzResult: payload.un || payload.kemler || undefined,
             timestamp: payload.timestamp ? new Date(payload.timestamp * 1000).toISOString() : new Date().toISOString(),
         };
+    }
+}
+
+/**
+ * Rewrite a MinIO presigned URL into a gateway-proxied URL.
+ *
+ * The agents publish presigned S3 links shaped like
+ * `http://minio-host:9000/<bucket>/<object>?X-Amz-...`. The browser cannot
+ * reach the internal MinIO directly in most deployments, so we route the
+ * GET through the gateway, which streams the bytes from MinIO server-side.
+ *
+ * Returns the input unchanged if it does not look like a MinIO URL — keeps
+ * the function safe to call on arbitrary user-provided strings.
+ */
+export function toGatewayMediaUrl(rawUrl?: string | null): string | undefined {
+    if (!rawUrl) return undefined;
+    try {
+        const parsed = new URL(rawUrl);
+        // Path is "/<bucket>/<key>". Drop the leading slash and the query (presign).
+        const path = parsed.pathname.replace(/^\/+/, '');
+        if (!path) return rawUrl;
+        const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+        return `${apiBase}/media/${path}`;
+    } catch {
+        return rawUrl;
     }
 }
 
