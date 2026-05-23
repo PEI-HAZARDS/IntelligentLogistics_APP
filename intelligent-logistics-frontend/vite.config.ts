@@ -17,9 +17,6 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@il/shared": path.resolve(__dirname, "../packages/shared/src"),
-        // Shared package source is resolved by Rollup relative to packages/shared/,
-        // which has no node_modules. Pin axios to the frontend's own copy.
-        "axios": path.resolve(__dirname, "./node_modules/axios"),
       },
     },
     preview: {
