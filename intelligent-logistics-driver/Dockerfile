@@ -1,19 +1,19 @@
 FROM node:22-alpine
 
-# Set working directory
+# Set working directory inside the container — Metro resolves
+# '../packages/shared' relative to here, so shared lands at /packages/shared.
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
-COPY package.json package-lock.json* ./
-
-# Install project dependencies
+# Install deps first (layer cached unless package files change)
+COPY intelligent-logistics-driver/package.json intelligent-logistics-driver/package-lock.json* ./
 RUN npm install
 
-# Copy the rest of the application code
-COPY . .
+# Copy the shared package where Metro expects it (/packages/shared)
+COPY packages/shared /packages/shared
 
-# Expose the port Expo uses
+# Copy the rest of the driver source
+COPY intelligent-logistics-driver/ .
+
 EXPOSE 8082
 
-# Command to start the Expo server
 CMD ["npm", "start", "--", "--port", "8082"]

@@ -1,14 +1,23 @@
 # --- Build stage ---
+# Build context must be the workspace root (IntelligentLogistics_APP/) so that
+# packages/shared is available for the @il/shared Vite alias.
 FROM node:20-alpine AS build
-WORKDIR /app
+WORKDIR /workspace
 
 # Enable pnpm via corepack (version pinned in package.json "packageManager").
 RUN corepack enable
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# Install frontend deps (separate layer — cached as long as lockfile doesn't change).
+COPY intelligent-logistics-frontend/package.json intelligent-logistics-frontend/pnpm-lock.yaml ./intelligent-logistics-frontend/
+RUN cd intelligent-logistics-frontend && pnpm install --frozen-lockfile
 
-COPY . .
+# Copy shared package (resolved by vite alias: ../packages/shared/src).
+COPY packages/shared ./packages/shared
+
+# Copy frontend source after deps to maximise cache hits.
+COPY intelligent-logistics-frontend/ ./intelligent-logistics-frontend/
+
+WORKDIR /workspace/intelligent-logistics-frontend
 
 ARG VITE_MODE=gate
 ARG VITE_API_URL
@@ -31,6 +40,6 @@ RUN pnpm run build --mode "$VITE_MODE"
 
 # --- Serve stage ---
 FROM nginx:1.27-alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /workspace/intelligent-logistics-frontend/dist /usr/share/nginx/html
+COPY --from=build /workspace/intelligent-logistics-frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
