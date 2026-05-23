@@ -5,6 +5,7 @@
 import api from '@/lib/api';
 import type {
     Appointment,
+    AppointmentDetail,
     AppointmentStatusUpdate,
     ArrivalsQueryParams,
     PaginatedResponse,
@@ -70,6 +71,15 @@ export async function getUpcomingArrivals(
  */
 export async function getArrival(appointmentId: number): Promise<Appointment> {
     const response = await api.get<Appointment>(`${BASE_PATH}/${appointmentId}`);
+    return response.data;
+}
+
+/**
+ * Get enriched appointment detail including visit state, driver, booking, gates.
+ * Uses the /detail endpoint which is not cached at Redis level (always fresh).
+ */
+export async function getArrivalDetail(appointmentId: number): Promise<AppointmentDetail> {
+    const response = await api.get<AppointmentDetail>(`${BASE_PATH}/detail/${appointmentId}`);
     return response.data;
 }
 

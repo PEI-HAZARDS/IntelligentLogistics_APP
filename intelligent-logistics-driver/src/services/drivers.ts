@@ -113,7 +113,7 @@ export async function startTrip(appointmentId: number): Promise<void> {
 }
 
 /**
- * Start unloading — transition visit state to 'unloading' (driver-triggered at dock)
+ * Start unloading — transition visit state to 'unloading' (driver at dock, cargo being offloaded)
  */
 export async function startUnloading(appointmentId: number): Promise<void> {
     await api.patch(`${BASE_PATH}/appointments/${appointmentId}/visit`, {
@@ -122,7 +122,18 @@ export async function startUnloading(appointmentId: number): Promise<void> {
 }
 
 /**
- * Complete an appointment (confirm delivery)
+ * Complete unloading — transition visit state to 'done' (cargo fully offloaded)
+ * The appointment is still in_process; driver must then confirm departure separately.
+ */
+export async function completeUnloading(appointmentId: number): Promise<void> {
+    await api.patch(`${BASE_PATH}/appointments/${appointmentId}/visit`, {
+        state: 'done',
+    });
+}
+
+/**
+ * Complete appointment — confirm departure from port (appointment → completed)
+ * Only valid after visit state is 'done'.
  */
 export async function completeAppointment(appointmentId: number): Promise<void> {
     await api.patch(`${BASE_PATH}/appointments/${appointmentId}/status`, {

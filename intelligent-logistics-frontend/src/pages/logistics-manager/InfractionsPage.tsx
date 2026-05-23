@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSummaryStats } from "@/hooks/useStatistics";
 import { useInfractionArrivals } from "@/hooks/useArrivals";
 import type { AppointmentStatusEnum } from "@/types/types";
+import { labelForStatus } from "@/lib/statusLabel";
 
 const PAGE_SIZE = 15;
 
@@ -35,19 +36,6 @@ function statusBadgeClass(status: AppointmentStatusEnum): string {
         default:
             return "inactive";
     }
-}
-
-function statusLabel(status: AppointmentStatusEnum): string {
-    const labels: Record<AppointmentStatusEnum, string> = {
-        scheduled: "Scheduled",
-        in_transit: "In Transit",
-        in_process: "In Process",
-        unloading: "Unloading",
-        canceled: "Canceled",
-        delayed: "Delayed",
-        completed: "Completed",
-    };
-    return labels[status] ?? status;
 }
 
 export default function InfractionsPage() {
@@ -235,7 +223,7 @@ export default function InfractionsPage() {
                                             <td>
                                                 <span style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                                     <span className={`status-badge ${statusBadgeClass((item as any).primary_status ?? item.status)}`}>
-                                                        {statusLabel((item as any).primary_status ?? item.status)}
+                                                        {labelForStatus((item as any).primary_status ?? item.status)}
                                                     </span>
                                                     {((item as any).is_delayed ?? item.status === 'delayed') && (
                                                         <span className="status-badge status-delayed-substate">Delayed</span>

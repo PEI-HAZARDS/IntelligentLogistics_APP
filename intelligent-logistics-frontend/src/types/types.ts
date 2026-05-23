@@ -1,253 +1,156 @@
 /**
- * TypeScript types matching Data_Module OpenAPI schemas
- * Source: /IntelligentLogistics/src/Data_Module/openapi.yaml
+ * Re-exports core domain types from the shared package.
+ * Web-specific types (Worker*, Alert, query params, etc.) are defined below.
  */
+export type {
+  PrimaryAppointmentStatus,
+  AppointmentStatusEnum,
+  AppointmentDisplayStatus,
+  DeliveryStatusEnum,
+  ShiftTypeEnum,
+  DirectionEnum,
+  AlertTypeEnum,
+  PhysicalStateEnum,
+  PaginatedResponse,
+  Cargo,
+  Company,
+  Driver,
+  Truck,
+  Terminal,
+  Gate,
+  Booking,
+  Appointment,
+  AppointmentStatusUpdate,
+  Visit,
+  AppointmentDetail,
+} from '@il/shared';
 
-// ==================== ENUMS ====================
+import type { AppointmentStatusEnum, DeliveryStatusEnum } from '@il/shared';
 
-// Primary flow states stored in DB (never 'delayed' or 'unloading')
-export type PrimaryAppointmentStatus = 'scheduled' | 'in_transit' | 'in_process' | 'canceled' | 'completed';
-// Display status includes computed sub-states for backward compat
-export type AppointmentStatusEnum = PrimaryAppointmentStatus | 'unloading' | 'delayed';
-export type DeliveryStatusEnum = 'not_started' | 'unloading' | 'completed';
-export type ShiftTypeEnum = '06:00-14:00' | '14:00-22:00' | '22:00-06:00';
-export type DirectionEnum = 'inbound' | 'outbound';
-export type AlertTypeEnum = 'generic' | 'safety' | 'problem' | 'operational';
-export type PhysicalStateEnum = 'liquid' | 'solid' | 'gaseous' | 'hybrid';
-
-// ==================== PAGINATION ====================
-
-export interface PaginatedResponse<T> {
-    items: T[];
-    total: number;
-    page: number;
-    limit: number;
-    pages: number;
-}
-
-// ==================== CORE ENTITIES ====================
-
-export interface Cargo {
-    id: number;
-    booking_reference: string;
-    quantity: number;
-    state: PhysicalStateEnum;
-    description?: string | null;
-}
-
-export interface Company {
-    nif: string;
-    name: string;
-    contact?: string | null;
-}
-
-export interface Driver {
-    drivers_license: string;
-    name: string;
-    company_nif?: string | null;
-    mobile_device_token?: string | null;
-    active?: boolean;
-    created_at?: string | null;
-    company?: Company | null;
-}
-
-export interface Truck {
-    license_plate: string;
-    company_nif?: string | null;
-    brand?: string | null;
-    company?: Company | null;
-}
-
-export interface Terminal {
-    id: number;
-    name?: string | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    hazmat_approved?: boolean;
-}
-
-export interface Gate {
-    id: number;
-    label: string;
-    latitude?: number | null;
-    longitude?: number | null;
-}
-
-export interface Booking {
-    reference: string;
-    direction?: DirectionEnum | null;
-    created_at?: string | null;
-    cargos?: Cargo[];
-}
-
-// Booking definition moved to after Cargo
-
-// ==================== APPOINTMENTS / ARRIVALS ====================
-
-export interface Appointment {
-    id: number;
-    arrival_id: string;
-    booking_reference: string;
-    driver_license: string;
-    truck_license_plate: string;
-    terminal_id: number;
-    gate_in_id?: number | null;
-    gate_out_id?: number | null;
-    scheduled_start_time?: string | null;
-    expected_duration?: number | null;
-    status: AppointmentStatusEnum;       // display_status (compat) — may be 'delayed'/'unloading'
-    display_status?: AppointmentStatusEnum;
-    primary_status?: PrimaryAppointmentStatus; // raw DB state, never 'delayed'/'unloading'
-    is_delayed?: boolean;
-    is_unloading?: boolean;
-    notes?: string | null;
-    highway_infraction?: boolean;
-    booking?: Booking | null;
-    driver?: Driver | null;
-    truck?: Truck | null;
-    terminal?: Terminal | null;
-    gate_in?: Gate | null;
-    gate_out?: Gate | null;
-}
-
-export interface AppointmentStatusUpdate {
-    status: AppointmentStatusEnum;
-    notes?: string | null;
-}
-
-export interface Visit {
-    appointment_id: number;
-    shift_gate_id: number;
-    shift_type: ShiftTypeEnum;
-    shift_date: string;
-    entry_time?: string | null;
-    out_time?: string | null;
-    state: DeliveryStatusEnum;
-}
+// ==================== VISIT (web-only request types) ====================
 
 export interface CreateVisitRequest {
-    shift_gate_id: number;
-    shift_type: 'MORNING' | 'AFTERNOON' | 'NIGHT';
-    shift_date: string;
+  shift_gate_id: number;
+  shift_type: 'MORNING' | 'AFTERNOON' | 'NIGHT';
+  shift_date: string;
 }
 
 export interface VisitStatusUpdate {
-    state: DeliveryStatusEnum;
-    entry_time?: string | null;
-    out_time?: string | null;
-    notes?: string | null;
+  state: DeliveryStatusEnum;
+  entry_time?: string | null;
+  out_time?: string | null;
+  notes?: string | null;
 }
 
-// Query params for arrivals endpoint (server-side pagination)
+// ==================== QUERY PARAMS ====================
+
 export interface ArrivalsQueryParams {
-    gate_id?: number;
-    page?: number;
-    limit?: number;
-    status?: AppointmentStatusEnum;
-    statuses?: string;
-    search?: string;
-    highway_infraction?: boolean;
-    scheduled_date?: string;
-    shift_gate_id?: number;
-    shift_type?: string;
-    shift_date?: string;
+  gate_id?: number;
+  page?: number;
+  limit?: number;
+  status?: AppointmentStatusEnum;
+  statuses?: string;
+  search?: string;
+  highway_infraction?: boolean;
+  scheduled_date?: string;
+  shift_gate_id?: number;
+  shift_type?: string;
+  shift_date?: string;
+}
+
+export interface AlertsQueryParams {
+  skip?: number;
+  limit?: number;
+  alert_type?: string;
+  visit_id?: number;
 }
 
 // ==================== ALERTS ====================
 
 export interface Alert {
-    id: number;
-    visit_id?: number | null;
-    type: AlertTypeEnum;
-    description?: string | null;
-    image_url?: string | null;
-    timestamp: string;
+  id: number;
+  visit_id?: number | null;
+  type: AlertTypeEnum;
+  description?: string | null;
+  image_url?: string | null;
+  timestamp: string;
 }
 
+export type { AlertTypeEnum } from '@il/shared';
+
 export interface CreateAlertRequest {
-    visit_id?: number | null;
-    type: string;
-    description: string;
-    image_url?: string | null;
+  visit_id?: number | null;
+  type: string;
+  description: string;
+  image_url?: string | null;
 }
 
 export interface CreateHazmatAlertRequest {
-    appointment_id: number;
-    un_code?: string | null;
-    kemler_code?: string | null;
-    detected_hazmat?: string | null;
+  appointment_id: number;
+  un_code?: string | null;
+  kemler_code?: string | null;
+  detected_hazmat?: string | null;
 }
-
-// Note: Driver authentication types moved to the native Driver app
-// The Driver interface above is still used for displaying driver info in appointments
 
 // ==================== WORKERS ====================
 
 export interface WorkerLoginRequest {
-    email: string;
-    password: string;
+  email: string;
+  password: string;
 }
 
 export interface WorkerLoginResponse {
-    token: string;
-    num_worker: string;
-    name: string;
-    email: string;
-    active: boolean;
+  token: string;
+  num_worker: string;
+  name: string;
+  email: string;
+  active: boolean;
 }
 
 export interface WorkerInfo {
-    num_worker: string;
-    name: string;
-    email: string;
-    role: string;
-    active: boolean;
+  num_worker: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
 }
 
 export interface CreateWorkerRequest {
-    num_worker: string;
-    name: string;
-    email: string;
-    password: string;
-    role: string;
-    access_level?: string | null;
-    phone?: string | null;
+  num_worker: string;
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  access_level?: string | null;
+  phone?: string | null;
 }
 
 export interface UpdatePasswordRequest {
-    current_password: string;
-    new_password: string;
+  current_password: string;
+  new_password: string;
 }
 
 export interface UpdateEmailRequest {
-    new_email: string;
+  new_email: string;
 }
 
 // ==================== DASHBOARDS ====================
 
+import type { Appointment } from '@il/shared';
+
 export interface OperatorDashboard {
-    operator_num_worker: string;
-    gate_id: number;
-    date: string;
-    upcoming_arrivals: Appointment[];
-    stats: Record<string, number>;
+  operator_num_worker: string;
+  gate_id: number;
+  date: string;
+  upcoming_arrivals: Appointment[];
+  stats: Record<string, number>;
 }
 
 export interface ManagerOverview {
-    manager_num_worker: string;
-    date: string;
-    active_gates: number;
-    shifts_today: number;
-    recent_alerts: number;
-    statistics: Record<string, number>;
+  manager_num_worker: string;
+  date: string;
+  active_gates: number;
+  shifts_today: number;
+  recent_alerts: number;
+  statistics: Record<string, number>;
 }
-
-// ==================== API QUERY PARAMS ====================
-
-export interface AlertsQueryParams {
-    skip?: number;
-    limit?: number;
-    alert_type?: string;
-    visit_id?: number;
-}
-

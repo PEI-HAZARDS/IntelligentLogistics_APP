@@ -1023,7 +1023,7 @@
 /* Stats Cards */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
 }
@@ -1864,12 +1864,6 @@ html {
   align-items: center;
   justify-content: center;
   padding: 0 3px;
-  animation: badge-pulse 2s ease-in-out infinite;
-}
-
-@keyframes badge-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.15); opacity: 0.85; }
 }
 
 /* ========== USER SECTION & DROPDOWN ========== */
@@ -2449,6 +2443,11 @@ html {
   cursor: not-allowed;
 }
 
+.refresh-btn.ws-reconnecting {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
 /* Inline icon helper */
 .inline-icon {
   vertical-align: middle;
@@ -2523,7 +2522,8 @@ html {
   text-align: center;
 }
 
-.loading-state .spin {
+.loading-state .spin,
+.spin {
   animation: spin 1s linear infinite;
 }
 

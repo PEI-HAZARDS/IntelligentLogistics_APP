@@ -156,8 +156,6 @@
   height: 16px;
   background: #ef4444;
   color: #fff;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,0.08);
   font-size: 10px;
   font-weight: 600;
   border-radius: 8px;
@@ -165,17 +163,4 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
 }
