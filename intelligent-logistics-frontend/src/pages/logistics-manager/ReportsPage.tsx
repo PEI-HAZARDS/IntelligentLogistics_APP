@@ -45,7 +45,7 @@ async function parseExcelData(buffer: ArrayBuffer): Promise<TerminalData[]> {
         // Read all rows as arrays
         const raw: (string | number | null)[][] = [];
         ws.eachRow({ includeEmpty: true }, (row) => {
-            raw.push(row.values.slice(1)); // row.values[0] is undefined
+            raw.push((row.values as (string | number | null)[]).slice(1)); // row.values[0] is undefined
         });
         // Header row with months is typically row index 4 (jan..dez)
         const monthRow = raw.find(r => r && r.some(c => typeof c === "string" && /^jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez$/i.test(String(c))));
@@ -117,7 +117,7 @@ export default function ReportsPage() {
             const summary = await getDashboardSummary();
             const { from, to } = getDateRange();
             const transportStats = await getTransportStats(from, to);
-            await exportToPDF({ summary, transportStats, timeRange: "month", generatedAt: new Date() });
+            await exportToPDF({ summary, transportStats, decisions: null, timeRange: "month", generatedAt: new Date() });
             addToHistory("Monthly Report", "PDF");
         } catch (error) { console.error("PDF export failed:", error); }
         finally { setIsExporting(false); }
@@ -130,7 +130,7 @@ export default function ReportsPage() {
             const summary = await getDashboardSummary();
             const { from, to } = getDateRange();
             const transportStats = await getTransportStats(from, to);
-            exportToCSV({ summary, transportStats, timeRange: "month", generatedAt: new Date() });
+            exportToCSV({ summary, transportStats, decisions: null, timeRange: "month", generatedAt: new Date() });
             addToHistory("Monthly Data", "CSV");
         } catch (error) { console.error("CSV export failed:", error); }
         finally { setIsExporting(false); }

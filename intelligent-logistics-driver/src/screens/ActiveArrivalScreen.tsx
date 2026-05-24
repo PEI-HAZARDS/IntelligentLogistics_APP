@@ -489,17 +489,17 @@ export default function ActiveArrivalScreen() {
         );
     };
 
-    // TRIGGER: Driver confirms all cargo is unloaded — sets visit.state = 'done'.
-    // Transitions to 'leaving_port': truck drives from dock to exit gate.
-    // The appointment remains in_process until exit is confirmed (handleConfirmExit).
+    // TRIGGER: Driver confirms unloading is done and exits the port in one step.
+    // Calls completeUnloading (visit.done) then completeAppointment (appointment.completed).
     const handleCompleteUnloading = () => {
         Alert.alert(
-            'Finish Unloading',
-            'Has all cargo been fully unloaded? You will then drive to the exit gate.',
+            'Complete & Exit Port',
+            'Confirm all cargo is unloaded and you are leaving the port terminal.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Done — Head to Exit',
+                    text: 'Complete & Exit',
+                    style: 'destructive',
                     onPress: async () => {
                         if (activeArrival?.id) {
                             try {
@@ -507,29 +507,6 @@ export default function ActiveArrivalScreen() {
                             } catch (err) {
                                 console.warn('Failed to complete unloading on backend:', err);
                             }
-                        }
-                        haptics.success();
-                        setDeliveryPhase('leaving_port');
-                        setSuccessMessage('Unloading complete! Proceed to the exit gate.');
-                    }
-                }
-            ]
-        );
-    };
-
-    // TRIGGER: Driver confirms exit at gate — sets appointment.status = 'completed'.
-    // In a future version this button is replaced by automatic gate detection (like entry).
-    const handleConfirmExit = () => {
-        Alert.alert(
-            'Confirm Exit',
-            'Confirm you have reached the exit gate and are leaving the port.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Confirm Exit',
-                    style: 'destructive',
-                    onPress: async () => {
-                        if (activeArrival?.id) {
                             try {
                                 await completeAppointment(activeArrival.id);
                             } catch (err) {
@@ -544,6 +521,9 @@ export default function ActiveArrivalScreen() {
             ]
         );
     };
+
+    // kept for type-safety (no longer shown as a button)
+    const handleConfirmExit = handleCompleteUnloading;
 
     // RESET Simulation
     const handleReset = () => {
@@ -819,15 +799,10 @@ export default function ActiveArrivalScreen() {
                             <Ionicons name="cube-outline" size={20} color={colors.white} />
                             <Text style={styles.primaryButtonText}>START UNLOADING</Text>
                         </TouchableOpacity>
-                    ) : deliveryPhase === 'unloading' ? (
+                    ) : deliveryPhase === 'unloading' || deliveryPhase === 'leaving_port' ? (
                         <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleCompleteUnloading}>
-                            <Ionicons name="checkmark-outline" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>FINISH UNLOADING</Text>
-                        </TouchableOpacity>
-                    ) : deliveryPhase === 'leaving_port' ? (
-                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleConfirmExit}>
                             <Ionicons name="exit-outline" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>CONFIRM EXIT</Text>
+                            <Text style={styles.primaryButtonText}>COMPLETE & EXIT PORT</Text>
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>

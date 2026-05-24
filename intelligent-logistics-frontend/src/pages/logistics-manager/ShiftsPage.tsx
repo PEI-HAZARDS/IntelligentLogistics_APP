@@ -3,8 +3,9 @@
  * Allows managers to view, filter, and manage operator shifts
  */
 import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, RefreshCw, Plus, Check, Clock, User } from "lucide-react";
-import { getShifts, type ShiftListItem } from "@/services/workers";
+import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2 } from "lucide-react";
+import { getShifts, deleteShift, type ShiftListItem } from "@/services/workers";
+import AddShiftModal from "@/components/logistics-manager/AddShiftModal";
 
 // Shift status type
 type ShiftStatus = 'active' | 'pending' | 'completed' | 'inactive';
@@ -28,6 +29,8 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
 export default function ShiftsPage() {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [filters, setFilters] = useState({
         workerId: '',
         status: '' as ShiftStatus | '',
@@ -72,17 +75,33 @@ export default function ShiftsPage() {
         setFilters({ workerId: '', status: '', shiftType: '' });
     };
 
-    const handleAddShift = () => {
-        // TODO: Open modal to add new shift
-        alert('Add shift functionality under development');
+    const handleDeleteShift = async (shift: Shift) => {
+        if (!confirm(`Delete shift ${shift.gateName} / ${SHIFT_TYPE_LABELS[shift.shiftType]} on ${shift.date}?`)) return;
+        setDeletingId(shift.id);
+        try {
+            await deleteShift(shift.gateId, shift.shiftType, shift.date);
+            await fetchShifts();
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to delete shift";
+            alert(msg);
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     return (
         <div className="shifts-page">
+            {showAddModal && (
+                <AddShiftModal
+                    onClose={() => setShowAddModal(false)}
+                    onCreated={() => { setShowAddModal(false); fetchShifts(); }}
+                />
+            )}
+
             <div className="dashboard-header">
                 <h1 className="dashboard-title">Shift Management</h1>
                 <div className="dashboard-filters">
-                    <button className="action-btn primary" onClick={handleAddShift}>
+                    <button className="action-btn primary" onClick={() => setShowAddModal(true)}>
                         <Plus size={16} />
                         New Shift
                     </button>
@@ -217,12 +236,14 @@ export default function ShiftsPage() {
                                         </td>
                                         <td>
                                             <button
-                                                className="action-btn"
+                                                className="action-btn danger"
                                                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
-                                                onClick={() => alert(`View details for shift ${shift.id}`)}
+                                                disabled={shift.status === 'active' || deletingId === shift.id}
+                                                title={shift.status === 'active' ? 'Cannot delete an active shift' : 'Delete shift'}
+                                                onClick={() => handleDeleteShift(shift)}
                                             >
-                                                <Check size={14} />
-                                                Manage
+                                                <Trash2 size={14} />
+                                                Delete
                                             </button>
                                         </td>
                                     </tr>

@@ -2,7 +2,7 @@
  * Toast notification system for real-time alerts
  */
 import { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, CheckCircle, Info, X, Bell } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
 import './ToastNotifications.css';
 
 export interface Toast {

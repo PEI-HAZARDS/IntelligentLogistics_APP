@@ -116,7 +116,7 @@ function ArrivalsList() {
   }, [searchQuery, debouncedSearch]);
 
   // Detail modal state — stores the appointment ID to fetch full detail
-  const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
+  const [_selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
 
   // Get gate ID from URL param (e.g. /gate/1/arrivals)

@@ -153,7 +153,7 @@ export default function InfractionsPage() {
                         <input
                             type="text"
                             className="filter-input"
-                            placeholder="Search by plate, driver..."
+                            placeholder="Search by plate, company..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -166,7 +166,6 @@ export default function InfractionsPage() {
                                 <th>#</th>
                                 <th>License Plate</th>
                                 <th>Company</th>
-                                <th>Driver</th>
                                 <th>Date / Time</th>
                                 <th>Gate</th>
                                 <th>Status</th>
@@ -175,31 +174,29 @@ export default function InfractionsPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={7} className="table-empty-state">
+                                    <td colSpan={6} className="table-empty-state">
                                         <RefreshCw size={20} className="spinning" style={{ marginRight: "0.5rem", display: "inline" }} />
                                         Loading...
                                     </td>
                                 </tr>
                             ) : tableError ? (
                                 <tr>
-                                    <td colSpan={7} className="table-empty-state">
+                                    <td colSpan={6} className="table-empty-state">
                                         <AlertCircle size={20} style={{ marginRight: "0.5rem", display: "inline" }} />
                                         Failed to load infraction records
                                     </td>
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="table-empty-state">
+                                    <td colSpan={6} className="table-empty-state">
                                         {debouncedSearch ? "No infractions match your search" : "No infraction records found"}
                                     </td>
                                 </tr>
                             ) : (
                                 items.map((item, index) => {
                                     const company =
-                                        item.driver?.company?.name ??
                                         item.truck?.company?.name ??
                                         "—";
-                                    const driver = item.driver?.name ?? "—";
                                     const gate = item.gate_in?.label ?? "—";
                                     const dateTime = item.scheduled_start_time
                                         ? new Date(item.scheduled_start_time).toLocaleString("en-GB", {
@@ -217,7 +214,6 @@ export default function InfractionsPage() {
                                                 {item.truck_license_plate}
                                             </td>
                                             <td className="table-company-name">{company}</td>
-                                            <td>{driver}</td>
                                             <td>{dateTime}</td>
                                             <td>{gate}</td>
                                             <td>

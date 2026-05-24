@@ -25,7 +25,7 @@ export type {
   AppointmentDetail,
 } from '@il/shared';
 
-import type { AppointmentStatusEnum, DeliveryStatusEnum } from '@il/shared';
+import type { AppointmentStatusEnum, DeliveryStatusEnum, AlertTypeEnum } from '@il/shared';
 
 // ==================== VISIT (web-only request types) ====================
 
@@ -76,7 +76,7 @@ export interface Alert {
   timestamp: string;
 }
 
-export type { AlertTypeEnum } from '@il/shared';
+// AlertTypeEnum is already re-exported in the block above
 
 export interface CreateAlertRequest {
   visit_id?: number | null;

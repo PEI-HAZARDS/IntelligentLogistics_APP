@@ -146,6 +146,55 @@ export async function getShifts(params?: {
     return response.data;
 }
 
+export interface GateItem {
+    id: number;
+    label: string;
+}
+
+export async function getGates(): Promise<GateItem[]> {
+    const response = await api.get<GateItem[]>(`${BASE_PATH}/gates`);
+    return response.data;
+}
+
+export interface ShiftCreatePayload {
+    gate_id: number;
+    shift_type: 'MORNING' | 'AFTERNOON' | 'NIGHT';
+    date: string;
+    operator_num_worker?: string;
+    manager_num_worker?: string;
+}
+
+export async function createShift(payload: ShiftCreatePayload): Promise<ShiftListItem> {
+    const response = await api.post<ShiftListItem>(`${BASE_PATH}/shifts`, payload);
+    return response.data;
+}
+
+export interface ShiftUpdatePayload {
+    operator_num_worker?: string | null;
+    manager_num_worker?: string | null;
+}
+
+export async function updateShift(
+    gateId: number,
+    shiftType: string,
+    date: string,
+    payload: ShiftUpdatePayload,
+): Promise<ShiftListItem> {
+    const response = await api.put<ShiftListItem>(
+        `${BASE_PATH}/shifts/${gateId}/${shiftType}/${date}`,
+        payload,
+    );
+    return response.data;
+}
+
+export async function deleteShift(
+    gateId: number,
+    shiftType: string,
+    date: string,
+): Promise<void> {
+    await api.delete(`${BASE_PATH}/shifts/${gateId}/${shiftType}/${date}`);
+}
+
 /**
  * List all workers
  */

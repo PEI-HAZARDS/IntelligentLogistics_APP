@@ -12,7 +12,7 @@ type StreamPlayerProps = {
 
 type Mode = "webrtc" | "hls";
 
-function preferredMode(webrtcUrl: string | null | undefined, hlsUrl: string | null): Mode {
+function preferredMode(webrtcUrl: string | null | undefined, _hlsUrl: string | null): Mode {
   const forced = typeof window !== "undefined" ? window.localStorage.getItem("stream.mode") : null;
   if (forced === "hls") return "hls";
   if (forced === "webrtc") return "webrtc";

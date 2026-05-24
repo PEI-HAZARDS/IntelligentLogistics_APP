@@ -119,6 +119,13 @@ export async function getAlertsBreakdown(
     return response.data;
 }
 
+export interface WaitDistribution {
+    "0_5": number;
+    "5_15": number;
+    "15_30": number;
+    over_30: number;
+}
+
 export interface SustainabilitySummary {
     from_date: string;
     to_date: string;
@@ -129,6 +136,7 @@ export interface SustainabilitySummary {
     total_waiting_minutes: number;
     total_co2_kg_estimate: number;
     avg_co2_per_truck_kg: number;
+    wait_distribution?: WaitDistribution;
 }
 
 export interface SustainabilityTrendPoint {
