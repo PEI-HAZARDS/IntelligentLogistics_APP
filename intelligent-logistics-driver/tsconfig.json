@@ -6,6 +6,15 @@
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "@il/shared": [
+        "../packages/shared/src/index.ts"
+      ],
+      "@il/shared/*": [
+        "../packages/shared/src/*"
+      ],
+      "axios": [
+        "./node_modules/axios"
       ]
     }
   },

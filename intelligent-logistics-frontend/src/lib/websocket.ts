@@ -94,9 +94,10 @@ class GateWebSocket {
     private connectHandlers: Set<ConnectionHandler> = new Set();
     private disconnectHandlers: Set<ConnectionHandler> = new Set();
     private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private reconnectDelay = 3000;
+    private readonly BASE_RECONNECT_MS = 1000;
+    private readonly MAX_RECONNECT_MS = 30000;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private _stopped = false;
 
     constructor(gateId: string | number, baseUrl?: string) {
         this.gateId = gateId;
@@ -171,18 +172,19 @@ class GateWebSocket {
     }
 
     /**
-     * Attempt to reconnect with exponential backoff
+     * Attempt to reconnect with exponential backoff, capped at MAX_RECONNECT_MS.
+     * Retries indefinitely — the gate operator dashboard runs for entire shifts.
      */
     private attemptReconnect(): void {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.log('[WS] Max reconnect attempts reached');
-            return;
-        }
+        if (this._stopped) return;
 
         this.reconnectAttempts++;
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        const delay = Math.min(
+            this.BASE_RECONNECT_MS * Math.pow(2, this.reconnectAttempts - 1),
+            this.MAX_RECONNECT_MS,
+        );
 
-        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
         this.reconnectTimer = setTimeout(() => {
             this.connect();
@@ -203,7 +205,7 @@ class GateWebSocket {
             this.ws = null;
         }
 
-        this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+        this._stopped = true; // Prevent auto-reconnect after explicit disconnect
 
         // Clear all handlers to prevent accumulation
         this.messageHandlers.clear();
@@ -211,6 +213,20 @@ class GateWebSocket {
         this.disconnectHandlers.clear();
 
         console.log('[WS] Disconnected and handlers cleared');
+    }
+
+    /**
+     * Cancel any pending reconnect timer and connect immediately.
+     * Use when the operator explicitly requests a reconnect.
+     */
+    reconnectNow(): void {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this._stopped = false;
+        this.reconnectAttempts = 0;
+        this.connect();
     }
 
     /**
@@ -222,6 +238,7 @@ class GateWebSocket {
             this.reconnectTimer = null;
         }
         this.reconnectAttempts = 0;
+        this._stopped = false;
         console.log('[WS] Connection state reset');
     }
 
@@ -323,6 +340,7 @@ export function useGateWebSocket(
     return {
         connect: () => ws.connect(),
         disconnect: () => ws.disconnect(),
+        reconnectNow: () => ws.reconnectNow(),
         isConnected: () => ws.isConnected(),
         onMessage: ws.onMessage.bind(ws),
         onConnect: ws.onConnect.bind(ws),

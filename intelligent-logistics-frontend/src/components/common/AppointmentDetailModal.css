@@ -1,0 +1,310 @@
+/* AppointmentDetailModal — uses the shared design system variables from theme-base.css */
+
+.adm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: admFadeIn 0.2s ease-out;
+}
+
+@keyframes admFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.adm-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: admSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes admSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ── */
+.adm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 14px 14px 0 0;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.adm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.adm-pin {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.03em;
+}
+
+.adm-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.adm-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* infraction badge — reuse badge-danger vars */
+.adm-infraction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Body ── */
+.adm-body {
+  overflow-y: auto;
+  padding: 1.1rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* scrollbar */
+.adm-body::-webkit-scrollbar { width: 4px; }
+.adm-body::-webkit-scrollbar-track { background: transparent; }
+.adm-body::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+.adm-loading,
+.adm-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  padding: 2.5rem 0;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+.adm-error { color: var(--color-danger); }
+
+/* ── Sections ── */
+.adm-section {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.adm-section:last-child { border-bottom: none; }
+
+.adm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+.adm-section-title svg { color: var(--accent-color); }
+
+/* ── Rows ── */
+.adm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.adm-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.adm-value {
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-word;
+  font-weight: 500;
+}
+
+/* ── Cargo chips ── */
+.adm-cargo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+.adm-cargo-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* ── Visit timeline ── */
+.adm-visit-timeline {
+  display: flex;
+  align-items: flex-start;
+  margin: 0.4rem 0 0.6rem;
+  position: relative;
+}
+
+.adm-timeline-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+/* connector line between dots */
+.adm-timeline-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border-color);
+  z-index: 0;
+  transition: background 0.2s;
+}
+.adm-timeline-step.done:not(:last-child)::after {
+  background: var(--color-success);
+}
+
+.adm-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-secondary, #1e293b);
+  border: 2px solid var(--border-color);
+  z-index: 1;
+  position: relative;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.adm-timeline-step.done .adm-timeline-dot {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.adm-timeline-step.active .adm-timeline-dot {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.adm-timeline-label {
+  font-size: 0.68rem;
+  margin-top: 0.45rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 500;
+}
+.adm-timeline-step.active .adm-timeline-label {
+  color: var(--accent-color);
+  font-weight: 700;
+}
+.adm-timeline-step.done .adm-timeline-label {
+  color: var(--color-success);
+}
+
+.adm-visit-times {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.25rem;
+}
+
+/* ── En Route (in_transit) banner ── */
+.adm-transit-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+}
+
+.adm-transit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  flex-shrink: 0;
+  animation: admPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes admPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.75); }
+}
+
+.adm-transit-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+}
+
+/* ── Spinner ── */
+@keyframes admSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.adm-spin { animation: admSpin 1s linear infinite; }

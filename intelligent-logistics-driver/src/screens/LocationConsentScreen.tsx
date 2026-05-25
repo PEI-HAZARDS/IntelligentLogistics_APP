@@ -42,45 +42,45 @@ export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
                 </Animated.View>
 
                 <Animated.Text entering={FadeInDown.delay(150).duration(400)} style={styles.title}>
-                    Utilização da Localização
+                    Location Usage
                 </Animated.Text>
                 <Animated.Text entering={FadeInDown.delay(250).duration(400)} style={styles.subtitle}>
-                    Informação ao abrigo do RGPD — Art. 13
+                    GDPR Information — Art. 13
                 </Animated.Text>
 
                 <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.card}>
-                    <Section icon="navigate-outline" title="Para que serve">
-                        A sua posição GPS é utilizada para calcular a rota até ao terminal portuário
-                        e estimar o tempo de chegada em tempo real.
+                    <Section icon="navigate-outline" title="Purpose">
+                        Your GPS position is used to calculate the route to the port terminal
+                        and estimate your arrival time in real time.
                     </Section>
 
                     <Divider />
 
-                    <Section icon="server-outline" title="Como é tratada">
-                        A localização é processada localmente no dispositivo para cálculo de rota.
-                        Não é armazenada em servidores nem partilhada com terceiros.
+                    <Section icon="server-outline" title="How it's processed">
+                        Location data is processed locally on your device for route calculation.
+                        It is not stored on servers or shared with third parties.
                     </Section>
 
                     <Divider />
 
-                    <Section icon="time-outline" title="Durante quanto tempo">
-                        Apenas enquanto a entrega estiver ativa (estado <Text style={styles.mono}>em_trânsito</Text>).
-                        Ao concluir ou cancelar a entrega, o acesso é interrompido.
+                    <Section icon="time-outline" title="How long">
+                        Only while the delivery is active (status <Text style={styles.mono}>in_transit</Text>).
+                        When the delivery is completed or cancelled, access is stopped.
                     </Section>
 
                     <Divider />
 
-                    <Section icon="person-outline" title="Os seus direitos">
-                        Pode revogar este consentimento a qualquer momento nas definições do
-                        dispositivo (Definições → Privacidade → Localização). Tal não afeta entregas
-                        já concluídas.
+                    <Section icon="person-outline" title="Your rights">
+                        You can withdraw this consent at any time in your device settings
+                        (Settings → Privacy → Location). This does not affect deliveries
+                        already completed.
                     </Section>
 
                     <Divider />
 
-                    <Section icon="business-outline" title="Responsável pelo tratamento">
-                        Porto de Aveiro — Intelligent Logistics System.{'\n'}
-                        Contacto DPO: dpo@porto-aveiro.pt
+                    <Section icon="business-outline" title="Data Controller">
+                        Port of Aveiro — Intelligent Logistics System.{'\n'}
+                        DPO Contact: dpo@porto-aveiro.pt
                     </Section>
                 </Animated.View>
 
@@ -96,7 +96,7 @@ export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
                         ) : (
                             <>
                                 <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-                                <Text style={styles.btnText}>Aceito — ativar localização</Text>
+                                <Text style={styles.btnText}>Accept — enable location</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -107,7 +107,7 @@ export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
                         disabled={saving}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.btnDeclineText}>Recusar — continuar sem localização</Text>
+                        <Text style={styles.btnDeclineText}>Decline — continue without location</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </ScrollView>

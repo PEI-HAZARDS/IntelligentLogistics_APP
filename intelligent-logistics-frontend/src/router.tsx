@@ -3,7 +3,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import Login from '@/pages/Login/Login';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-// Layouts e Componentes do Operador de Portaria
+// Gate Operator Layouts and Components
 const GateQuickLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorQuick'));
 const GateDetailLayout = React.lazy(() => import('@/components/layout/gate-operator/OperatorDetail'));
 const Dashboard = React.lazy(() => import('@/components/gate-operator/Dashboard'));
@@ -11,7 +11,7 @@ const ArrivalsList = React.lazy(() => import('@/pages/gate-operator/ArrivalsList
 const ArrivalDetail = React.lazy(() => import('@/pages/gate-operator/ArrivalDetail'));
 const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 
-// Componentes do Gestor Logístico
+// Logistics Manager Components
 const ManagerLayout = React.lazy(() => import('@/components/layout/logistics-manager/ManagerLayout'));
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
 const ShiftsPage = React.lazy(() => import('@/pages/logistics-manager/ShiftsPage'));
@@ -21,11 +21,11 @@ const InfractionsPage = React.lazy(() => import('@/pages/logistics-manager/Infra
 const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
 const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
-// Componentes Partilhados
+// Shared Components
 const WarningSign = React.lazy(() => import('@/pages/shared/WarningSign'));
 const EnergyMetrics = React.lazy(() => import('@/pages/shared/EnergyMetrics'));
 
-// Rotas Comuns (Login)
+// Common Routes (Login)
 const commonRoutes = [
   { path: '/', element: <Login /> },
   { path: '/login', element: <Login /> },
@@ -33,7 +33,7 @@ const commonRoutes = [
   { path: '/energy-metrics', element: <EnergyMetrics /> },
 ];
 
-// Rotas do Operador de Portaria
+// Gate Operator Routes
 const gateRoutes = [
   ...commonRoutes,
   // Redirect bare /gate to /gate/1 for backwards compat
@@ -66,11 +66,11 @@ const gateRoutes = [
       { index: true, element: <AlertsPage /> },
     ],
   },
-  // Redireciona qualquer rota desconhecida para /gate/1
+  // Redirect unknown routes to /gate/1
   { path: '*', element: <Navigate to="/gate/1" replace /> }
 ];
 
-// Rotas do Gestor Logístico
+// Logistics Manager Routes
 const managerRoutes = [
   ...commonRoutes,
   {
@@ -86,22 +86,22 @@ const managerRoutes = [
       { path: 'settings', element: <SettingsPage /> },
     ],
   },
-  // Redireciona qualquer rota desconhecida para /manager
+  // Redirect unknown routes to /manager
   { path: '*', element: <Navigate to="/manager" replace /> }
 ];
 
-// Seleção de rotas baseada no modo
+// Route selection based on build mode
 const getRoutes = () => {
   const mode = import.meta.env.MODE;
 
-  console.log(`Carregando rotas para o modo: ${mode}`);
+  console.log(`Loading routes for mode: ${mode}`);
 
   switch (mode) {
     case 'manager':
       return managerRoutes;
     case 'gate':
     default:
-      // Gate é agora o modo padrão (driver foi movido para app nativo)
+      // Gate is the default mode (driver moved to native app)
       return gateRoutes;
   }
 };

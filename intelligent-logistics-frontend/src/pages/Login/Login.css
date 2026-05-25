@@ -20,7 +20,15 @@
       #0284c7 50%,
       #0ea5e9 75%,
       #38bdf8 100%);
+  background-size: 300% 300%;
+  animation: bg-shift 12s ease infinite;
   z-index: 0;
+}
+
+@keyframes bg-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* Efeito de overlay escuro */
@@ -31,8 +39,53 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
   z-index: 1;
+}
+
+/* Floating orbs */
+.login-bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.12;
+  filter: blur(60px);
+  z-index: 2;
+  animation: orb-float linear infinite;
+}
+
+.login-bg-orb--1 {
+  width: 500px;
+  height: 500px;
+  background: #38bdf8;
+  top: -120px;
+  left: -100px;
+  animation-duration: 20s;
+}
+
+.login-bg-orb--2 {
+  width: 400px;
+  height: 400px;
+  background: #0ea5e9;
+  bottom: -80px;
+  right: -80px;
+  animation-duration: 28s;
+  animation-direction: reverse;
+}
+
+.login-bg-orb--3 {
+  width: 300px;
+  height: 300px;
+  background: #7dd3fc;
+  top: 50%;
+  left: 55%;
+  animation-duration: 22s;
+}
+
+@keyframes orb-float {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -40px) scale(1.05); }
+  66%  { transform: translate(-20px, 20px) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
 }
 
 .login-container {
@@ -51,6 +104,24 @@
   padding: 3rem 2.5rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.login-card--success {
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 197, 94, 0.2);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Logo e camião */
@@ -263,6 +334,37 @@
   line-height: 1.4;
 }
 
+/* Success message */
+.login-success {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  animation: slide-in 0.3s ease;
+}
+
+.login-success svg {
+  width: 18px;
+  height: 18px;
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.login-success span {
+  color: #86efac;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Loading state */
 .login-loading {
   display: flex;
@@ -295,6 +397,11 @@
 
 .login-button:disabled:hover {
   filter: none;
+}
+
+.login-button--success {
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+  opacity: 1 !important;
 }
 
 /* Disabled input state */

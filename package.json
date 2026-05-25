@@ -1,0 +1,9 @@
+{
+  "name": "intelligent-logistics-app",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "intelligent-logistics-frontend",
+    "intelligent-logistics-driver"
+  ]
+}

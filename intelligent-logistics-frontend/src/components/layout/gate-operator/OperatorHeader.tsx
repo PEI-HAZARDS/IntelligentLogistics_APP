@@ -39,6 +39,21 @@ export default function OperatorHeader() {
     const userName = userInfo.name || userInfo.email || 'Operator';
     const userRole = userInfo.role || 'Gate Operator';
 
+    const READ_IDS_KEY = 'notification_read_ids';
+
+    const getReadIds = (): Set<string> => {
+        try {
+            const saved = localStorage.getItem(READ_IDS_KEY);
+            return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+        } catch {
+            return new Set();
+        }
+    };
+
+    const persistReadIds = (ids: Set<string>) => {
+        localStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
+    };
+
     // Listen for localStorage changes (same as Dashboard)
     const updateNotificationsFromStorage = useCallback(() => {
         try {
@@ -48,6 +63,8 @@ export default function OperatorHeader() {
             const messages = JSON.parse(saved) as Array<{ id: string, timestamp: string, data: any }>;
             if (messages.length === 0) return;
 
+            const readIds = getReadIds();
+
             // Sort messages by timestamp (newest first)
             const sortedMessages = messages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -55,7 +72,6 @@ export default function OperatorHeader() {
 
             // Process all messages in the history
             for (const msg of sortedMessages) {
-                // Determine whether the data is nested under payload or direct
                 const payload = msg.data?.payload || msg.data;
 
                 if (payload && payload.alerts && Array.isArray(payload.alerts)) {
@@ -68,28 +84,21 @@ export default function OperatorHeader() {
                                 type = "warning";
                             }
 
+                            const id = `alert-${msg.id}-${index}`;
                             newNotifications.push({
-                                id: `alert-${msg.id}-${index}`,
+                                id,
                                 type,
                                 title: "Safety Alert",
                                 message: alertMsg,
                                 time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                // Check if already exist to preserve read status later, for now mark as false
-                                read: false
+                                read: readIds.has(id),
                             });
                         }
                     });
                 }
             }
 
-            // Restore read status from current state if it exists
-            setNotifications(prev => {
-                const updatedNotifications = newNotifications.map(newNotif => {
-                    const existing = prev.find(p => p.id === newNotif.id);
-                    return existing ? { ...newNotif, read: existing.read } : newNotif;
-                });
-                return updatedNotifications;
-            });
+            setNotifications(newNotifications);
         } catch (e) {
             console.error("Failed to parse notifications from storage", e);
         }
@@ -168,7 +177,11 @@ export default function OperatorHeader() {
     };
 
     const handleMarkAllRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setNotifications(prev => {
+            const updated = prev.map(n => ({ ...n, read: true }));
+            persistReadIds(new Set(updated.map(n => n.id)));
+            return updated;
+        });
     };
 
     const unreadCount = notifications.filter((n) => !n.read).length;

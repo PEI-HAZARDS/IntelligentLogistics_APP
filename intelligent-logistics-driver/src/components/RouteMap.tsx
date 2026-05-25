@@ -33,6 +33,8 @@ export default function RouteMap({
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let subscription: Location.LocationSubscription | null = null;
+
         (async () => {
             try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
@@ -42,14 +44,29 @@ export default function RouteMap({
                     return;
                 }
 
-                const currentLocation = await Location.getCurrentPositionAsync({});
-                setLocation(currentLocation);
+                // Get an initial fix immediately so the map shows something fast
+                const initial = await Location.getCurrentPositionAsync({});
+                setLocation(initial);
+                setIsLoading(false);
+
+                // Watch for updates so the polyline tracks the driver in real time
+                subscription = await Location.watchPositionAsync(
+                    {
+                        accuracy: Location.Accuracy.High,
+                        distanceInterval: 20,   // update every 20 m of movement
+                        timeInterval: 5000,     // or every 5 s, whichever comes first
+                    },
+                    (newLocation) => setLocation(newLocation),
+                );
             } catch (error) {
                 setErrorMsg('Failed to get location');
-            } finally {
                 setIsLoading(false);
             }
         })();
+
+        return () => {
+            subscription?.remove();
+        };
     }, []);
 
     if (isLoading) {

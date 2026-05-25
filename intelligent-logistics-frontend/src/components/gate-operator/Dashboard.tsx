@@ -1,5 +1,6 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef } from "react";
+import AppointmentDetailModal from "@/components/common/AppointmentDetailModal";
 import StreamPlayer from "./StreamPlayer";
 import ManualReviewModal, { type ManualReviewData } from "./ManualReviewModal";
 import DetectionDetailsModal from "./DetectionDetailsModal";
@@ -10,6 +11,7 @@ import { getGateWebSocket, toGatewayMediaUrl, type DecisionUpdatePayload } from 
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import AuthedImage from "@/components/common/AuthedImage";
 import type { Appointment } from "@/types/types";
+import { labelForStatus, getSubBadges } from "@/lib/statusLabel";
 
 // Extended Appointment type with all orthogonal state flags
 interface ExtendedAppointment extends Appointment {
@@ -18,20 +20,6 @@ interface ExtendedAppointment extends Appointment {
   is_unloading?: boolean;
   primary_status?: string;
   display_status?: string;
-}
-
-// Map API status to English display
-function mapStatusToLabel(status: string): string {
-  const statusMap: Record<string, string> = {
-    scheduled: "Scheduled",
-    in_transit: "In Transit",
-    in_process: "In Process",
-    unloading: "Unloading",
-    delayed: "Delayed",
-    completed: "Completed",
-    canceled: "Canceled",
-  };
-  return statusMap[status] || status;
 }
 
 // Detection/Alert UI type - matches the new card design
@@ -91,10 +79,11 @@ function mapArrivalToUI(arrival: ExtendedAppointment) {
       : "--:--",
     cargo: arrival.booking?.reference || "N/A",
     cargoAmount: arrival.notes || "",
-    status: mapStatusToLabel(arrival.status) as string,        // display_status (compat)
-    primaryStatus: mapStatusToLabel(primaryStatus) as string,  // primary for new badge
+    status: labelForStatus(arrival.status) as string,        // display_status (compat)
+    primaryStatus: labelForStatus(primaryStatus) as string,  // primary for new badge
     isDelayed: arrival.is_delayed ?? (arrival.status === "delayed" || isDelayedScheduled),
-    isUnloading: arrival.is_unloading || arrival.status === "unloading",
+    isUnloading: (arrival.is_unloading || arrival.status === "unloading") && !arrival.is_visit_done,
+    isVisitDone: (arrival.is_visit_done ?? false) && primaryStatus === 'in_process',
     dock: arrival.gate_in?.label || "N/A",
     highwayInfraction: arrival.highway_infraction || false,
   };
@@ -103,6 +92,7 @@ function mapArrivalToUI(arrival: ExtendedAppointment) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [expandedArrivalId, setExpandedArrivalId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
   const [arrivalFilter, setArrivalFilter] = useState<"scheduled" | "in_transit">("scheduled");
 
@@ -185,20 +175,18 @@ export default function Dashboard() {
         });
         items = mapped;
       } else {
-        // In Transit: merge on-time + delayed (delayed are semantically in_transit past tolerance)
-        const [inTransitRes, delayedRes] = await Promise.all([
-          getArrivals({ ...baseParams, status: "in_transit" }),
-          getArrivals({ ...baseParams, status: "delayed" }),
-        ]);
-        const merged = [...inTransitRes.items, ...delayedRes.items].map(mapArrivalToUI);
+        // In Transit: status=in_transit now returns all in_transit (on-time and delayed).
+        // is_delayed flag on each item distinguishes them for badge rendering.
+        const inTransitRes = await getArrivals({ ...baseParams, status: "in_transit" });
+        const mapped = inTransitRes.items.map(mapArrivalToUI);
         // Delayed first, then by arrival time ascending
-        merged.sort((a, b) => {
+        mapped.sort((a, b) => {
           const aD = a.isDelayed ? 0 : 1;
           const bD = b.isDelayed ? 0 : 1;
           if (aD !== bD) return aD - bD;
           return a.arrivalTime.localeCompare(b.arrivalTime);
         });
-        items = merged;
+        items = mapped;
       }
       setArrivals(items);
     } catch (err) {
@@ -502,8 +490,14 @@ export default function Dashboard() {
       setIsWsConnected(false);
     });
 
-    // Connect
+    // Connect (or sync state if already open from a prior mount in Strict Mode)
     ws.connect();
+    // After subscribing handlers, sync state in case the WS connected between
+    // cleanup of a prior mount and this mount (Strict Mode race: onopen fired
+    // while connectHandlers was empty, so setIsWsConnected(true) was missed).
+    if (ws.isConnected()) {
+      setIsWsConnected(true);
+    }
 
     return () => {
       // Only unsubscribe handlers - don't disconnect the singleton WebSocket
@@ -541,6 +535,12 @@ export default function Dashboard() {
   const handleRefresh = () => {
     setIsLoading(true);
     fetchData();
+  };
+
+  const handleWsReconnect = () => {
+    const ws = wsRef.current;
+    if (!ws) return;
+    ws.reconnectNow();
   };
 
   // Handle manual review completion
@@ -710,12 +710,12 @@ export default function Dashboard() {
                 {isWsConnected ? 'Live' : 'Offline'}
               </span>
               <button
-                className="refresh-btn"
-                onClick={handleRefresh}
-                disabled={isLoading}
-                title="Refresh"
+                className={`refresh-btn${!isWsConnected ? ' ws-reconnecting' : ''}`}
+                onClick={() => { handleRefresh(); handleWsReconnect(); }}
+                disabled={isLoading && isWsConnected}
+                title={isWsConnected ? 'Refresh data' : 'Click to reconnect WebSocket'}
               >
-                {isLoading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                {(isLoading || !isWsConnected) ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
               </button>
             </div>
           </div>
@@ -956,6 +956,9 @@ export default function Dashboard() {
                         {arrival.isUnloading && (
                           <span className="status-badge status-unloading-substate">Unloading</span>
                         )}
+                        {arrival.isVisitDone && (
+                          <span className="status-badge status-leaving-port">Leaving Port</span>
+                        )}
                         {arrival.highwayInfraction && (
                           <span className="status-badge status-highway-infraction">
                             Infraction
@@ -989,9 +992,12 @@ export default function Dashboard() {
                         </div>
                       )}
                       <div className="actions-row">
-                        <Link to={`/gate/arrival/${arrival.id}`} className="details-btn">
+                        <button
+                          className="details-btn"
+                          onClick={e => { e.stopPropagation(); setDetailId(Number(arrival.id)); }}
+                        >
                           View Full Details
-                        </Link>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1108,6 +1114,8 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      <AppointmentDetailModal appointmentId={detailId} onClose={() => setDetailId(null)} />
     </div>
   );
 }

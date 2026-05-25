@@ -30,7 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
-import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeAppointment } from '../services/drivers';
+import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeUnloading, completeAppointment } from '../services/drivers';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import RouteMap from '../components/RouteMap';
@@ -106,24 +106,30 @@ const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
 // ===== END MOCK MODE =====
 
 // Delivery states - TRIGGER: Driver action buttons
-type DeliveryPhase = 'idle' | 'in_transit' | 'gate_opening' | 'in_port' | 'unloading' | 'completed';
+// Aligned with backend state machine:
+//   in_transit → (gate) → in_port → unloading → leaving_port → completed
+//   leaving_port = visit.done but appointment still in_process (truck driving to exit gate)
+//   In a future version, the exit confirmation becomes automatic (like the entry AI detection)
+type DeliveryPhase = 'idle' | 'in_transit' | 'gate_opening' | 'in_port' | 'unloading' | 'leaving_port' | 'completed';
 
 const DELIVERY_STEPS: { id: DeliveryPhase; label: string; icon: string }[] = [
     { id: 'in_transit', label: 'In Transit', icon: 'navigate-outline' },
     { id: 'gate_opening', label: 'Gate', icon: 'enter-outline' },
     { id: 'in_port', label: 'Port Nav', icon: 'map-outline' },
     { id: 'unloading', label: 'Unloading', icon: 'cube-outline' },
-    { id: 'completed', label: 'Completed', icon: 'checkmark-circle-outline' },
+    { id: 'leaving_port', label: 'Leaving', icon: 'exit-outline' },
+    { id: 'completed', label: 'Departed', icon: 'checkmark-circle-outline' },
 ];
 
 function getDeliveryPhaseIndex(phase: DeliveryPhase): number {
     switch (phase) {
-        case 'completed': return 5;
-        case 'unloading': return 4;
-        case 'in_port': return 3;
-        case 'gate_opening': return 2;
-        case 'in_transit': return 1;
-        default: return 0;
+        case 'completed':     return 6;
+        case 'leaving_port':  return 5;
+        case 'unloading':     return 4;
+        case 'in_port':       return 3;
+        case 'gate_opening':  return 2;
+        case 'in_transit':    return 1;
+        default:              return 0;
     }
 }
 
@@ -134,7 +140,8 @@ function getStatusLabel(phase: DeliveryPhase): string {
         gate_opening: 'At Gate',
         in_port: 'At Port',
         unloading: 'Unloading',
-        completed: 'Completed',
+        leaving_port: 'Leaving Port',
+        completed: 'Departed',
     };
     return labels[phase] || phase;
 }
@@ -142,6 +149,7 @@ function getStatusLabel(phase: DeliveryPhase): string {
 function getStatusColors(phase: DeliveryPhase): { bg: string; text: string; accent: string } {
     switch (phase) {
         case 'completed':
+        case 'leaving_port':
             return { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e', accent: '#22c55e' };
         case 'unloading':
         case 'in_port':
@@ -224,14 +232,17 @@ export default function ActiveArrivalScreen() {
             ]);
 
             // Show pending/upcoming deliveries on the dashboard
+            // 'delayed' and 'unloading' are computed display_status values, not persisted statuses
             const pending = (todayArrivals || []).filter(
-                (a) => a.status === 'scheduled' || a.status === 'in_transit' || a.status === 'delayed' || a.status === 'in_process' || a.status === 'unloading' || (a.status as string) === 'pending'
+                (a) => a.status === 'scheduled' || a.status === 'in_transit' || a.status === 'in_process'
             );
             setAssignedDeliveries(pending);
 
             if (active && deliveryPhase === 'idle') {
                 setActiveArrival(active);
-                if (active.status === 'unloading') setDeliveryPhase('unloading');
+                // Derive UI phase from backend sub-state flags (is_visit_done > is_unloading > is_in_port)
+                if (active.status === 'in_process' && active.is_visit_done) setDeliveryPhase('leaving_port');
+                else if (active.is_unloading) setDeliveryPhase('unloading');
                 else if (active.status === 'in_process') setDeliveryPhase('in_port');
                 else if (active.status === 'completed') setDeliveryPhase('completed');
                 else setDeliveryPhase('in_transit');
@@ -256,67 +267,109 @@ export default function ActiveArrivalScreen() {
         deliveryPhaseRef.current = deliveryPhase;
     }, [deliveryPhase]);
 
+    // Keep a ref to activeArrival so WS handlers always read fresh state
+    // without being listed as effect dependencies (which would cause reconnects).
+    const activeArrivalRef = useRef(activeArrival);
+    useEffect(() => {
+        activeArrivalRef.current = activeArrival;
+    }, [activeArrival]);
+
     const isActivePhase = deliveryPhase !== 'idle' && deliveryPhase !== 'completed';
 
-    // WebSocket: listen for gate approval, status changes, and infractions
+    // Clear infraction timer on unmount to avoid setState on an unmounted component
+    useEffect(() => {
+        return () => {
+            if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+        };
+    }, []);
+
+    // WebSocket: listen for gate approval, status changes, and infractions.
+    // Uses a ref so the socket survives re-renders without reconnecting.
+    // Reconnects automatically with exponential backoff if the connection drops.
+    const wsRef = useRef<WebSocket | null>(null);
+    const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wsReconnectDelay = useRef(1000);
+
     useEffect(() => {
         if (!isActivePhase || !driversLicense || !token) {
             setIsWsConnected(false);
+            wsRef.current?.close();
             return;
         }
 
-        const ws = new WebSocket(`${API_CONFIG.wsUrl}/ws/driver/${driversLicense}?token=${encodeURIComponent(token || '')}`);
+        const connect = () => {
+            if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) return;
 
-        ws.onopen = async () => {
-            setIsWsConnected(true);
-            // Guard against the race where the operator accepted while the WS
-            // was not yet connected: fetch the current status and react if
-            // the transition already happened.
-            try {
-                const current = await getMyActiveArrival();
-                if (current?.id === activeArrival?.id && current?.status === 'in_process') {
-                    if (deliveryPhaseRef.current === 'in_transit') {
-                        handleArriveAtGate(true); // skip backend update
+            const ws = new WebSocket(
+                `${API_CONFIG.wsUrl}/ws/driver/${driversLicense}?token=${encodeURIComponent(token)}`,
+            );
+            wsRef.current = ws;
+
+            ws.onopen = async () => {
+                setIsWsConnected(true);
+                wsReconnectDelay.current = 1000; // reset backoff on successful connect
+                // Race guard: fetch current status in case transition happened while offline
+                try {
+                    const current = await getMyActiveArrival();
+                    if (current?.id === activeArrivalRef.current?.id && current?.status === 'in_process') {
+                        if (deliveryPhaseRef.current === 'in_transit') {
+                            handleArriveAtGate(true);
+                        }
                     }
-                }
-            } catch {}
+                } catch {}
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    setDebugMessages(prev => [
+                        {
+                            id: String(++debugMsgIdRef.current),
+                            timestamp: new Date().toISOString(),
+                            type: (data.message_type as string) || 'unknown',
+                            data,
+                        },
+                        ...prev.slice(0, 49),
+                    ]);
+                    if (
+                        data.message_type === 'status_changed' &&
+                        data.appointment_id === activeArrivalRef.current?.id &&
+                        data.new_status === 'in_process'
+                    ) {
+                        if (deliveryPhaseRef.current === 'in_transit') {
+                            handleArriveAtGate(true);
+                        }
+                    }
+                    if (data.message_type === 'infraction_warning') {
+                        haptics.error();
+                        setShowInfractionPopup(true);
+                        if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
+                        infractionTimerRef.current = setTimeout(() => setShowInfractionPopup(false), 10000);
+                    }
+                } catch {}
+            };
+
+            ws.onerror = (e) => console.warn('Driver WS error:', e);
+
+            ws.onclose = () => {
+                setIsWsConnected(false);
+                // Reconnect with exponential backoff (max 30 s)
+                const delay = wsReconnectDelay.current;
+                wsReconnectDelay.current = Math.min(delay * 2, 30000);
+                wsReconnectTimerRef.current = setTimeout(connect, delay);
+            };
         };
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                setDebugMessages(prev => [
-                    {
-                        id: String(++debugMsgIdRef.current),
-                        timestamp: new Date().toISOString(),
-                        type: (data.message_type as string) || 'unknown',
-                        data,
-                    },
-                    ...prev.slice(0, 49), // keep last 50
-                ]);
-                if (
-                    data.message_type === 'status_changed' &&
-                    data.appointment_id === activeArrival?.id &&
-                    data.new_status === 'in_process'
-                ) {
-                    if (deliveryPhaseRef.current === 'in_transit') {
-                        handleArriveAtGate(true); // skip backend update
-                    }
-                }
-                if (data.message_type === 'infraction_warning') {
-                    haptics.error();
-                    setShowInfractionPopup(true);
-                    if (infractionTimerRef.current) clearTimeout(infractionTimerRef.current);
-                    infractionTimerRef.current = setTimeout(() => setShowInfractionPopup(false), 10000);
-                }
-            } catch {}
+        connect();
+
+        return () => {
+            if (wsReconnectTimerRef.current) clearTimeout(wsReconnectTimerRef.current);
+            wsRef.current?.close();
+            wsRef.current = null;
         };
-
-        ws.onerror = (e) => console.warn('Driver WS error:', e);
-        ws.onclose = () => setIsWsConnected(false);
-
-        return () => ws.close();
-    }, [isActivePhase, driversLicense, activeArrival?.id, token]);
+    // Only reconnect when the active session itself changes, not on every render.
+    // activeArrival changes are handled via activeArrivalRef.
+    }, [isActivePhase, driversLicense, token]);
 
     const onRefresh = () => {
         setIsRefreshing(true);
@@ -385,7 +438,7 @@ export default function ActiveArrivalScreen() {
     // Arrive at Gate — update backend status to in_process
     const handleArriveAtGate = async (skipBackendUpdate = false) => {
         // Prevent calling if we already transitioned
-        if (deliveryPhase !== 'in_transit' && deliveryPhase !== 'scheduled') {
+        if (deliveryPhase !== 'in_transit' && deliveryPhase !== 'idle') {
             return;
         }
         haptics.medium();
@@ -436,17 +489,46 @@ export default function ActiveArrivalScreen() {
         );
     };
 
-    // TRIGGER: Driver finishes unloading — marks appointment as completed on backend
-    const handleFinishDelivery = () => {
+    // TRIGGER: Driver confirms all cargo is unloaded — sets visit.state = 'done'.
+    // Transitions to 'leaving_port': truck drives from dock to exit gate.
+    // The appointment remains in_process until exit is confirmed (handleConfirmExit).
+    const handleCompleteUnloading = () => {
         Alert.alert(
-            'Complete Delivery',
-            'Has all cargo been unloaded and processed?',
+            'Finish Unloading',
+            'Has all cargo been fully unloaded? You will then drive to the exit gate.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Complete',
+                    text: 'Done — Head to Exit',
                     onPress: async () => {
-                        // Call backend to mark appointment completed
+                        if (activeArrival?.id) {
+                            try {
+                                await completeUnloading(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to complete unloading on backend:', err);
+                            }
+                        }
+                        haptics.success();
+                        setDeliveryPhase('leaving_port');
+                        setSuccessMessage('Unloading complete! Proceed to the exit gate.');
+                    }
+                }
+            ]
+        );
+    };
+
+    // TRIGGER: Driver confirms exit at gate — sets appointment.status = 'completed'.
+    // In a future version this button is replaced by automatic gate detection (like entry).
+    const handleConfirmExit = () => {
+        Alert.alert(
+            'Confirm Exit',
+            'Confirm you have reached the exit gate and are leaving the port.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm Exit',
+                    style: 'destructive',
+                    onPress: async () => {
                         if (activeArrival?.id) {
                             try {
                                 await completeAppointment(activeArrival.id);
@@ -456,7 +538,7 @@ export default function ActiveArrivalScreen() {
                         }
                         haptics.success();
                         setDeliveryPhase('completed');
-                        setSuccessMessage('Delivery completed!');
+                        setSuccessMessage('Delivery completed! Safe travels.');
                     }
                 }
             ]
@@ -605,14 +687,16 @@ export default function ActiveArrivalScreen() {
     // Layout for in_port or unloading
     const renderInPortLayout = () => {
         const isMapVisible = deliveryPhase === 'in_port';
-        
+
         return (
             <View style={styles.contentContainer}>
                 {/* 1. Map OR Unified Task Focus Area */}
                 {isMapVisible ? (
                     <TouchableOpacity onPress={handleExpandMap} activeOpacity={0.9}>
                         <Animated.View style={styles.mapContainerExtraLarge} entering={FadeInUp.delay(100).duration(400)}>
+                            {/* key forces remount when terminal changes so stale props never linger */}
                             <PortMap
+                                key={`${activeArrival?.terminal_id ?? 'default'}-${deliveryPhase}`}
                                 terminalId={activeArrival?.terminal_id}
                                 dockNumber={claimResult?.dock_bay_number || 'A-05'}
                             />
@@ -667,14 +751,14 @@ export default function ActiveArrivalScreen() {
                         {/* Integrated Header inside the card */}
                         <View style={styles.taskFocusHeader}>
                             <View style={styles.statsHeader}>
-                                <View style={[styles.gateIndicator, { backgroundColor: deliveryPhase === 'completed' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(168, 85, 247, 0.15)' }]}>
-                                    <Ionicons 
-                                        name={deliveryPhase === 'completed' ? "checkmark-circle" : "cube"} 
-                                        size={16} 
-                                        color={deliveryPhase === 'completed' ? colors.status.completed : "#a855f7"} 
+                                <View style={[styles.gateIndicator, { backgroundColor: (deliveryPhase === 'completed' || deliveryPhase === 'leaving_port') ? 'rgba(34, 197, 94, 0.15)' : 'rgba(168, 85, 247, 0.15)' }]}>
+                                    <Ionicons
+                                        name={deliveryPhase === 'completed' ? "checkmark-circle" : deliveryPhase === 'leaving_port' ? "exit-outline" : "cube"}
+                                        size={16}
+                                        color={(deliveryPhase === 'completed' || deliveryPhase === 'leaving_port') ? colors.status.completed : "#a855f7"}
                                     />
-                                    <Text style={[styles.gateText, { color: deliveryPhase === 'completed' ? colors.status.completed : "#a855f7" }]}>
-                                        DOCK {claimResult?.dock_bay_number || 'A-05'}
+                                    <Text style={[styles.gateText, { color: (deliveryPhase === 'completed' || deliveryPhase === 'leaving_port') ? colors.status.completed : "#a855f7" }]}>
+                                        {deliveryPhase === 'leaving_port' ? 'EXIT GATE' : `DOCK ${claimResult?.dock_bay_number || 'A-05'}`}
                                     </Text>
                                 </View>
                                 <View style={{ flex: 1 }}>
@@ -707,18 +791,20 @@ export default function ActiveArrivalScreen() {
                         {/* Main Body */}
                         <View style={styles.taskFocusBody}>
                             <View style={styles.taskIconContainer}>
-                                <Ionicons 
-                                    name={deliveryPhase === 'completed' ? "checkmark-circle" : "sync"} 
-                                    size={80} 
-                                    color={deliveryPhase === 'completed' ? colors.status.completed : colors.primary} 
+                                <Ionicons
+                                    name={deliveryPhase === 'completed' ? "checkmark-circle" : deliveryPhase === 'leaving_port' ? "exit-outline" : "sync"}
+                                    size={80}
+                                    color={deliveryPhase === 'completed' || deliveryPhase === 'leaving_port' ? colors.status.completed : colors.primary}
                                 />
                             </View>
                             <Text style={styles.taskTitle}>
-                                {deliveryPhase === 'completed' ? 'Delivery Successful' : 'Unloading in Progress'}
+                                {deliveryPhase === 'completed' ? 'Delivery Successful' : deliveryPhase === 'leaving_port' ? 'Heading to Exit Gate' : 'Unloading in Progress'}
                             </Text>
                             <Text style={styles.taskSubtitle}>
-                                {deliveryPhase === 'completed' 
-                                    ? 'You may now leave the port terminal.' 
+                                {deliveryPhase === 'completed'
+                                    ? 'You may now leave the port terminal.'
+                                    : deliveryPhase === 'leaving_port'
+                                    ? 'Drive to the exit gate and confirm your departure.'
                                     : 'Please wait at the dock while the cargo is being processed.'}
                             </Text>
                         </View>
@@ -734,9 +820,14 @@ export default function ActiveArrivalScreen() {
                             <Text style={styles.primaryButtonText}>START UNLOADING</Text>
                         </TouchableOpacity>
                     ) : deliveryPhase === 'unloading' ? (
-                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleFinishDelivery}>
-                            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>COMPLETE DELIVERY</Text>
+                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleCompleteUnloading}>
+                            <Ionicons name="checkmark-outline" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>FINISH UNLOADING</Text>
+                        </TouchableOpacity>
+                    ) : deliveryPhase === 'leaving_port' ? (
+                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleConfirmExit}>
+                            <Ionicons name="exit-outline" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>CONFIRM EXIT</Text>
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>
@@ -804,14 +895,10 @@ export default function ActiveArrivalScreen() {
                 </Animated.View>
             </TouchableOpacity>
 
-            {/* Progress Timeline (Shared) - Touchable Simulation Hotspot */}
-            <TouchableOpacity 
-                onPress={() => deliveryPhase === 'in_transit' && handleArriveAtGate()}
-                activeOpacity={1}
-                style={{ marginTop: spacing.md }}
-            >
+            {/* Progress Timeline */}
+            <View style={{ marginTop: spacing.md }}>
                 {renderProgressTimeline()}
-            </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -1014,8 +1101,9 @@ export default function ActiveArrivalScreen() {
 
                 {/* Large Map */}
                 <View style={styles.modalMapContainer}>
-                    {deliveryPhase === 'in_port' || deliveryPhase === 'unloading' ? (
+                    {deliveryPhase === 'in_port' || deliveryPhase === 'unloading' || deliveryPhase === 'leaving_port' ? (
                         <PortMap
+                            key={`modal-${activeArrival?.terminal_id ?? 'default'}`}
                             terminalId={activeArrival?.terminal_id}
                             dockNumber={claimResult?.dock_bay_number || 'A-05'}
                         />

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Clock,
   Truck,
   CheckCircle,
   RotateCcw,
@@ -20,35 +19,20 @@ import {
   PinOff,
   Container,
   CalendarClock,
-  PackageOpen,
 } from "lucide-react";
 import { getArrivals, getArrivalsStats, getArrival } from "@/services/arrivals";
 import { getGateWebSocket } from "@/lib/websocket";
 import type { Appointment, AppointmentStatusEnum, ArrivalsQueryParams } from "@/types/types";
+import { labelForStatus } from "@/lib/statusLabel";
+import AppointmentDetailModal from "@/components/common/AppointmentDetailModal";
 
-// Map API status to English display
-function mapStatusToLabel(status: AppointmentStatusEnum): string {
-  const statusMap: Record<AppointmentStatusEnum, string> = {
-    scheduled: "Scheduled",
-    in_transit: "In Transit",
-    in_process: "In Process",
-    unloading: "Unloading",
-    delayed: "Delayed",
-    completed: "Completed",
-    canceled: "Canceled",
-  };
-  return statusMap[status] || status;
-}
-
-// Map English status back to API status
+// Map English UI label back to API status (filter dropdowns)
 function mapStatusToAPI(status: string): AppointmentStatusEnum {
   const statusMap: Record<string, AppointmentStatusEnum> = {
     "Scheduled": "scheduled",
     "Pending": "in_transit",
     "In Transit": "in_transit",
     "In Process": "in_process",
-    "Unloading": "unloading",
-    "Delayed": "delayed",
     "Completed": "completed",
     "Canceled": "canceled",
   };
@@ -66,6 +50,7 @@ type UIArrival = {
   highwayInfraction?: boolean;
   isDelayed?: boolean;
   isUnloading?: boolean;
+  isVisitDone?: boolean;
 };
 
 export const ITEMS_PER_PAGE = 10;
@@ -130,8 +115,9 @@ function ArrivalsList() {
     return () => clearTimeout(timer);
   }, [searchQuery, debouncedSearch]);
 
-  // Modal states
+  // Detail modal state — stores the appointment ID to fetch full detail
   const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   // Get gate ID from URL param (e.g. /gate/1/arrivals)
   const { gateId: rawGateId } = useParams<{ gateId: string }>();
@@ -148,12 +134,13 @@ function ArrivalsList() {
         ? new Date(arrival.scheduled_start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
         : "--:--",
       cargo: arrival.booking?.reference || "N/A",
-      status: arrival.status ? mapStatusToLabel(arrival.status) : "Unknown",
-      primaryStatus: primaryStatus ? mapStatusToLabel(primaryStatus) : "Unknown",
+      status: arrival.status ? labelForStatus(arrival.status) : "Unknown",
+      primaryStatus: primaryStatus ? labelForStatus(primaryStatus) : "Unknown",
       apiStatus: (arrival.status ?? "scheduled"),
       highwayInfraction: arrival.highway_infraction || false,
       isDelayed: (arrival as any).is_delayed ?? arrival.status === "delayed",
-      isUnloading: (arrival as any).is_unloading || arrival.status === "unloading",
+      isUnloading: ((arrival as any).is_unloading || arrival.status === "unloading") && !(arrival as any).is_visit_done,
+      isVisitDone: ((arrival as any).is_visit_done ?? false) && primaryStatus === 'in_process',
     };
   };
 
@@ -193,7 +180,7 @@ function ArrivalsList() {
             if (liveData) {
               return {
                 ...cached,
-                status: liveData.status ? mapStatusToLabel(liveData.status) : cached.status,
+                status: liveData.status ? labelForStatus(liveData.status) : cached.status,
                 apiStatus: liveData.status || cached.apiStatus,
                 highwayInfraction: liveData.highway_infraction ?? cached.highwayInfraction
               };
@@ -267,7 +254,7 @@ function ArrivalsList() {
           });
           setArrivals(prev => prev.map(a =>
             a.id === appointmentId
-              ? { ...a, apiStatus: newStatus, status: mapStatusToLabel(newStatus) }
+              ? { ...a, apiStatus: newStatus, status: labelForStatus(newStatus) }
               : a
           ));
         } else if (!target) {
@@ -292,7 +279,7 @@ function ArrivalsList() {
           });
           setArrivals(prev => prev.map(a =>
             a.plate === plate && a.apiStatus === oldStatus
-              ? { ...a, apiStatus: "in_process" as AppointmentStatusEnum, status: mapStatusToLabel("in_process" as AppointmentStatusEnum) }
+              ? { ...a, apiStatus: "in_process" as AppointmentStatusEnum, status: labelForStatus("in_process" as AppointmentStatusEnum) }
               : a
           ));
         } else if (!target) {
@@ -354,25 +341,26 @@ function ArrivalsList() {
   // Reset page when server-side filter status changes
   useEffect(() => { setCurrentPage(1); }, [statusFilter]);
 
-  // All stats come from the /stats endpoint (full gate population, not current page)
-  const statsTotal = (stats.scheduled ?? 0) + (stats.in_transit ?? 0) + (stats.in_process ?? 0) + (stats.unloading ?? 0) + (stats.delayed ?? 0) + (stats.completed ?? 0);
+  // All stats come from the /stats endpoint (full gate population, not current page).
+  // Delayed is a sub-state of scheduled; unloading is a sub-state of in_process.
+  // Their counts are folded into the parent pill — not shown as separate filters.
   const dynamicStats = {
-    total: statsTotal || serverTotal,
-    scheduled: stats.scheduled ?? 0,
-    pending: stats.in_transit ?? 0,
-    inProcess: stats.in_process ?? 0,
-    unloading: stats.unloading ?? 0,
-    inProgress: stats.delayed ?? 0,
+    total: (stats.scheduled ?? 0) + (stats.delayed ?? 0) + (stats.in_transit ?? 0) + (stats.in_process ?? 0) + (stats.unloading ?? 0) + (stats.completed ?? 0) || serverTotal,
+    scheduled: (stats.scheduled ?? 0) + (stats.delayed ?? 0),
+    inTransit: stats.in_transit ?? 0,
+    inProcess: (stats.in_process ?? 0) + (stats.unloading ?? 0),
     completed: stats.completed ?? 0,
     infractions: stats.infractions ?? 0,
   };
 
   const handleView = (arrival: UIArrival) => {
     setSelectedArrival(arrival);
+    setDetailId(arrival.id);
   };
 
   const closeModal = () => {
     setSelectedArrival(null);
+    setDetailId(null);
   };
 
   const handleClearFilters = () => {
@@ -428,10 +416,8 @@ function ArrivalsList() {
           </div>
         )}
 
-        {/* Estatísticas (Clickable Filters) */}
-        {/* Estatísticas — compact pill grid */}
+        {/* Stats pills — clickable filters. Delayed folds into Scheduled; Unloading folds into In Process. */}
         <div className="stats-grid">
-          {/* Row 1: Total · Scheduled · Delayed · Infractions */}
           <div
             className={`stat-card ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter("all")}
@@ -453,16 +439,6 @@ function ArrivalsList() {
             </div>
           </div>
           <div
-            className={`stat-card ${statusFilter === 'Delayed' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Delayed")}
-          >
-            <div className="stat-icon"><Clock size={20} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{dynamicStats.inProgress}</span>
-              <span className="stat-label">Delayed</span>
-            </div>
-          </div>
-          <div
             className={`stat-card violators ${statusFilter === 'Violators' ? 'active' : ''}`}
             onClick={() => setStatusFilter("Violators")}
           >
@@ -472,14 +448,13 @@ function ArrivalsList() {
               <span className="stat-label">Infractions</span>
             </div>
           </div>
-          {/* Row 2: In Transit · In Process · Unloading · Completed */}
           <div
             className={`stat-card ${statusFilter === 'In Transit' ? 'active' : ''}`}
             onClick={() => setStatusFilter("In Transit")}
           >
             <div className="stat-icon"><Truck size={20} /></div>
             <div className="stat-content">
-              <span className="stat-value">{dynamicStats.pending}</span>
+              <span className="stat-value">{dynamicStats.inTransit}</span>
               <span className="stat-label">In Transit</span>
             </div>
           </div>
@@ -491,16 +466,6 @@ function ArrivalsList() {
             <div className="stat-content">
               <span className="stat-value">{dynamicStats.inProcess}</span>
               <span className="stat-label">In Process</span>
-            </div>
-          </div>
-          <div
-            className={`stat-card ${statusFilter === 'Unloading' ? 'active' : ''}`}
-            onClick={() => setStatusFilter("Unloading")}
-          >
-            <div className="stat-icon"><PackageOpen size={20} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{dynamicStats.unloading}</span>
-              <span className="stat-label">Unloading</span>
             </div>
           </div>
           <div
@@ -521,7 +486,7 @@ function ArrivalsList() {
           <div className="arrivals-toolbar">
             <h3 className="content-title">Arrivals List</h3>
             <span className="content-count">
-              {dynamicStats.total} {dynamicStats.total === 1 ? 'arrival' : 'arrivals'}
+              {statusFilter === 'all' ? dynamicStats.total : serverTotal} {(statusFilter === 'all' ? dynamicStats.total : serverTotal) === 1 ? 'arrival' : 'arrivals'}
             </span>
             <div className="toolbar-spacer" />
             <select
@@ -611,6 +576,9 @@ function ArrivalsList() {
                               {arrival.isUnloading && (
                                 <span className="status-badge status-unloading-substate">Unloading</span>
                               )}
+                              {arrival.isVisitDone && (
+                                <span className="status-badge status-leaving-port">Leaving Port</span>
+                              )}
                               {arrival.highwayInfraction && (
                                 <span className="status-badge status-highway-infraction">Infraction</span>
                               )}
@@ -664,64 +632,7 @@ function ArrivalsList() {
         </div>
       </main>
 
-      {/* Modal / Information Card */}
-      {selectedArrival && (
-        <div className="modal-overlay" onClick={(e) => {
-          if (e.target === e.currentTarget) closeModal();
-        }}>
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">
-                <Eye size={20} />
-                Arrival Details
-              </h3>
-              <button className="modal-close-btn" onClick={closeModal}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="detail-row">
-                <span className="detail-label">License Plate</span>
-                <span className="detail-value">{selectedArrival.plate}</span>
-              </div>
-
-              <div className="detail-row">
-                <span className="detail-label">Arrival Time</span>
-                <span className="detail-value">{selectedArrival.arrivalTime}</span>
-              </div>
-
-              <div className="detail-row">
-                <span className="detail-label">Dock</span>
-                <span className="detail-value">{selectedArrival.dock}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Reference</span>
-                <span className="detail-value">{selectedArrival.cargo}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Status</span>
-                <span className="status-badge-wrapper" style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                  <span className={`status-badge status-${selectedArrival.status.toLowerCase().replace(/\s/g, "-")}`}>
-                    {selectedArrival.status}
-                  </span>
-                  {selectedArrival.highwayInfraction && (
-                    <span className="status-badge status-highway-infraction">
-                      Infraction
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={closeModal}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppointmentDetailModal appointmentId={detailId} onClose={closeModal} />
     </div>
   );
 }
