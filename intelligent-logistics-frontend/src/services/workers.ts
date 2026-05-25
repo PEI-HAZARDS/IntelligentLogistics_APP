@@ -195,6 +195,21 @@ export async function deleteShift(
     await api.delete(`${BASE_PATH}/shifts/${gateId}/${shiftType}/${date}`);
 }
 
+export interface BulkShiftResult {
+    created: number;
+    skipped: number;
+    errors: { row: number; reason: string }[];
+}
+
+export async function importShiftsCSV(file: File): Promise<BulkShiftResult> {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post<BulkShiftResult>(`${BASE_PATH}/shifts/bulk`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+}
+
 /**
  * List all workers
  */

@@ -3,9 +3,12 @@
  * Allows managers to view, filter, and manage operator shifts
  */
 import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2 } from "lucide-react";
+import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2, Upload } from "lucide-react";
 import { getShifts, deleteShift, type ShiftListItem } from "@/services/workers";
 import AddShiftModal from "@/components/logistics-manager/AddShiftModal";
+import ImportShiftsModal from "@/components/logistics-manager/ImportShiftsModal";
+import ImportAppointmentsModal from "@/components/logistics-manager/ImportAppointmentsModal";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Shift status type
 type ShiftStatus = 'active' | 'pending' | 'completed' | 'inactive';
@@ -27,9 +30,12 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
 };
 
 export default function ShiftsPage() {
+    const queryClient = useQueryClient();
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [showImportAppointmentsModal, setShowImportAppointmentsModal] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [filters, setFilters] = useState({
         workerId: '',
@@ -97,10 +103,33 @@ export default function ShiftsPage() {
                     onCreated={() => { setShowAddModal(false); fetchShifts(); }}
                 />
             )}
+            {showImportModal && (
+                <ImportShiftsModal
+                    onClose={() => setShowImportModal(false)}
+                    onImported={() => { fetchShifts(); }}
+                />
+            )}
+            {showImportAppointmentsModal && (
+                <ImportAppointmentsModal
+                    onClose={() => setShowImportAppointmentsModal(false)}
+                    onImported={() => {
+                        setShowImportAppointmentsModal(false);
+                        queryClient.invalidateQueries({ queryKey: ["arrivals"] });
+                    }}
+                />
+            )}
 
             <div className="dashboard-header">
-                <h1 className="dashboard-title">Shift Management</h1>
+                <h1 className="dashboard-title">Shifts & Appointments</h1>
                 <div className="dashboard-filters">
+                    <button className="action-btn" onClick={() => setShowImportAppointmentsModal(true)}>
+                        <Upload size={16} />
+                        Import Appointments
+                    </button>
+                    <button className="action-btn" onClick={() => setShowImportModal(true)}>
+                        <Upload size={16} />
+                        Import Shifts
+                    </button>
                     <button className="action-btn primary" onClick={() => setShowAddModal(true)}>
                         <Plus size={16} />
                         New Shift

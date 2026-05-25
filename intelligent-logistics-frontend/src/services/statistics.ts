@@ -129,13 +129,13 @@ export interface WaitDistribution {
 export interface SustainabilitySummary {
     from_date: string;
     to_date: string;
-    total_appointments_with_scheduled: number;
     trucks_processed: number;
     trucks_delayed: number;
     avg_waiting_minutes: number;
     total_waiting_minutes: number;
     total_co2_kg_estimate: number;
     avg_co2_per_truck_kg: number;
+    appointments_excluded?: number;
     wait_distribution?: WaitDistribution;
 }
 

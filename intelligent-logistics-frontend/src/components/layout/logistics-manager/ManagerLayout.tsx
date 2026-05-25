@@ -26,7 +26,7 @@ const navigationItems: NavItem[] = [
     { path: "/manager/performance", label: "Port Performance", icon: <BarChart2 size={18} /> },
     { path: "/manager/infractions", label: "Infractions", icon: <ShieldAlert size={18} /> },
     { path: "/manager/sustainability", label: "Sustainability", icon: <Leaf size={18} /> },
-    { path: "/manager/shifts", label: "Shifts", icon: <Calendar size={18} /> },
+    { path: "/manager/shifts", label: "Shifts & Appointments", icon: <Calendar size={18} /> },
 ];
 
 const secondaryItems: NavItem[] = [

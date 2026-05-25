@@ -556,6 +556,11 @@
    SHIFTS PAGE STYLES
    ============================================================ */
 
+.shifts-page {
+    background: var(--bg-primary);
+    min-height: 100%;
+}
+
 .shifts-filters {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -1597,6 +1602,192 @@
 }
 
 /* ============================================================
+   SUSTAINABILITY SECTION (Reports page)
+   ============================================================ */
+
+.sust-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+@media (max-width: 900px) {
+    .sust-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+    .sust-kpi-grid { grid-template-columns: 1fr; }
+}
+
+.sust-kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    transition: border-color 0.15s;
+}
+
+.sust-kpi-card:hover {
+    border-color: var(--border-hover);
+}
+
+.sust-kpi-card.sust-kpi-co2 {
+    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(34, 197, 94, 0.04);
+}
+
+.sust-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.sust-kpi-value {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.sust-kpi-value small {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.sust-kpi-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.sust-value-ok {
+    color: var(--color-success);
+}
+
+.sust-value-warn {
+    color: var(--color-warning);
+}
+
+/* Wait distribution */
+.sust-wait-dist {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.sust-dist-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.sust-dist-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sust-dist-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 36px 40px;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sust-dist-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.sust-dist-bar-wrap {
+    height: 8px;
+    background: var(--bg-hover);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sust-dist-bar {
+    height: 100%;
+    background: var(--accent-gradient);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    min-width: 2px;
+}
+
+.sust-dist-pct {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.sust-dist-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* CO2 Trend sparkline */
+.sust-trend-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.sust-trend-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.sust-trend-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sust-trend-dir {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.sust-trend-dir.down {
+    color: var(--color-success);
+}
+
+.sust-trend-dir.up {
+    color: var(--color-warning);
+}
+
+.sust-trend-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.3rem;
+}
+
+.sust-trend-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================
    SETTINGS PAGE
    ============================================================ */
 
@@ -2021,4 +2212,393 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+
+/* ── Import Shifts Modal ─────────────────────────────────────────────────── */
+
+.import-template-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.import-hint-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 0.25rem;
+}
+
+.import-hint-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.import-hint-sub code {
+    font-family: monospace;
+    font-size: 0.72rem;
+    background: rgba(148,163,184,0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    color: var(--text-secondary);
+}
+
+.import-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    min-height: 110px;
+}
+
+.import-dropzone:hover,
+.import-dropzone--over {
+    border-color: var(--accent-color);
+    background: var(--accent-bg);
+}
+
+.import-dropzone--has-file {
+    border-style: solid;
+    border-color: var(--accent-color);
+    background: var(--accent-bg);
+}
+
+.import-filename {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.import-filesize {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.import-drop-label {
+    color: var(--text-muted);
+}
+
+.import-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.import-result-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+}
+
+.import-result-created {
+    background: rgba(34,197,94,0.08);
+    color: var(--color-success, #22c55e);
+    border: 1px solid rgba(34,197,94,0.2);
+}
+
+.import-result-skipped {
+    background: rgba(245,158,11,0.08);
+    color: var(--color-warning, #f59e0b);
+    border: 1px solid rgba(245,158,11,0.2);
+}
+
+.import-errors {
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.18);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+}
+
+.import-errors-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-danger, #ef4444);
+    margin: 0 0 0.4rem;
+}
+
+.import-errors-list {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+/* ── Infraction Review Modal ─────────────────────────────────────────────── */
+
+.infr-review-card {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.infr-review-plate {
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-primary);
+}
+
+.infr-review-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.infr-review-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.infr-review-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-danger, #ef4444);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 4px;
+    padding: 0.25rem 0.55rem;
+    width: fit-content;
+}
+
+.infr-review-already {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--color-warning, #f59e0b);
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+}
+
+/* ── Infraction table review buttons ─────────────────────────────────────── */
+
+.infr-review-btn,
+.infr-reviewed-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.infr-review-btn {
+    background: rgba(2, 119, 189, 0.08);
+    border-color: rgba(2, 119, 189, 0.35);
+    color: var(--accent-color);
+}
+
+.infr-review-btn:hover {
+    background: rgba(2, 119, 189, 0.16);
+    border-color: var(--accent-color);
+}
+
+.infr-reviewed-btn {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: var(--color-success, #22c55e);
+}
+
+.infr-reviewed-btn:hover {
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.row-infraction--reviewed {
+    opacity: 0.75;
+}
+
+/* ============================================================
+   REPORTS DROPDOWN (header Download button)
+   ============================================================ */
+
+.reports-btn-wrap {
+    position: relative;
+}
+
+.header-icon-btn.active {
+    background: var(--accent-bg);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.reports-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.reports-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 280px;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    z-index: 200;
+    overflow: hidden;
+    animation: sharedDropdownFadeIn 0.18s ease;
+}
+
+.reports-dropdown-header {
+    padding: 0.7rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.reports-dropdown-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.1rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.reports-dropdown-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0;
+}
+
+.reports-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 1rem;
+    transition: background 0.15s;
+}
+
+.reports-dropdown-item:hover {
+    background: var(--bg-hover);
+}
+
+.reports-fmt-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.reports-fmt-pdf {
+    background: rgba(239, 83, 80, 0.15);
+    color: #FC8181;
+    border: 1px solid rgba(239, 83, 80, 0.3);
+}
+
+.reports-fmt-csv {
+    background: rgba(34, 197, 94, 0.12);
+    color: #86EFAC;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.light-mode .reports-fmt-pdf {
+    background: #FEE2E2;
+    color: #991B1B;
+    border-color: #FCA5A5;
+}
+
+.light-mode .reports-fmt-csv {
+    background: #DCFCE7;
+    color: #166534;
+    border-color: #86EFAC;
+}
+
+.reports-item-name {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reports-item-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.reports-dropdown-footer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--border-color);
+    background: transparent;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    transition: background 0.15s;
+}
+
+.reports-dropdown-footer:hover {
+    background: var(--accent-bg);
 }

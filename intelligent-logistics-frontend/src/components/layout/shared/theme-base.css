@@ -65,8 +65,8 @@
 }
 
 .light-mode {
-  --bg-primary: #ECEFF1;
-  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #ECEFF1 100%);
+  --bg-primary: #F2F3F5;
+  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #F2F3F5 100%);
   --bg-surface: rgba(255, 255, 255, 0.85);
   --bg-surface-glass: rgba(255, 255, 255, 0.92);
   --bg-card: #ffffff;

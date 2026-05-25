@@ -44,19 +44,26 @@ export default function ShiftHandoverModal({
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [inTransitRes, delayedRes, statsData] = await Promise.all([
-                getArrivals({ status: 'in_transit' }),
-                getArrivals({ status: 'delayed' }),
+            // Fetch all active statuses — these will be handed over to the next shift
+            const [scheduledRes, inTransitRes, inProcessRes, statsData] = await Promise.all([
+                getArrivals({ status: 'scheduled', limit: 100 }),
+                getArrivals({ statuses: 'in_transit,delayed', limit: 100 }),
+                getArrivals({ status: 'in_process', limit: 100 }),
                 getArrivalsStats(),
             ]);
 
-            // Merge: delayed rows are semantically in_transit past tolerance
-            const merged = [...inTransitRes.items, ...delayedRes.items];
-            // Delayed first, then by scheduled time ascending
+            const merged = [
+                ...scheduledRes.items,
+                ...inTransitRes.items,
+                ...inProcessRes.items,
+            ];
+
+            // Sort: in_process first (already at gate), then delayed, then in_transit, then scheduled
+            const ORDER: Record<string, number> = { in_process: 0, delayed: 1, in_transit: 2, scheduled: 3 };
             merged.sort((a, b) => {
-                const aD = (a.is_delayed || a.status === 'delayed') ? 0 : 1;
-                const bD = (b.is_delayed || b.status === 'delayed') ? 0 : 1;
-                if (aD !== bD) return aD - bD;
+                const aOrder = (a as any).is_delayed ? 1 : (ORDER[a.status] ?? 9);
+                const bOrder = (b as any).is_delayed ? 1 : (ORDER[b.status] ?? 9);
+                if (aOrder !== bOrder) return aOrder - bOrder;
                 if (!a.scheduled_start_time) return 1;
                 if (!b.scheduled_start_time) return -1;
                 return a.scheduled_start_time.localeCompare(b.scheduled_start_time);
@@ -75,6 +82,8 @@ export default function ShiftHandoverModal({
     const completedCount = stats.completed || 0;
     const delayedCount = pendingArrivals.filter(a => (a as any).is_delayed || a.status === 'delayed').length;
     const inTransitCount = pendingArrivals.filter(a => a.status === 'in_transit' && !(a as any).is_delayed).length;
+    const scheduledCount = pendingArrivals.filter(a => a.status === 'scheduled').length;
+    const inProcessCount = pendingArrivals.filter(a => a.status === 'in_process').length;
 
     // Use portal to render outside of header
     return createPortal(
@@ -104,15 +113,15 @@ export default function ShiftHandoverModal({
                             <span className="stat-value">{completedCount}</span>
                             <span className="stat-label">Completed</span>
                         </div>
-                        <div className="stat-item delayed">
-                            <AlertTriangle size={18} />
-                            <span className="stat-value">{delayedCount}</span>
-                            <span className="stat-label">Delayed</span>
-                        </div>
                         <div className="stat-item transit">
                             <Truck size={18} />
-                            <span className="stat-value">{inTransitCount}</span>
-                            <span className="stat-label">In Transit</span>
+                            <span className="stat-value">{scheduledCount + inTransitCount}</span>
+                            <span className="stat-label">Scheduled/Transit</span>
+                        </div>
+                        <div className="stat-item delayed">
+                            <AlertTriangle size={18} />
+                            <span className="stat-value">{delayedCount + inProcessCount}</span>
+                            <span className="stat-label">Active/Delayed</span>
                         </div>
                     </div>
 
