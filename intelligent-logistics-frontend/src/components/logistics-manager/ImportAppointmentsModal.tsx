@@ -8,10 +8,10 @@ interface Props {
 }
 
 const CSV_TEMPLATE = [
-    "truck_license_plate,terminal_name,scheduled_start_time,expected_duration,notes",
-    "AA-00-BB,Terminal Sul,2026-06-01T08:00:00,60,",
-    "CC-11-DD,Terminal Sul,2026-06-01T10:00:00,90,Fragile cargo",
-    "EE-22-FF,Terminal Norte,,,",
+    "truck_license_plate,terminal_name,scheduled_start_time,expected_duration,direction,cargo_description,cargo_type,cargo_quantity,notes",
+    "AA-00-BB,Terminal Norte - Porto de Aveiro,2026-06-01T08:00:00,60,inbound,Steel coils,solid,24.5,",
+    "CC-11-DD,Terminal de Granéis Líquidos - Porto de Aveiro,2026-06-01T10:00:00,90,inbound,Chemical drums,liquid,12,Fragile cargo",
+    "EE-22-FF,Terminal de Granéis Sólidos - Porto de Aveiro,2026-06-01T14:00:00,,inbound,,,",
 ].join("\n");
 
 function downloadTemplate() {
@@ -86,13 +86,16 @@ export default function ImportAppointmentsModal({ onClose, onImported }: Props) 
                         <div>
                             <p className="import-hint-title">Required columns</p>
                             <p className="import-hint-sub">
-                                <code>truck_license_plate</code>, <code>terminal_name</code> (exact name, e.g. "Terminal Sul")
+                                <code>truck_license_plate</code>, <code>terminal_name</code> (e.g. "Terminal Norte - Porto de Aveiro")
                             </p>
                             <p className="import-hint-sub" style={{ marginTop: "0.2rem" }}>
-                                Optional: <code>scheduled_start_time</code> (ISO-8601), <code>expected_duration</code> (minutes), <code>notes</code>
+                                Optional: <code>scheduled_start_time</code> (ISO-8601), <code>expected_duration</code> (min), <code>direction</code> (inbound/outbound, default: inbound)
+                            </p>
+                            <p className="import-hint-sub" style={{ marginTop: "0.2rem" }}>
+                                Cargo: <code>cargo_description</code>, <code>cargo_type</code> (liquid/solid/gaseous/hybrid), <code>cargo_quantity</code>, <code>notes</code>
                             </p>
                             <p className="import-hint-sub" style={{ marginTop: "0.2rem", color: "var(--text-muted)" }}>
-                                Booking references are auto-generated. Drivers claim via PIN after arrival.
+                                Booking references are auto-generated. Drivers claim via PIN after arrival. Trucks must be pre-registered.
                             </p>
                         </div>
                         <button className="action-btn" onClick={downloadTemplate} title="Download CSV template">
@@ -148,7 +151,7 @@ export default function ImportAppointmentsModal({ onClose, onImported }: Props) 
                             {result.skipped > 0 && (
                                 <div className="import-result-row import-result-skipped">
                                     <AlertCircle size={16} />
-                                    <span><strong>{result.skipped}</strong> skipped (already exist)</span>
+                                    <span><strong>{result.skipped}</strong> row{result.skipped !== 1 ? "s" : ""} skipped — see details below</span>
                                 </div>
                             )}
                             {result.errors.length > 0 && (

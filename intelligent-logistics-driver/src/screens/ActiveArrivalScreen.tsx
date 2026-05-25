@@ -489,12 +489,37 @@ export default function ActiveArrivalScreen() {
         );
     };
 
-    // TRIGGER: Driver confirms unloading is done and exits the port in one step.
-    // Calls completeUnloading (visit.done) then completeAppointment (appointment.completed).
-    const handleCompleteUnloading = () => {
+    // Step 1 of 2: mark visit as done → backend computes leaving_port sub-state
+    const handleFinishUnloading = () => {
+        Alert.alert(
+            'Unloading Complete',
+            'Confirm all cargo has been unloaded.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        if (activeArrival?.id) {
+                            try {
+                                await completeUnloading(activeArrival.id);
+                            } catch (err) {
+                                console.warn('Failed to complete unloading:', err);
+                            }
+                        }
+                        haptics.medium();
+                        setDeliveryPhase('leaving_port');
+                        setSuccessMessage('Proceed to the exit gate.');
+                    }
+                }
+            ]
+        );
+    };
+
+    // Step 2 of 2: mark appointment as completed
+    const handleCompleteDelivery = () => {
         Alert.alert(
             'Complete & Exit Port',
-            'Confirm all cargo is unloaded and you are leaving the port terminal.',
+            'Confirm you are leaving the port terminal.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -503,19 +528,22 @@ export default function ActiveArrivalScreen() {
                     onPress: async () => {
                         if (activeArrival?.id) {
                             try {
-                                await completeUnloading(activeArrival.id);
-                            } catch (err) {
-                                console.warn('Failed to complete unloading on backend:', err);
-                            }
-                            try {
                                 await completeAppointment(activeArrival.id);
                             } catch (err) {
-                                console.warn('Failed to complete appointment on backend:', err);
+                                console.warn('Failed to complete appointment:', err);
                             }
                         }
                         haptics.success();
                         setDeliveryPhase('completed');
                         setSuccessMessage('Delivery completed! Safe travels.');
+                        setTimeout(() => {
+                            setDeliveryPhase('idle');
+                            setActiveArrival(null);
+                            setSelectedForPin(null);
+                            setClaimResult(null);
+                            setSuccessMessage(null);
+                            setPinCode('');
+                        }, 3500);
                     }
                 }
             ]
@@ -523,7 +551,7 @@ export default function ActiveArrivalScreen() {
     };
 
     // kept for type-safety (no longer shown as a button)
-    const handleConfirmExit = handleCompleteUnloading;
+    const handleConfirmExit = handleCompleteDelivery;
 
     // RESET Simulation
     const handleReset = () => {
@@ -799,17 +827,25 @@ export default function ActiveArrivalScreen() {
                             <Ionicons name="cube-outline" size={20} color={colors.white} />
                             <Text style={styles.primaryButtonText}>START UNLOADING</Text>
                         </TouchableOpacity>
-                    ) : deliveryPhase === 'unloading' || deliveryPhase === 'leaving_port' ? (
-                        <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleCompleteUnloading}>
-                            <Ionicons name="exit-outline" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>COMPLETE & EXIT PORT</Text>
+                    ) : deliveryPhase === 'unloading' ? (
+                        <TouchableOpacity style={[styles.primaryButton, styles.warningButton]} onPress={handleFinishUnloading}>
+                            <Ionicons name="checkmark-done-outline" size={20} color={colors.white} />
+                            <Text style={styles.primaryButtonText}>FINISHED UNLOADING</Text>
                         </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>
-                            <Ionicons name="log-out-outline" size={20} color={colors.white} />
-                            <Text style={styles.primaryButtonText}>LEAVE PORT / FINISH</Text>
-                        </TouchableOpacity>
-                    )}
+                    ) : deliveryPhase === 'leaving_port' ? (
+                        <View style={{ gap: 12 }}>
+                            {activeArrival?.highway_infraction && (
+                                <View style={styles.infractionWarningBanner}>
+                                    <Ionicons name="warning-outline" size={18} color="#ef4444" />
+                                    <Text style={styles.infractionWarningText}>Highway infraction flagged on this delivery</Text>
+                                </View>
+                            )}
+                            <TouchableOpacity style={[styles.primaryButton, styles.successButton]} onPress={handleCompleteDelivery}>
+                                <Ionicons name="exit-outline" size={20} color={colors.white} />
+                                <Text style={styles.primaryButtonText}>COMPLETE & EXIT PORT</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
                 </Animated.View>
             </View>
         );
@@ -1608,6 +1644,26 @@ const styles = StyleSheet.create({
     },
     successButton: {
         backgroundColor: '#22c55e',
+    },
+    warningButton: {
+        backgroundColor: colors.primary,
+    },
+    infractionWarningBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.35)',
+        borderRadius: borderRadius.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    infractionWarningText: {
+        flex: 1,
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: '#ef4444',
     },
     buttonDisabled: {
         opacity: 0.6,

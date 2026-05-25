@@ -145,9 +145,14 @@ function alertTypeLabel(type: string): string {
 
 function alertTypeClass(type: string): string {
     switch (type) {
-        case "HAZMAT":         return "db-badge db-badge-danger-strong";
-        case "HIGHWAY_INFRACTION": return "db-badge db-badge-warning";
-        default:               return "db-badge db-badge-neutral";
+        case "HAZMAT":
+        case "UNAUTHORIZED":
+        case "safety":
+        case "problem":        return "db-badge db-badge-danger-strong";
+        case "HIGHWAY_INFRACTION":
+        case "SPEEDING":
+        case "operational":    return "db-badge db-badge-warning";
+        default:               return "db-badge db-badge-danger-strong";
     }
 }
 
