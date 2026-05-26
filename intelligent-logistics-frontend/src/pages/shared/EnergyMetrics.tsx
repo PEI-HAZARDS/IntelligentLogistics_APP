@@ -56,15 +56,6 @@ export default function EnergyMetrics() {
             <div className="w-full h-64 sm:h-80 md:h-[400px] relative p-4">
                 {useSimulated ? (
                     <>
-                        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                            <span className={`text-xs px-2 py-1 rounded-md border ${
-                                isDarkMode 
-                                ? "bg-neutral-900 border-neutral-700 text-neutral-400" 
-                                : "bg-slate-100 border-slate-200 text-slate-500"
-                            }`}>
-                                Powered by <strong className="text-orange-500 font-semibold">Simulation</strong>
-                            </span>
-                        </div>
                         <SimulatedEnergyGraph isDarkMode={isDarkMode} />
                     </>
                 ) : (
