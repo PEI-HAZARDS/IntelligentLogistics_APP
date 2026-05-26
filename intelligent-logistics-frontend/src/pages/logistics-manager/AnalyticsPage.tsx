@@ -341,7 +341,7 @@ export default function AnalyticsPage() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
                                             <XAxis type="number" tick={{ fontSize: 11 }} unit="m" />
                                             <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 11 }} />
-                                            <Tooltip formatter={(value: number) => `${value} min`} />
+                                            <Tooltip formatter={(value) => typeof value === 'number' ? `${value} min` : String(value)} />
                                             <Legend />
                                             <Bar dataKey="unloading" stackId="time" fill="#3b82f6" name="Unloading" radius={[0, 0, 0, 0]} />
                                             <Bar dataKey="waiting" stackId="time" fill="#f59e0b" name="Waiting" radius={[0, 4, 4, 0]} />
@@ -375,7 +375,7 @@ export default function AnalyticsPage() {
                                                     outerRadius={90}
                                                     paddingAngle={3}
                                                     dataKey="value"
-                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                                                 >
                                                     {alertsChartData.map((entry, idx) => (
                                                         <Cell key={idx} fill={entry.color} />

@@ -11,15 +11,14 @@ import { getGateWebSocket, toGatewayMediaUrl, type DecisionUpdatePayload } from 
 import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 import AuthedImage from "@/components/common/AuthedImage";
 import type { Appointment } from "@/types/types";
-import { labelForStatus, getSubBadges } from "@/lib/statusLabel";
+import { labelForStatus } from "@/lib/statusLabel";
 
 // Extended Appointment type with all orthogonal state flags
+// Note: is_delayed, is_unloading, primary_status, display_status already exist on Appointment
 interface ExtendedAppointment extends Appointment {
   highway_infraction?: boolean;
-  is_delayed?: boolean;
-  is_unloading?: boolean;
-  primary_status?: string;
-  display_status?: string;
+  is_delayed?: boolean | null;
+  is_unloading?: boolean | null;
 }
 
 // Detection/Alert UI type - matches the new card design

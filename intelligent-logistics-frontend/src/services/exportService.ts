@@ -2,7 +2,7 @@
  * Export Service
  * PDF and CSV report generation for manager dashboard
  */
-import type { DashboardSummary, TransportStats, DecisionAnalytics } from './statistics';
+import type { DashboardSummary, TransportStats, DecisionAnalytics, SustainabilitySummary } from './statistics';
 
 interface ExportData {
     summary: DashboardSummary;
@@ -10,6 +10,7 @@ interface ExportData {
     transportStats: TransportStats[];
     timeRange: string;
     generatedAt: Date;
+    sustainability?: SustainabilitySummary | null;
 }
 
 /**
@@ -114,6 +115,37 @@ export async function exportToPDF(data: ExportData): Promise<void> {
         margin: { left: 14, right: 14 },
     });
 
+    // Sustainability Section
+    finalY = (doc as any).lastAutoTable.finalY || finalY + 60;
+    if (data.sustainability) {
+        const s = data.sustainability;
+        doc.setFontSize(14);
+        doc.text('Sustainability', 14, finalY + 15);
+
+        const co2Display = s.total_co2_kg_estimate >= 1000
+            ? `${(s.total_co2_kg_estimate / 1000).toFixed(2)} t`
+            : `${Math.round(s.total_co2_kg_estimate)} kg`;
+
+        const sustData = [
+            ['Period', `${s.from_date} → ${s.to_date}`],
+            ['Total CO₂ estimate (idling)', co2Display],
+            ['Avg CO₂ / truck', `${s.avg_co2_per_truck_kg.toFixed(2)} kg`],
+            ['Trucks processed', s.trucks_processed.toString()],
+            ['Trucks delayed', `${s.trucks_delayed} (${s.trucks_processed > 0 ? ((s.trucks_delayed / s.trucks_processed) * 100).toFixed(1) : '—'}%)`],
+            ['Avg. wait time', `${Math.round(s.avg_waiting_minutes)} min`],
+            ['Total waiting time', `${Math.round(s.total_waiting_minutes)} min`],
+        ];
+
+        autoTable(doc, {
+            startY: finalY + 20,
+            head: [['Metric', 'Value']],
+            body: sustData,
+            theme: 'striped',
+            headStyles: { fillColor: [34, 197, 94] },
+            margin: { left: 14, right: 14 },
+        });
+    }
+
     // Footer
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -190,6 +222,25 @@ export function exportToCSV(data: ExportData): void {
             stat.slaAttendedRate.toString(),
         ]);
     });
+
+    // Sustainability section
+    if (data.sustainability) {
+        const s = data.sustainability;
+        const co2Display = s.total_co2_kg_estimate >= 1000
+            ? `${(s.total_co2_kg_estimate / 1000).toFixed(2)} t`
+            : `${Math.round(s.total_co2_kg_estimate)} kg`;
+        rows.push(['SUSTAINABILITY']);
+        rows.push(['Metric', 'Value']);
+        rows.push(['Period', `${s.from_date} → ${s.to_date}`]);
+        rows.push(['Total CO2 estimate (idling)', co2Display]);
+        rows.push(['Avg CO2 per truck (kg)', s.avg_co2_per_truck_kg.toFixed(2)]);
+        rows.push(['Trucks processed', s.trucks_processed.toString()]);
+        rows.push(['Trucks delayed', s.trucks_delayed.toString()]);
+        rows.push(['Delay rate (%)', s.trucks_processed > 0 ? ((s.trucks_delayed / s.trucks_processed) * 100).toFixed(1) : '—']);
+        rows.push(['Avg wait time (min)', Math.round(s.avg_waiting_minutes).toString()]);
+        rows.push(['Total waiting time (min)', Math.round(s.total_waiting_minutes).toString()]);
+        rows.push([]);
+    }
 
     // Convert to CSV string
     const csvContent = rows

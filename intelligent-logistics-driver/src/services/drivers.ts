@@ -140,3 +140,22 @@ export async function completeAppointment(appointmentId: number): Promise<void> 
         status: 'completed',
     });
 }
+
+export interface PaginatedAppointments {
+    items: Appointment[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+}
+
+/**
+ * Get unclaimed scheduled appointments for the driver's company.
+ * Driver claims one via claimArrival() with the arrival_id PIN.
+ */
+export async function getAvailableBookings(page = 1, limit = 20): Promise<PaginatedAppointments> {
+    const response = await api.get<PaginatedAppointments>(`${BASE_PATH}/me/available-bookings`, {
+        params: { page, limit },
+    });
+    return response.data;
+}

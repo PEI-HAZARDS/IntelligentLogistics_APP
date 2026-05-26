@@ -15,9 +15,9 @@ const AlertsPage = React.lazy(() => import('@/pages/gate-operator/AlertsPage'));
 const ManagerLayout = React.lazy(() => import('@/components/layout/logistics-manager/ManagerLayout'));
 const ManagerDashboard = React.lazy(() => import('@/pages/logistics-manager/ManagerDashboard'));
 const ShiftsPage = React.lazy(() => import('@/pages/logistics-manager/ShiftsPage'));
-const AnalyticsPage = React.lazy(() => import('@/pages/logistics-manager/AnalyticsPage'));
-const TransportPage = React.lazy(() => import('@/pages/logistics-manager/TransportPage'));
+const PortPerformancePage = React.lazy(() => import('@/pages/logistics-manager/PortPerformancePage'));
 const InfractionsPage = React.lazy(() => import('@/pages/logistics-manager/InfractionsPage'));
+const SustainabilityPage = React.lazy(() => import('@/pages/logistics-manager/SustainabilityPage'));
 const ReportsPage = React.lazy(() => import('@/pages/logistics-manager/ReportsPage'));
 const SettingsPage = React.lazy(() => import('@/pages/logistics-manager/SettingsPage'));
 
@@ -78,10 +78,10 @@ const managerRoutes = [
     element: <ProtectedRoute allowedRoles={['manager']}><ManagerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <ManagerDashboard /> },
-      { path: 'shifts', element: <ShiftsPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'performance', element: <PortPerformancePage /> },
       { path: 'infractions', element: <InfractionsPage /> },
-      { path: 'transport', element: <TransportPage /> },
+      { path: 'sustainability', element: <SustainabilityPage /> },
+      { path: 'shifts', element: <ShiftsPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],

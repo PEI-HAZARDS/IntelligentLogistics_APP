@@ -133,6 +133,44 @@ export async function createVisit(
     return response.data;
 }
 
+export interface InfractionReviewPayload {
+    reviewed_by: string;
+    note?: string;
+}
+
+export interface InfractionReviewResult {
+    id: number;
+    reviewed_at: string;
+    reviewed_by: string;
+    review_note: string | null;
+}
+
+export async function reviewInfraction(
+    appointmentId: number,
+    payload: InfractionReviewPayload,
+): Promise<InfractionReviewResult> {
+    const response = await api.patch<InfractionReviewResult>(
+        `${BASE_PATH}/${appointmentId}/review`,
+        payload,
+    );
+    return response.data;
+}
+
+export interface BulkArrivalsResult {
+    created: number;
+    skipped: number;
+    errors: { row: number; reason: string }[];
+}
+
+export async function importArrivalsCSV(file: File): Promise<BulkArrivalsResult> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const response = await api.post<BulkArrivalsResult>(`${BASE_PATH}/bulk`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+}
+
 /**
  * Update visit status (e.g., to 'completed' when truck leaves)
  */

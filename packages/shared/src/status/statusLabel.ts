@@ -39,14 +39,15 @@ export function getPrimaryLabel(appt: Pick<Appointment, 'status' | 'display_stat
  * Suppresses sub-badges when the appointment is in a terminal state.
  */
 export function getSubBadges(
-  appt: Pick<Appointment, 'status' | 'display_status' | 'is_delayed' | 'is_unloading'>,
-): Array<'delayed' | 'unloading'> {
+  appt: Pick<Appointment, 'status' | 'display_status' | 'is_delayed' | 'is_unloading' | 'is_visit_done'>,
+): Array<'delayed' | 'unloading' | 'leaving_port'> {
   const primary = appt.display_status ?? appt.status;
   if (primary === 'completed' || primary === 'canceled') return [];
 
-  const badges: Array<'delayed' | 'unloading'> = [];
+  const badges: Array<'delayed' | 'unloading' | 'leaving_port'> = [];
   if (appt.is_delayed || primary === 'delayed') badges.push('delayed');
   if (appt.is_unloading || primary === 'unloading') badges.push('unloading');
+  if (appt.is_visit_done && (appt.status === 'in_process' || primary === 'leaving_port')) badges.push('leaving_port');
   return badges;
 }
 

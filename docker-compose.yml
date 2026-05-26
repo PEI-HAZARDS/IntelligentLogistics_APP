@@ -12,6 +12,7 @@ services:
         VITE_SUBTITLE: ${VITE_SUBTITLE}
         VITE_LOGO_PATH: ${VITE_LOGO_PATH}
         VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL}
+        VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
       - "8080:80"
     networks:
@@ -30,6 +31,7 @@ services:
         VITE_SUBTITLE: ${VITE_SUBTITLE}
         VITE_LOGO_PATH: ${VITE_LOGO_PATH}
         VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL}
+        VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
       - "8081:80"
     networks:

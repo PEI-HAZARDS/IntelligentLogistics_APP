@@ -9,11 +9,15 @@ import {
     getAlertsBreakdown,
     getTransportStats,
     getDecisionAnalytics,
+    getSustainabilitySummary,
+    getSustainabilityTrend,
     type DashboardSummary,
     type VolumeDataPoint,
     type AlertsBreakdown,
     type TransportStats,
     type DecisionAnalytics,
+    type SustainabilitySummary,
+    type SustainabilityTrendPoint,
 } from '@/services/statistics';
 import { getActiveAlerts } from '@/services/alerts';
 import type { Alert } from '@/types/types';
@@ -73,5 +77,26 @@ export function useActiveAlerts(limit: number = 5) {
         queryFn: () => getActiveAlerts(limit),
         refetchInterval: 15_000,
         staleTime: 10_000,
+    });
+}
+
+export function useSustainabilitySummary(from: string, to: string) {
+    return useQuery<SustainabilitySummary>({
+        queryKey: ['statistics', 'sustainability', 'summary', from, to],
+        queryFn: () => getSustainabilitySummary(from, to),
+        refetchInterval: 60_000,
+        staleTime: 30_000,
+    });
+}
+
+export function useSustainabilityTrend(
+    granularity: 'day' | 'week' | 'month' = 'day',
+    nPeriods = 7
+) {
+    return useQuery<SustainabilityTrendPoint[]>({
+        queryKey: ['statistics', 'sustainability', 'trend', granularity, nPeriods],
+        queryFn: () => getSustainabilityTrend(granularity, nPeriods),
+        refetchInterval: 60_000,
+        staleTime: 30_000,
     });
 }

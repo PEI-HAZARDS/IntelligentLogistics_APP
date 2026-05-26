@@ -116,7 +116,7 @@ function ArrivalsList() {
   }, [searchQuery, debouncedSearch]);
 
   // Detail modal state — stores the appointment ID to fetch full detail
-  const [selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
+  const [_selectedArrival, setSelectedArrival] = useState<UIArrival | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
 
   // Get gate ID from URL param (e.g. /gate/1/arrivals)
@@ -239,26 +239,62 @@ function ArrivalsList() {
       const messageType = data.message_type as string | undefined;
 
       // ── status_changed: appointment_id + new_status ──
+      // new_status may be an appointment status (in_process, completed…)
+      // OR a visit sub-state (unloading, done, in_port) sent by the driver visit PATCH.
+      // These must be handled separately — visit states only update sub-badges, never the primary label.
       if (messageType === "status_changed") {
         const appointmentId = data.appointment_id as number;
-        const newStatus = data.new_status as AppointmentStatusEnum;
+        const newStatus = data.new_status as string;
         const target = arrivalsRef.current.find(a => a.id === appointmentId);
 
-        if (target && target.apiStatus !== newStatus) {
+        // ── Visit sub-state: update flags only, leave primary status untouched ──
+        const visitSubstateMap: Record<string, Partial<{ isUnloading: boolean; isVisitDone: boolean }>> = {
+          unloading: { isUnloading: true,  isVisitDone: false },
+          done:      { isUnloading: false, isVisitDone: true  },
+          in_port:   { isUnloading: false, isVisitDone: false },
+        };
+        if (visitSubstateMap[newStatus]) {
+          if (target) {
+            setArrivals(prev => prev.map(a =>
+              a.id === appointmentId ? { ...a, ...visitSubstateMap[newStatus] } : a
+            ));
+          }
+          return;
+        }
+
+        // ── Appointment status change ──
+        const APPT_STATUSES = new Set(['scheduled', 'in_transit', 'in_process', 'completed', 'canceled']);
+        if (!APPT_STATUSES.has(newStatus)) return; // unknown status — ignore
+
+        const apptStatus = newStatus as AppointmentStatusEnum;
+        if (target && target.apiStatus !== apptStatus) {
           const oldStatus = target.apiStatus;
           setStats(prev => {
             const next = { ...prev };
             next[oldStatus] = Math.max(0, (next[oldStatus] || 0) - 1);
-            next[newStatus] = (next[newStatus] || 0) + 1;
+            next[apptStatus] = (next[apptStatus] || 0) + 1;
             return next;
           });
-          setArrivals(prev => prev.map(a =>
-            a.id === appointmentId
-              ? { ...a, apiStatus: newStatus, status: labelForStatus(newStatus) }
-              : a
-          ));
+          const isTerminal = apptStatus === 'completed' || apptStatus === 'canceled';
+          setArrivals(prev => {
+            const updated = prev.map(a =>
+              a.id === appointmentId
+                ? {
+                    ...a,
+                    apiStatus: apptStatus,
+                    status: labelForStatus(apptStatus),
+                    primaryStatus: labelForStatus(apptStatus),
+                    ...(isTerminal && { isUnloading: false, isVisitDone: false, isDelayed: false }),
+                  }
+                : a
+            );
+            // Remove row if it no longer matches the active status filter
+            if (isTerminal && statusFilter !== 'all' && statusFilter !== 'Violators') {
+              return updated.filter(a => a.id !== appointmentId || a.apiStatus === mapStatusToAPI(statusFilter));
+            }
+            return updated;
+          });
         } else if (!target) {
-          // Appointment not on current page — can't compute delta, refetch stats
           fetchData();
         }
         return;

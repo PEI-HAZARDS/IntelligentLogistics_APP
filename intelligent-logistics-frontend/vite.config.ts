@@ -14,12 +14,12 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     envDir: '../', // shared .env lives in IntelligentLogistics_APP/
     resolve: {
+      // Force a single React copy — prevents "Q is null" when npm workspace
+      // hoisting creates a nested react (e.g. driver pins 19.1.0, frontend ^19.2.0).
+      dedupe: ['react', 'react-dom', 'react-router-dom'],
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@il/shared": path.resolve(__dirname, "../packages/shared/src"),
-        // Shared package source is resolved by Rollup relative to packages/shared/,
-        // which has no node_modules. Pin axios to the frontend's own copy.
-        "axios": path.resolve(__dirname, "./node_modules/axios"),
       },
     },
     preview: {

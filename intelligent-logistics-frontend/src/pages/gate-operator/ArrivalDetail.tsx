@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import { getArrival } from "@/services/arrivals";
 import type { Appointment } from "@/types/types";
-import { labelForStatus, getSubBadges } from "@/lib/statusLabel";
+import { labelForStatus } from "@/lib/statusLabel";
 import "./ArrivalDetail.css";
 
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value }: { label: string; value?: string | React.ReactNode | null }) {
   if (!value) return null;
   return (
     <div className="ad-row">

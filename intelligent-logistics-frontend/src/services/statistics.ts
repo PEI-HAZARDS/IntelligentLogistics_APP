@@ -118,3 +118,50 @@ export async function getAlertsBreakdown(
     const response = await api.get('/statistics/alerts', { params });
     return response.data;
 }
+
+export interface WaitDistribution {
+    "0_5": number;
+    "5_15": number;
+    "15_30": number;
+    over_30: number;
+}
+
+export interface SustainabilitySummary {
+    from_date: string;
+    to_date: string;
+    trucks_processed: number;
+    trucks_delayed: number;
+    avg_waiting_minutes: number;
+    total_waiting_minutes: number;
+    total_co2_kg_estimate: number;
+    avg_co2_per_truck_kg: number;
+    appointments_excluded?: number;
+    wait_distribution?: WaitDistribution;
+}
+
+export interface SustainabilityTrendPoint {
+    period: string;
+    trucks_processed: number;
+    avg_waiting_minutes: number;
+    total_co2_kg: number;
+}
+
+export async function getSustainabilitySummary(
+    from: string,
+    to: string
+): Promise<SustainabilitySummary> {
+    const response = await api.get('/statistics/sustainability/summary', {
+        params: { from_date: from, to_date: to },
+    });
+    return response.data;
+}
+
+export async function getSustainabilityTrend(
+    granularity: 'day' | 'week' | 'month' = 'day',
+    nPeriods = 7
+): Promise<SustainabilityTrendPoint[]> {
+    const response = await api.get('/statistics/sustainability/trend', {
+        params: { granularity, n_periods: nPeriods },
+    });
+    return response.data;
+}

@@ -16,24 +16,57 @@ import {
     User,
     FileText,
     Download,
+    Clock,
+    File,
 } from "lucide-react";
+
+const HISTORY_KEY = "report_download_history_v1";
+
+interface HistoryEntry {
+    id: string;
+    name: string;
+    format: "PDF" | "CSV";
+    date: string; // ISO string for localStorage serialization
+}
+
+function timeAgo(isoDate: string): string {
+    const diff = Date.now() - new Date(isoDate).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return `${min}m ago`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+}
 
 export default function ManagerHeader() {
     const { isDarkMode, toggleTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isReportsOpen, setIsReportsOpen] = useState(false);
+    const [recentReports, setRecentReports] = useState<HistoryEntry[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const reportsDropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
-    // Get user info from localStorage
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    const userName = userInfo.name || userInfo.email || 'Manager';
-    const userRole = userInfo.role || 'Logistics Manager';
+    const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const userName = userInfo.name || userInfo.email || "Manager";
+    const userRole = userInfo.role || "Logistics Manager";
 
-    // Close dropdown when clicking outside
+    // Load report history from localStorage
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(HISTORY_KEY);
+            if (stored) setRecentReports(JSON.parse(stored).slice(0, 5));
+        } catch {}
+    }, [isReportsOpen]); // refresh when dropdown opens
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
+            }
+            if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(event.target as Node)) {
+                setIsReportsOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -45,25 +78,22 @@ export default function ManagerHeader() {
         navigate("/login");
     };
 
-    // Get current time for display
     const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
     }, []);
 
-    const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    };
+    const formatTime = (date: Date) =>
+        date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-    const formatDate = (date: Date) => {
-        return date.toLocaleDateString('en-GB', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
+    const formatDate = (date: Date) =>
+        date.toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
         });
-    };
 
     return (
         <header className="manager-header">
@@ -86,10 +116,53 @@ export default function ManagerHeader() {
             </div>
 
             <div className="header-right">
-                {/* Quick Export Button */}
-                <button className="header-icon-btn" aria-label="Export Report">
-                    <Download size={20} />
-                </button>
+                {/* Quick Export / Recent Reports Dropdown */}
+                <div className="reports-btn-wrap" ref={reportsDropdownRef}>
+                    <button
+                        className={`header-icon-btn${isReportsOpen ? " active" : ""}`}
+                        aria-label="Recent Reports"
+                        onClick={() => setIsReportsOpen(p => !p)}
+                    >
+                        <Download size={20} />
+                        {recentReports.length > 0 && (
+                            <span className="reports-badge">{recentReports.length}</span>
+                        )}
+                    </button>
+
+                    {isReportsOpen && (
+                        <div className="reports-dropdown">
+                            <div className="reports-dropdown-header">
+                                <span>Recent Exports</span>
+                            </div>
+                            {recentReports.length === 0 ? (
+                                <div className="reports-dropdown-empty">
+                                    <Clock size={16} />
+                                    <span>No exports yet</span>
+                                </div>
+                            ) : (
+                                <ul className="reports-dropdown-list">
+                                    {recentReports.map(entry => (
+                                        <li key={entry.id} className="reports-dropdown-item">
+                                            <span className={`reports-fmt-badge reports-fmt-${entry.format.toLowerCase()}`}>
+                                                <File size={11} />
+                                                {entry.format}
+                                            </span>
+                                            <span className="reports-item-name">{entry.name}</span>
+                                            <span className="reports-item-time">{timeAgo(entry.date)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <button
+                                className="reports-dropdown-footer"
+                                onClick={() => { setIsReportsOpen(false); navigate("/manager/reports"); }}
+                            >
+                                <FileText size={13} />
+                                View all reports
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {/* Theme Toggle */}
                 <button
@@ -121,7 +194,7 @@ export default function ManagerHeader() {
                                 <span className="dropdown-role">{userRole}</span>
                             </div>
                             <div className="dropdown-divider" />
-                            <button className="dropdown-item" onClick={() => navigate('/manager/reports')}>
+                            <button className="dropdown-item" onClick={() => navigate("/manager/reports")}>
                                 <FileText size={16} />
                                 <span>Reports</span>
                             </button>

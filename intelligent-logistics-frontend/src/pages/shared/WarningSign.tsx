@@ -198,21 +198,21 @@ export default function WarningSign() {
           }`}>
           {/* LED flashing corner lights (often seen on these signs) */}
           <div
-            className={`absolute top-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : "bg-amber-900/40"} `}
+            className={`absolute top-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
           ></div>
           <div
-            className={`absolute top-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : "bg-amber-900/40"} `}
+            className={`absolute top-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
           ></div>
 
           <div
-            className={`absolute bottom-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : "bg-amber-900/40"} `}
+            className={`absolute bottom-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
           ></div>
           <div
-            className={`absolute bottom-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-600'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : "bg-amber-900/40"} `}
+            className={`absolute bottom-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
+              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
           ></div>
 
           {/* The actual display area */}

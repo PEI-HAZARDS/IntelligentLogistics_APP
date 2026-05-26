@@ -12,11 +12,13 @@ import { colors, spacing, borderRadius, fontSize } from '../theme/colors';
 // Screens
 import ActiveArrivalScreen from '../screens/ActiveArrivalScreen';
 import ArrivalsScreen from '../screens/ArrivalsScreen';
+import AvailableBookingsScreen from '../screens/AvailableBookingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 export type MainDrawerParamList = {
     Home: undefined;
     Arrivals: undefined;
+    AvailableBookings: undefined;
     Profile: undefined;
 };
 
@@ -80,6 +82,17 @@ export default function MainDrawerNavigator() {
                     headerRight: () => <HeaderRight />,
                     drawerIcon: ({ color, size }) => (
                         <Ionicons name="list" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Drawer.Screen
+                name="AvailableBookings"
+                component={AvailableBookingsScreen}
+                options={{
+                    title: 'Available Bookings',
+                    headerRight: () => <HeaderRight />,
+                    drawerIcon: ({ color, size }) => (
+                        <Ionicons name="calendar-outline" size={size} color={color} />
                     ),
                 }}
             />
