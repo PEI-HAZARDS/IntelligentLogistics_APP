@@ -3,7 +3,8 @@ import {
     Leaf, Clock, AlertTriangle, Truck,
     ChevronDown, ChevronUp, RefreshCw, AlertCircle, Zap,
 } from "lucide-react";
-import GrafanaPanel from "@/components/common/GrafanaPanel";
+import SimulatedEnergyGraph from "@/components/common/SimulatedEnergyGraph";
+// import GrafanaPanel from "@/components/common/GrafanaPanel";
 import Co2TrendChart from "@/components/common/Co2TrendChart";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSustainabilitySummary, useSustainabilityTrend } from "@/hooks/useStatistics";
@@ -310,11 +311,18 @@ export default function SustainabilityPage() {
                     <span className="sus-card-sub">5G energy metrics from the port network</span>
                 </div>
                 <div className="sus-ran-panel">
+                    <SimulatedEnergyGraph isDarkMode={true} />
+                    {/*
+                     * GrafanaPanel desligado: o painel original liga ao sistema real
+                     * do porto (RAN 5G via Grafana) e não está acessível fora dessa
+                     * rede. Mantido aqui comentado para reactivação em produção.
+                     *
                     <GrafanaPanel
                         dashboardId="adcptvw/new-dashboard"
                         panelId="panel-1"
                         title="Energy consumption panel"
                     />
+                    */}
                 </div>
             </div>
 
