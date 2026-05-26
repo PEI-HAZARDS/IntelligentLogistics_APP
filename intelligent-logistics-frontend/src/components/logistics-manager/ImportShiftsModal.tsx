@@ -4,7 +4,7 @@ import { importShiftsCSV, type BulkShiftResult } from "@/services/workers";
 
 interface Props {
     onClose: () => void;
-    onImported: () => void;
+    onImported: (res: BulkShiftResult) => void;
 }
 
 const CSV_TEMPLATE = [
@@ -59,7 +59,7 @@ export default function ImportShiftsModal({ onClose, onImported }: Props) {
             const res = await importShiftsCSV(file);
             setResult(res);
             setStage("done");
-            if (res.created > 0) onImported();
+            onImported(res);
         } catch (err: unknown) {
             const msg =
                 (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail

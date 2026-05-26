@@ -9,6 +9,7 @@ import AddShiftModal from "@/components/logistics-manager/AddShiftModal";
 import ImportShiftsModal from "@/components/logistics-manager/ImportShiftsModal";
 import ImportAppointmentsModal from "@/components/logistics-manager/ImportAppointmentsModal";
 import { useQueryClient } from "@tanstack/react-query";
+import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 
 // Shift status type
 type ShiftStatus = 'active' | 'pending' | 'completed' | 'inactive';
@@ -31,6 +32,7 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
 
 export default function ShiftsPage() {
     const queryClient = useQueryClient();
+    const { toasts, addToast, dismissToast } = useToasts();
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -97,24 +99,50 @@ export default function ShiftsPage() {
 
     return (
         <div className="shifts-page">
+            <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
             {showAddModal && (
                 <AddShiftModal
                     onClose={() => setShowAddModal(false)}
-                    onCreated={() => { setShowAddModal(false); fetchShifts(); }}
+                    onCreated={() => {
+                        setShowAddModal(false);
+                        fetchShifts();
+                        addToast({ type: 'success', title: 'Shift Created', message: 'The shift was created successfully.' });
+                    }}
                 />
             )}
             {showImportModal && (
                 <ImportShiftsModal
                     onClose={() => setShowImportModal(false)}
-                    onImported={() => { fetchShifts(); }}
+                    onImported={(res) => {
+                        if (res.created > 0) {
+                            fetchShifts();
+                            addToast({
+                                type: res.errors.length > 0 || res.skipped > 0 ? 'warning' : 'success',
+                                title: res.errors.length > 0 || res.skipped > 0 ? 'Import Completed with Warnings' : 'Import Successful',
+                                message: `Successfully imported ${res.created} shifts.`
+                            });
+                        }
+                        if (res.errors.length === 0 && res.skipped === 0) {
+                            setShowImportModal(false);
+                        }
+                    }}
                 />
             )}
             {showImportAppointmentsModal && (
                 <ImportAppointmentsModal
                     onClose={() => setShowImportAppointmentsModal(false)}
-                    onImported={() => {
-                        setShowImportAppointmentsModal(false);
-                        queryClient.invalidateQueries({ queryKey: ["arrivals"] });
+                    onImported={(res) => {
+                        if (res.created > 0) {
+                            queryClient.invalidateQueries({ queryKey: ["arrivals"] });
+                            addToast({
+                                type: res.errors.length > 0 || res.skipped > 0 ? 'warning' : 'success',
+                                title: res.errors.length > 0 || res.skipped > 0 ? 'Import Completed with Warnings' : 'Import Successful',
+                                message: `Successfully imported ${res.created} appointments.`
+                            });
+                        }
+                        if (res.errors.length === 0 && res.skipped === 0) {
+                            setShowImportAppointmentsModal(false);
+                        }
                     }}
                 />
             )}

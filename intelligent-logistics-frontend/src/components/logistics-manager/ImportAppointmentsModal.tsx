@@ -4,7 +4,7 @@ import { importArrivalsCSV, type BulkArrivalsResult } from "@/services/arrivals"
 
 interface Props {
     onClose: () => void;
-    onImported: () => void;
+    onImported: (res: BulkArrivalsResult) => void;
 }
 
 const CSV_TEMPLATE = [
@@ -59,7 +59,7 @@ export default function ImportAppointmentsModal({ onClose, onImported }: Props) 
             const res = await importArrivalsCSV(file);
             setResult(res);
             setStage("done");
-            if (res.created > 0) onImported();
+            onImported(res);
         } catch (err: unknown) {
             const msg =
                 (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
