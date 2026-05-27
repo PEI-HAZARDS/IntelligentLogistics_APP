@@ -1,38 +1,67 @@
 services:
   gate-ui:
     build:
-      context: ./intelligent-logistics-frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: intelligent-logistics-frontend/Dockerfile
+      args:
+        VITE_MODE: gate
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_WS_URL: ${VITE_WS_URL}
+        VITE_GRAFANA_URL: ${VITE_GRAFANA_URL}
+        VITE_PORT_NAME: ${VITE_PORT_NAME}
+        VITE_SUBTITLE: ${VITE_SUBTITLE}
+        VITE_LOGO_PATH: ${VITE_LOGO_PATH}
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL}
+        VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
-      - "5173:5173"
-    command: npm run dev:gate -- --host
-    env_file: .env
+      - "8080:80"
     networks:
       - logistics-network
 
   manager-ui:
     build:
-      context: ./intelligent-logistics-frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: intelligent-logistics-frontend/Dockerfile
+      args:
+        VITE_MODE: manager
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_WS_URL: ${VITE_WS_URL}
+        VITE_GRAFANA_URL: ${VITE_GRAFANA_URL}
+        VITE_PORT_NAME: ${VITE_PORT_NAME}
+        VITE_SUBTITLE: ${VITE_SUBTITLE}
+        VITE_LOGO_PATH: ${VITE_LOGO_PATH}
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL}
+        VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
-      - "5174:5173"
-    command: npm run dev:manager -- --host
-    env_file: .env
+      - "8081:80"
     networks:
       - logistics-network
-      
+
+  api-proxy:
+    build:
+      context: ./infra/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+      - "8189:8189/udp"
+    networks:
+      - logistics-network
 
   driver-app:
     build:
-      context: ./intelligent-logistics-driver
+      context: .
+      dockerfile: intelligent-logistics-driver/Dockerfile
     ports:
-      - "8081:8081"
+      - "8082:8082"
+    networks:
+      - logistics-network
     environment:
       - CHOKIDAR_USEPOLLING=true
       - EXPO_USE_DEV_SERVER=true
       - REACT_NATIVE_PACKAGER_HOSTNAME=${REACT_NATIVE_PACKAGER_HOSTNAME}
-      - EXPO_PUBLIC_API_URL=${VITE_API_URL}
-      - EXPO_PUBLIC_WS_URL=${VITE_WS_URL}
+      - EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL}
+      - EXPO_PUBLIC_WS_URL=${EXPO_PUBLIC_WS_URL}
+    command: ["npm", "start", "--", "--port", "8082"]
     develop:
       watch:
         - action: sync
@@ -40,6 +69,9 @@ services:
           target: /app
           ignore:
             - node_modules/
+        - action: sync
+          path: ./packages/shared
+          target: /packages/shared
     stdin_open: true
     tty: true
 

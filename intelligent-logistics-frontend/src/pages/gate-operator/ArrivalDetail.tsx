@@ -13,22 +13,10 @@ import {
 } from "lucide-react";
 import { getArrival } from "@/services/arrivals";
 import type { Appointment } from "@/types/types";
+import { labelForStatus } from "@/lib/statusLabel";
 import "./ArrivalDetail.css";
 
-function statusLabel(s: string): string {
-  const map: Record<string, string> = {
-    scheduled:   "Scheduled",
-    in_transit:  "In Transit",
-    in_process:  "In Process",
-    unloading:   "Unloading",
-    delayed:     "Delayed",
-    completed:   "Completed",
-    canceled:    "Canceled",
-  };
-  return map[s] ?? s;
-}
-
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value }: { label: string; value?: string | React.ReactNode | null }) {
   if (!value) return null;
   return (
     <div className="ad-row">
@@ -119,7 +107,7 @@ export default function ArrivalDetail() {
               value={
                 <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
                   <span className={`status-badge status-${((appointment as any).primary_status ?? appointment.status).toLowerCase().replace(/\s/g, '-')}`}>
-                    {statusLabel((appointment as any).primary_status ?? appointment.status)}
+                    {labelForStatus((appointment as any).primary_status ?? appointment.status)}
                   </span>
                   {((appointment as any).is_delayed ?? appointment.status === 'delayed') && (
                     <span className="status-badge status-delayed-substate">Delayed</span>

@@ -21,6 +21,7 @@ interface Alert {
     read: boolean;
     licensePlate?: string;
     decision?: string;
+    messageType?: string;
 }
 
 export default function AlertsPage() {
@@ -41,32 +42,95 @@ export default function AlertsPage() {
 
             const messages = JSON.parse(saved) as Array<{ id: string; timestamp: string; data: any }>;
 
-            const parsedAlerts: Alert[] = messages.map((msg) => {
-                const payload = msg.data?.payload;
-                const decision = payload?.decision || "UNKNOWN";
-                const licensePlate = payload?.licensePlate || "N/A";
+            const parsedAlerts: Alert[] = messages
+                .map((msg): Alert | null => {
+                    // Data is stored flat — no extra .payload wrapper
+                    const d = msg.data;
+                    if (!d) return null;
 
-                let type: "warning" | "info" | "danger" = "info";
-                if (decision === "REJECTED") type = "danger";
-                else if (decision === "MANUAL_REVIEW") type = "warning";
+                    const msgType: string = d.message_type || "unknown";
+                    const plate: string | undefined = d.license_plate || undefined;
 
-                // Get alerts from payload or create message from decision
-                const alertMessages = payload?.alerts || [];
-                const alertText = alertMessages.length > 0
-                    ? alertMessages.join(", ")
-                    : `${decision}: ${licensePlate}`;
+                    // ── decision_results ────────────────────────────────────
+                    if (msgType === "decision_results" || msgType === "plate_decision") {
+                        const decision: string = (d.decision as string)?.toUpperCase() || "–";
+                        let type: "warning" | "info" | "danger" = "info";
+                        if (decision === "REJECTED") type = "danger";
+                        else if (decision === "MANUAL_REVIEW") type = "warning";
 
-                return {
-                    id: msg.id,
-                    type,
-                    title: `Detection - ${licensePlate}`,
-                    message: alertText,
-                    timestamp: new Date(msg.timestamp).toLocaleString(),
-                    read: false,
-                    licensePlate,
-                    decision,
-                };
-            });
+                        const alertMessages: string[] = Array.isArray(d.alerts) ? d.alerts : [];
+                        const message = alertMessages.length > 0
+                            ? alertMessages.join(", ")
+                            : d.decision_reason || `Decision: ${decision}`;
+
+                        return {
+                            id: msg.id,
+                            type,
+                            title: `Detection — ${plate ?? "N/A"}`,
+                            message,
+                            timestamp: new Date(msg.timestamp).toLocaleString("en-GB"),
+                            read: false,
+                            licensePlate: plate,
+                            decision,
+                            messageType: msgType,
+                        };
+                    }
+
+                    // ── infraction_decision ──────────────────────────────────
+                    if (msgType === "infraction_decision") {
+                        const alertMessages: string[] = Array.isArray(d.alerts) ? d.alerts : [];
+                        const message = alertMessages.length > 0
+                            ? alertMessages.join(", ")
+                            : d.decision_reason || "Infraction recorded";
+
+                        return {
+                            id: msg.id,
+                            type: "danger",
+                            title: `Infraction — ${plate ?? "N/A"}`,
+                            message,
+                            timestamp: new Date(msg.timestamp).toLocaleString("en-GB"),
+                            read: false,
+                            licensePlate: plate,
+                            messageType: msgType,
+                        };
+                    }
+
+                    // ── status_changed ───────────────────────────────────────
+                    if (msgType === "status_changed") {
+                        const newStatus: string = d.new_status || d.status || "–";
+                        const apptId: string | undefined = d.appointment_id != null
+                            ? String(d.appointment_id)
+                            : undefined;
+
+                        return {
+                            id: msg.id,
+                            type: "info",
+                            title: `Status update${plate ? ` — ${plate}` : apptId ? ` — #${apptId}` : ""}`,
+                            message: `Appointment moved to: ${newStatus.replace(/_/g, " ")}`,
+                            timestamp: new Date(msg.timestamp).toLocaleString("en-GB"),
+                            read: false,
+                            licensePlate: plate,
+                            messageType: msgType,
+                        };
+                    }
+
+                    // ── fallback: skip internal/infra messages ───────────────
+                    if (["scale_network", "ping", "heartbeat"].includes(msgType)) return null;
+
+                    // ── generic fallback for any other message type ───────────
+                    const alertMessages: string[] = Array.isArray(d.alerts) ? d.alerts : [];
+                    return {
+                        id: msg.id,
+                        type: "info",
+                        title: msgType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+                        message: alertMessages.join(", ") || d.decision_reason || "–",
+                        timestamp: new Date(msg.timestamp).toLocaleString("en-GB"),
+                        read: false,
+                        licensePlate: plate,
+                        messageType: msgType,
+                    };
+                })
+                .filter((a): a is Alert => a !== null);
 
             // Sort by timestamp descending (newest first)
             parsedAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -202,11 +266,26 @@ export default function AlertsPage() {
                                     <span className="alert-time">{alert.timestamp}</span>
                                 </div>
                                 <p className="alert-message">{alert.message}</p>
-                                {alert.decision && (
-                                    <span className={`decision-badge decision-${alert.decision.toLowerCase().replace("_", "-")}`} style={{ marginTop: "0.5rem", display: "inline-block" }}>
-                                        {alert.decision}
+                                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.35rem" }}>
+                                {alert.decision && alert.decision !== "–" && (
+                                    <span className={`decision-badge decision-${alert.decision.toLowerCase().replace("_", "-")}`}>
+                                        {alert.decision.replace(/_/g, " ")}
                                     </span>
                                 )}
+                                {alert.messageType && (
+                                    <span style={{
+                                        fontSize: "0.68rem",
+                                        padding: "0.15rem 0.45rem",
+                                        borderRadius: "4px",
+                                        background: "var(--bg-hover)",
+                                        color: "var(--text-muted)",
+                                        border: "1px solid var(--border-color)",
+                                        fontFamily: "ui-monospace, monospace",
+                                    }}>
+                                        {alert.messageType}
+                                    </span>
+                                )}
+                                </div>
                             </div>
                             <button
                                 onClick={() => handleDeleteAlert(alert.id)}

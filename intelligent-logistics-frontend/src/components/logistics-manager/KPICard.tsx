@@ -57,7 +57,7 @@ export default function KPICard({
             {change !== undefined && change !== null && (
                 <div className={`kpi-change ${change >= 0 ? "positive" : "negative"}`}>
                     {change >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                    <span>{change >= 0 ? "+" : ""}{change.toFixed(1)}% vs. período anterior</span>
+                    <span>{change >= 0 ? "+" : ""}{change.toFixed(1)}% vs. previous period</span>
                 </div>
             )}
         </div>

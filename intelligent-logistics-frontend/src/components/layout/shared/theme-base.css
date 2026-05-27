@@ -65,8 +65,8 @@
 }
 
 .light-mode {
-  --bg-primary: #ECEFF1;
-  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #ECEFF1 100%);
+  --bg-primary: #F2F3F5;
+  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #F2F3F5 100%);
   --bg-surface: rgba(255, 255, 255, 0.85);
   --bg-surface-glass: rgba(255, 255, 255, 0.92);
   --bg-card: #ffffff;
@@ -349,5 +349,12 @@
   background: rgba(59, 130, 246, 0.12);
   color: #93C5FD;
   border: 1px dashed rgba(59, 130, 246, 0.45);
+  font-size: 0.7rem;
+}
+
+.status-badge.status-leaving-port {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+  border: 1px dashed rgba(34, 197, 94, 0.45);
   font-size: 0.7rem;
 }

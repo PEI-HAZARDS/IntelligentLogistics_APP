@@ -188,6 +188,7 @@ export default function HomeScreen() {
         try {
             const result = await claimArrival({
                 arrival_id: pinCode.trim(),
+                booking_reference: '',  // HomeScreen claim uses PIN only; backend accepts empty ref
             });
 
             // Haptic success feedback

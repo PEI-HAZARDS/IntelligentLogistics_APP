@@ -71,6 +71,12 @@ function normalizeWsBaseUrl(rawBaseUrl?: string): string {
         }
     }
 
+    if (input.startsWith('/') && typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const path = input.replace(/\/+$/, '');
+        return `${protocol}//${window.location.host}${path}`;
+    }
+
     const sanitized = input.replace(/^\/+/, '').replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -88,9 +94,10 @@ class GateWebSocket {
     private connectHandlers: Set<ConnectionHandler> = new Set();
     private disconnectHandlers: Set<ConnectionHandler> = new Set();
     private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private reconnectDelay = 3000;
+    private readonly BASE_RECONNECT_MS = 1000;
+    private readonly MAX_RECONNECT_MS = 30000;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private _stopped = false;
 
     constructor(gateId: string | number, baseUrl?: string) {
         this.gateId = gateId;
@@ -165,18 +172,19 @@ class GateWebSocket {
     }
 
     /**
-     * Attempt to reconnect with exponential backoff
+     * Attempt to reconnect with exponential backoff, capped at MAX_RECONNECT_MS.
+     * Retries indefinitely — the gate operator dashboard runs for entire shifts.
      */
     private attemptReconnect(): void {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.log('[WS] Max reconnect attempts reached');
-            return;
-        }
+        if (this._stopped) return;
 
         this.reconnectAttempts++;
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        const delay = Math.min(
+            this.BASE_RECONNECT_MS * Math.pow(2, this.reconnectAttempts - 1),
+            this.MAX_RECONNECT_MS,
+        );
 
-        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
         this.reconnectTimer = setTimeout(() => {
             this.connect();
@@ -197,7 +205,7 @@ class GateWebSocket {
             this.ws = null;
         }
 
-        this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+        this._stopped = true; // Prevent auto-reconnect after explicit disconnect
 
         // Clear all handlers to prevent accumulation
         this.messageHandlers.clear();
@@ -205,6 +213,20 @@ class GateWebSocket {
         this.disconnectHandlers.clear();
 
         console.log('[WS] Disconnected and handlers cleared');
+    }
+
+    /**
+     * Cancel any pending reconnect timer and connect immediately.
+     * Use when the operator explicitly requests a reconnect.
+     */
+    reconnectNow(): void {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this._stopped = false;
+        this.reconnectAttempts = 0;
+        this.connect();
     }
 
     /**
@@ -216,6 +238,7 @@ class GateWebSocket {
             this.reconnectTimer = null;
         }
         this.reconnectAttempts = 0;
+        this._stopped = false;
         console.log('[WS] Connection state reset');
     }
 
@@ -255,12 +278,37 @@ class GateWebSocket {
      */
     static extractCrops(payload: DecisionUpdatePayload): CropUpdate {
         return {
-            lpCrop: payload.license_crop_url,
-            hzCrop: payload.hazard_crop_url,
+            lpCrop: toGatewayMediaUrl(payload.license_crop_url),
+            hzCrop: toGatewayMediaUrl(payload.hazard_crop_url),
             lpResult: payload.license_plate,
             hzResult: payload.un || payload.kemler || undefined,
             timestamp: payload.timestamp ? new Date(payload.timestamp * 1000).toISOString() : new Date().toISOString(),
         };
+    }
+}
+
+/**
+ * Rewrite a MinIO presigned URL into a gateway-proxied URL.
+ *
+ * The agents publish presigned S3 links shaped like
+ * `http://minio-host:9000/<bucket>/<object>?X-Amz-...`. The browser cannot
+ * reach the internal MinIO directly in most deployments, so we route the
+ * GET through the gateway, which streams the bytes from MinIO server-side.
+ *
+ * Returns the input unchanged if it does not look like a MinIO URL — keeps
+ * the function safe to call on arbitrary user-provided strings.
+ */
+export function toGatewayMediaUrl(rawUrl?: string | null): string | undefined {
+    if (!rawUrl) return undefined;
+    try {
+        const parsed = new URL(rawUrl);
+        // Path is "/<bucket>/<key>". Drop the leading slash and the query (presign).
+        const path = parsed.pathname.replace(/^\/+/, '');
+        if (!path) return rawUrl;
+        const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+        return `${apiBase}/media/${path}`;
+    } catch {
+        return rawUrl;
     }
 }
 
@@ -292,6 +340,7 @@ export function useGateWebSocket(
     return {
         connect: () => ws.connect(),
         disconnect: () => ws.disconnect(),
+        reconnectNow: () => ws.reconnectNow(),
         isConnected: () => ws.isConnected(),
         onMessage: ws.onMessage.bind(ws),
         onConnect: ws.onConnect.bind(ws),

@@ -1,9 +1,14 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import GrafanaPanel from '@/components/common/GrafanaPanel';
+import SimulatedEnergyGraph from '@/components/common/SimulatedEnergyGraph';
 import { Sun, Moon } from 'lucide-react';
 
 export default function EnergyMetrics() {
     const { isDarkMode, toggleTheme } = useTheme();
+    
+    // Toggle via environment variable
+    const useSimulated = import.meta.env.VITE_USE_SIMULATED_GRAPH === 'true';
+
     return (
       <div
         className={`min-h-screen flex flex-col items-center justify-start p-4 md:p-6 xl:p-8 overflow-x-hidden overflow-y-auto ${
@@ -48,12 +53,18 @@ export default function EnergyMetrics() {
                 : "bg-white border-slate-200"
             }`}
           >
-            <div className="w-full h-32 sm:h-52 md:h-64 lg:h-80">
-                <GrafanaPanel
-                    dashboardId="adcptvw/new-dashboard"
-                    panelId="panel-1"
-                    title="Energy consumption panel"
-                />
+            <div className="w-full h-64 sm:h-80 md:h-[400px] relative p-4">
+                {useSimulated ? (
+                    <>
+                        <SimulatedEnergyGraph isDarkMode={isDarkMode} />
+                    </>
+                ) : (
+                    <GrafanaPanel
+                        dashboardId="adcptvw/new-dashboard"
+                        panelId="1"
+                        title="Energy consumption panel"
+                    />
+                )}
             </div>
           </div>
         </div>

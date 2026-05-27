@@ -29,6 +29,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const authLogin = useAuthStore((state) => state.login);
@@ -56,8 +57,11 @@ export default function LoginScreen() {
                 role: 'driver',
             };
 
-            await authLogin(response.access_token, response.refresh_token, userInfo);
+            setSuccess(true);
             haptics.success();
+            // Brief success display before the auth store triggers navigation
+            await new Promise(resolve => setTimeout(resolve, 900));
+            await authLogin(response.access_token, response.refresh_token, userInfo);
         } catch (err: unknown) {
             console.error('Login error:', err);
 
@@ -110,8 +114,16 @@ export default function LoginScreen() {
                         Driver Area
                     </Animated.Text>
 
+                    {/* Success Message */}
+                    {success && (
+                        <Animated.View style={styles.successContainer} entering={FadeInDown.duration(300).springify()}>
+                            <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                            <Text style={styles.successText}>Login successful! Redirecting…</Text>
+                        </Animated.View>
+                    )}
+
                     {/* Error Message - Animated */}
-                    {error && (
+                    {error && !success && (
                         <Animated.View style={styles.errorContainer} entering={FadeInDown.duration(300).springify()}>
                             <Ionicons name="alert-circle" size={18} color={colors.error} />
                             <Text style={styles.errorText}>{error}</Text>
@@ -133,7 +145,7 @@ export default function LoginScreen() {
                                 onChangeText={setDriversLicense}
                                 autoCapitalize="characters"
                                 autoCorrect={false}
-                                editable={!isLoading}
+                                editable={!isLoading && !success}
                             />
                         </View>
 
@@ -151,7 +163,7 @@ export default function LoginScreen() {
                                 secureTextEntry={!showPassword}
                                 autoCapitalize="none"
                                 autoCorrect={false}
-                                editable={!isLoading}
+                                editable={!isLoading && !success}
                             />
                             <TouchableOpacity
                                 style={styles.togglePassword}
@@ -167,12 +179,21 @@ export default function LoginScreen() {
                         </View>
 
                         <TouchableOpacity
-                            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                            style={[
+                                styles.loginButton,
+                                (isLoading || success) && styles.loginButtonDisabled,
+                                success && styles.loginButtonSuccess,
+                            ]}
                             onPress={handleLoginPress}
-                            disabled={isLoading}
+                            disabled={isLoading || success}
                             activeOpacity={0.8}
                         >
-                            {isLoading ? (
+                            {success ? (
+                                <View style={styles.loadingContainer}>
+                                    <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+                                    <Text style={styles.loginButtonText}>Redirecting…</Text>
+                                </View>
+                            ) : isLoading ? (
                                 <View style={styles.loadingContainer}>
                                     <ActivityIndicator size="small" color={colors.white} />
                                     <Text style={styles.loginButtonText}>Logging in...</Text>
@@ -229,6 +250,26 @@ const styles = StyleSheet.create({
         color: colors.text.secondary,
         textAlign: 'center',
         marginBottom: spacing.xl,
+    },
+    successContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(34, 197, 94, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(34, 197, 94, 0.35)',
+        borderRadius: borderRadius.md,
+        padding: spacing.md,
+        marginBottom: spacing.lg,
+        gap: spacing.sm,
+    },
+    successText: {
+        flex: 1,
+        color: '#86efac',
+        fontSize: fontSize.sm,
+        fontWeight: fontWeight.medium,
+    },
+    loginButtonSuccess: {
+        backgroundColor: '#15803d',
     },
     errorContainer: {
         flexDirection: 'row',

@@ -1,7 +1,3 @@
-/**
- * Stream API Service
- * Fetches stream URLs from API Gateway (MediaMTX backend)
- */
 import api from '@/lib/api';
 
 export interface StreamInfo {
@@ -11,32 +7,25 @@ export interface StreamInfo {
     webrtc_url: string;
 }
 
-/**
- * Get low quality stream URL for a gate
- */
-export async function getLowStreamUrl(gateId: string): Promise<StreamInfo> {
-    const response = await api.get<StreamInfo>(`/stream/${gateId}/low`);
-    return response.data;
+export interface StreamUrls {
+    quality: 'low' | 'high';
+    webrtcUrl: string;
+    hlsUrl: string;
 }
 
-/**
- * Get high quality stream URL for a gate
- */
-export async function getHighStreamUrl(gateId: string): Promise<StreamInfo> {
-    const response = await api.get<StreamInfo>(`/stream/${gateId}/high`);
-    return response.data;
+function toAbsolute(urlOrPath: string): string {
+    if (/^https?:\/\//i.test(urlOrPath)) return urlOrPath;
+    return `${window.location.origin}${urlOrPath.startsWith('/') ? '' : '/'}${urlOrPath}`;
 }
 
-/**
- * Get stream URL for a gate with specified quality.
- * Returns the WebRTC iframe URL (ultra-low latency via MediaMTX).
- */
-export async function getStreamUrl(
+export async function getStreamUrls(
     gateId: string,
-    quality: 'low' | 'high' = 'high'
-): Promise<string> {
-    const streamInfo = quality === 'low'
-        ? await getLowStreamUrl(gateId)
-        : await getHighStreamUrl(gateId);
-    return streamInfo.webrtc_url;
+    quality: 'low' | 'high' = 'low',
+): Promise<StreamUrls> {
+    const { data } = await api.get<StreamInfo>(`/stream/${gateId}/${quality}`);
+    return {
+        quality: data.quality,
+        webrtcUrl: toAbsolute(data.webrtc_url),
+        hlsUrl: toAbsolute(data.hls_url),
+    };
 }

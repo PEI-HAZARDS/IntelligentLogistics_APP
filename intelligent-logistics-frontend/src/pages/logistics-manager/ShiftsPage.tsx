@@ -3,8 +3,13 @@
  * Allows managers to view, filter, and manage operator shifts
  */
 import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, RefreshCw, Plus, Check, Clock, User } from "lucide-react";
-import { getShifts, type ShiftListItem } from "@/services/workers";
+import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2, Upload } from "lucide-react";
+import { getShifts, deleteShift, type ShiftListItem } from "@/services/workers";
+import AddShiftModal from "@/components/logistics-manager/AddShiftModal";
+import ImportShiftsModal from "@/components/logistics-manager/ImportShiftsModal";
+import ImportAppointmentsModal from "@/components/logistics-manager/ImportAppointmentsModal";
+import { useQueryClient } from "@tanstack/react-query";
+import { ToastNotifications, useToasts } from "@/components/common/ToastNotifications";
 
 // Shift status type
 type ShiftStatus = 'active' | 'pending' | 'completed' | 'inactive';
@@ -26,8 +31,14 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
 };
 
 export default function ShiftsPage() {
+    const queryClient = useQueryClient();
+    const { toasts, addToast, dismissToast } = useToasts();
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [showImportAppointmentsModal, setShowImportAppointmentsModal] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [filters, setFilters] = useState({
         workerId: '',
         status: '' as ShiftStatus | '',
@@ -72,17 +83,82 @@ export default function ShiftsPage() {
         setFilters({ workerId: '', status: '', shiftType: '' });
     };
 
-    const handleAddShift = () => {
-        // TODO: Open modal to add new shift
-        alert('Add shift functionality under development');
+    const handleDeleteShift = async (shift: Shift) => {
+        if (!confirm(`Delete shift ${shift.gateName} / ${SHIFT_TYPE_LABELS[shift.shiftType]} on ${shift.date}?`)) return;
+        setDeletingId(shift.id);
+        try {
+            await deleteShift(shift.gateId, shift.shiftType, shift.date);
+            await fetchShifts();
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to delete shift";
+            alert(msg);
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     return (
         <div className="shifts-page">
+            <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
+            {showAddModal && (
+                <AddShiftModal
+                    onClose={() => setShowAddModal(false)}
+                    onCreated={() => {
+                        setShowAddModal(false);
+                        fetchShifts();
+                        addToast({ type: 'success', title: 'Shift Created', message: 'The shift was created successfully.' });
+                    }}
+                />
+            )}
+            {showImportModal && (
+                <ImportShiftsModal
+                    onClose={() => setShowImportModal(false)}
+                    onImported={(res) => {
+                        if (res.created > 0) {
+                            fetchShifts();
+                            addToast({
+                                type: res.errors.length > 0 || res.skipped > 0 ? 'warning' : 'success',
+                                title: res.errors.length > 0 || res.skipped > 0 ? 'Import Completed with Warnings' : 'Import Successful',
+                                message: `Successfully imported ${res.created} shifts.`
+                            });
+                        }
+                        if (res.errors.length === 0 && res.skipped === 0) {
+                            setShowImportModal(false);
+                        }
+                    }}
+                />
+            )}
+            {showImportAppointmentsModal && (
+                <ImportAppointmentsModal
+                    onClose={() => setShowImportAppointmentsModal(false)}
+                    onImported={(res) => {
+                        if (res.created > 0) {
+                            queryClient.invalidateQueries({ queryKey: ["arrivals"] });
+                            addToast({
+                                type: res.errors.length > 0 || res.skipped > 0 ? 'warning' : 'success',
+                                title: res.errors.length > 0 || res.skipped > 0 ? 'Import Completed with Warnings' : 'Import Successful',
+                                message: `Successfully imported ${res.created} appointments.`
+                            });
+                        }
+                        if (res.errors.length === 0 && res.skipped === 0) {
+                            setShowImportAppointmentsModal(false);
+                        }
+                    }}
+                />
+            )}
+
             <div className="dashboard-header">
-                <h1 className="dashboard-title">Shift Management</h1>
+                <h1 className="dashboard-title">Shifts & Appointments</h1>
                 <div className="dashboard-filters">
-                    <button className="action-btn primary" onClick={handleAddShift}>
+                    <button className="action-btn" onClick={() => setShowImportAppointmentsModal(true)}>
+                        <Upload size={16} />
+                        Import Appointments
+                    </button>
+                    <button className="action-btn" onClick={() => setShowImportModal(true)}>
+                        <Upload size={16} />
+                        Import Shifts
+                    </button>
+                    <button className="action-btn primary" onClick={() => setShowAddModal(true)}>
                         <Plus size={16} />
                         New Shift
                     </button>
@@ -217,12 +293,14 @@ export default function ShiftsPage() {
                                         </td>
                                         <td>
                                             <button
-                                                className="action-btn"
+                                                className="action-btn danger"
                                                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
-                                                onClick={() => alert(`View details for shift ${shift.id}`)}
+                                                disabled={shift.status === 'active' || deletingId === shift.id}
+                                                title={shift.status === 'active' ? 'Cannot delete an active shift' : 'Delete shift'}
+                                                onClick={() => handleDeleteShift(shift)}
                                             >
-                                                <Check size={14} />
-                                                Manage
+                                                <Trash2 size={14} />
+                                                Delete
                                             </button>
                                         </td>
                                     </tr>

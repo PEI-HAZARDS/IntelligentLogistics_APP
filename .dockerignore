@@ -1,0 +1,18 @@
+# Exclude large directories not needed for frontend Docker builds
+intelligent-logistics-driver/node_modules
+intelligent-logistics-driver/.expo
+intelligent-logistics-driver/dist
+intelligent-logistics-frontend/node_modules
+intelligent-logistics-frontend/dist
+packages/shared/node_modules
+
+# Git and IDE artifacts
+.git
+.gitignore
+.vscode
+.idea
+
+# Logs and local overrides
+*.log
+*.local
+.env.local

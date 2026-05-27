@@ -9,6 +9,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const nav = useNavigate();
 
   // Determine the app mode from Vite environment
@@ -48,12 +49,15 @@ export default function Login() {
         return;
       }
 
-      // Redirect based on role
-      if (role === 'manager') {
-        nav("/manager");
-      } else {
-        nav("/gate/1");
-      }
+      // Show success briefly before redirect
+      setSuccess(true);
+      setTimeout(() => {
+        if (role === 'manager') {
+          nav("/manager");
+        } else {
+          nav("/gate/1");
+        }
+      }, 900);
     } catch (err: unknown) {
       console.error("Login error:", err);
 
@@ -77,10 +81,14 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-background" />
+      <div className="login-background">
+        <div className="login-bg-orb login-bg-orb--1" />
+        <div className="login-bg-orb login-bg-orb--2" />
+        <div className="login-bg-orb login-bg-orb--3" />
+      </div>
 
       <div className="login-container">
-        <div className="login-card">
+        <div className={`login-card${success ? ' login-card--success' : ''}`}>
           {/* Logo */}
           <div className="login-visual">
             <img
@@ -98,8 +106,19 @@ export default function Login() {
             {mode === 'manager' ? "Logistics Manager" : "Gate Operator"}
           </p>
 
+          {/* Mensagem de sucesso */}
+          {success && (
+            <div className="login-success">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+              <span>Login successful! Redirecting…</span>
+            </div>
+          )}
+
           {/* Mensagem de erro */}
-          {error && (
+          {error && !success && (
             <div className="login-error">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -133,7 +152,7 @@ export default function Login() {
                 className="login-input"
                 aria-label="Email"
                 required
-                disabled={isLoading}
+                disabled={isLoading || success}
               />
             </div>
 
@@ -158,14 +177,14 @@ export default function Login() {
                 className="login-input"
                 aria-label="Password"
                 required
-                disabled={isLoading}
+                disabled={isLoading || success}
               />
               <button
                 type="button"
                 className="toggle-password"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label="Toggle password visibility"
-                disabled={isLoading}
+                disabled={isLoading || success}
               >
                 {showPassword ? (
                   <svg
@@ -192,8 +211,20 @@ export default function Login() {
             </div>
 
             {/* Botão de Login */}
-            <button type="submit" className="login-button" disabled={isLoading}>
-              {isLoading ? (
+            <button
+              type="submit"
+              className={`login-button${success ? ' login-button--success' : ''}`}
+              disabled={isLoading || success}
+            >
+              {success ? (
+                <span className="login-loading">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 20, height: 20 }}>
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="9 12 11 14 15 10" />
+                  </svg>
+                  Redirecting…
+                </span>
+              ) : isLoading ? (
                 <span className="login-loading">
                   <svg className="spinner" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" />

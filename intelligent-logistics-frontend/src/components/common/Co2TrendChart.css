@@ -1,0 +1,52 @@
+.co2chart-wrap {
+    padding: 0.75rem 0.5rem 0.25rem;
+    position: relative;
+}
+
+.co2chart-wrap.co2chart-loading,
+.co2chart-wrap.co2chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 160px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.co2chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.co2chart-bar {
+    transition: fill 0.15s ease;
+}
+
+.co2chart-bar-group:hover .co2chart-bar {
+    fill: url(#co2-bar-grad-hover);
+}
+
+.co2chart-yaxis-label {
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    pointer-events: none;
+    transform-origin: left center;
+}
+
+@keyframes co2chart-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.co2chart-spin {
+    animation: co2chart-spin 1s linear infinite;
+    color: var(--color-success, #22c55e);
+}

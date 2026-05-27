@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { X, ZoomIn } from 'lucide-react';
+import AuthedImage from '@/components/common/AuthedImage';
 
 interface ImagePreviewModalProps {
     isOpen: boolean;
@@ -29,7 +30,7 @@ export default function ImagePreviewModal({
                     </button>
                 </div>
                 <div className="preview-body">
-                    <img
+                    <AuthedImage
                         src={imageUrl}
                         alt={title || 'Preview'}
                         className="preview-image"

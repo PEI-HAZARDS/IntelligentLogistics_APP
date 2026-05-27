@@ -2,7 +2,7 @@
  * Export Service
  * PDF and CSV report generation for manager dashboard
  */
-import type { DashboardSummary, TransportStats, DecisionAnalytics } from './statistics';
+import type { DashboardSummary, TransportStats, DecisionAnalytics, SustainabilitySummary } from './statistics';
 
 interface ExportData {
     summary: DashboardSummary;
@@ -10,6 +10,7 @@ interface ExportData {
     transportStats: TransportStats[];
     timeRange: string;
     generatedAt: Date;
+    sustainability?: SustainabilitySummary | null;
 }
 
 /**
@@ -27,40 +28,40 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     // Header
     doc.setFontSize(20);
     doc.setTextColor(30, 41, 59);
-    doc.text('Relatório de Operações Logísticas', pageWidth / 2, 20, { align: 'center' });
+    doc.text('Logistics Operations Report', pageWidth / 2, 20, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Período: ${getTimeRangeLabel(data.timeRange)}`, pageWidth / 2, 28, { align: 'center' });
-    doc.text(`Gerado em: ${data.generatedAt.toLocaleString('pt-PT')}`, pageWidth / 2, 34, { align: 'center' });
+    doc.text(`Period: ${getTimeRangeLabel(data.timeRange)}`, pageWidth / 2, 28, { align: 'center' });
+    doc.text(`Generated at: ${data.generatedAt.toLocaleString('en-GB')}`, pageWidth / 2, 34, { align: 'center' });
 
     // Summary Section
     doc.setFontSize(14);
     doc.setTextColor(30, 41, 59);
-    doc.text('Resumo', 14, 48);
+    doc.text('Summary', 14, 48);
 
     const summaryData = [
-        ['Camiões no Porto', data.summary.trucksInPort.toString()],
-        ['Em Trânsito', data.summary.trucksInTransit.toString()],
-        ['Em Descarga', data.summary.unloadingCount.toString()],
-        ['Agendados', data.summary.scheduledCount.toString()],
-        ['Entradas', data.summary.entriesCount.toString()],
-        ['Saídas', data.summary.exitsCount.toString()],
-        ['Concluídos', data.summary.completedCount.toString()],
-        ['Tempo Médio Permanência', `${data.summary.avgPermanenceMinutes} min`],
-        ['Tempo Médio Espera', `${data.summary.avgWaitingMinutes} min`],
-        ['Taxa de Atraso', `${data.summary.delayRate.toFixed(1)}%`],
-        ['SLA Cumprido', `${data.summary.slaCompliance.toFixed(1)}%`],
-        ['Infrações', data.summary.infractionCount.toString()],
-        ['Hora de Pico', data.summary.peakHour ? `${data.summary.peakHour.hour}h (${data.summary.peakHour.count} entradas)` : 'N/A'],
-        ['Taxa de Congestionamento', `${data.summary.congestionRate}%`],
-        ['Capacidade do Porto', data.summary.portCapacity.toString()],
-        ['Veículos / Hora', data.summary.vehiclesPerHour.toString()],
+        ['Trucks in Port', data.summary.trucksInPort.toString()],
+        ['In Transit', data.summary.trucksInTransit.toString()],
+        ['Unloading', data.summary.unloadingCount.toString()],
+        ['Scheduled', data.summary.scheduledCount.toString()],
+        ['Entries', data.summary.entriesCount.toString()],
+        ['Exits', data.summary.exitsCount.toString()],
+        ['Completed', data.summary.completedCount.toString()],
+        ['Avg. Stay Time', `${data.summary.avgPermanenceMinutes} min`],
+        ['Avg. Wait Time', `${data.summary.avgWaitingMinutes} min`],
+        ['Delay Rate', `${data.summary.delayRate.toFixed(1)}%`],
+        ['SLA Compliance', `${data.summary.slaCompliance.toFixed(1)}%`],
+        ['Infractions', data.summary.infractionCount.toString()],
+        ['Peak Hour', data.summary.peakHour ? `${data.summary.peakHour.hour}h (${data.summary.peakHour.count} entries)` : 'N/A'],
+        ['Congestion Rate', `${data.summary.congestionRate}%`],
+        ['Port Capacity', data.summary.portCapacity.toString()],
+        ['Vehicles / Hour', data.summary.vehiclesPerHour.toString()],
     ];
 
     autoTable(doc, {
         startY: 52,
-        head: [['Métrica', 'Valor']],
+        head: [['Metric', 'Value']],
         body: summaryData,
         theme: 'striped',
         headStyles: { fillColor: [59, 130, 246] },
@@ -71,20 +72,20 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     let finalY = (doc as any).lastAutoTable.finalY || 100;
     if (data.decisions && data.decisions.totalDecisions > 0) {
         doc.setFontSize(14);
-        doc.text('Análise de Decisões (IA)', 14, finalY + 15);
+        doc.text('Decision Analysis (AI)', 14, finalY + 15);
 
         const decisionData = [
-            ['Total de Decisões', data.decisions.totalDecisions.toString()],
-            ['Aceites', data.decisions.accepted.toString()],
-            ['Rejeitados', data.decisions.rejected.toString()],
-            ['Revisão Manual', data.decisions.manualReview.toString()],
-            ['Taxa de Aceitação', `${data.decisions.acceptanceRate.toFixed(1)}%`],
-            ['Tempo Médio Pipeline', `${data.decisions.avgPipelineMs} ms`],
+            ['Total Decisions', data.decisions.totalDecisions.toString()],
+            ['Accepted', data.decisions.accepted.toString()],
+            ['Rejected', data.decisions.rejected.toString()],
+            ['Manual Review', data.decisions.manualReview.toString()],
+            ['Acceptance Rate', `${data.decisions.acceptanceRate.toFixed(1)}%`],
+            ['Avg. Pipeline Time', `${data.decisions.avgPipelineMs} ms`],
         ];
 
         autoTable(doc, {
             startY: finalY + 20,
-            head: [['Métrica', 'Valor']],
+            head: [['Metric', 'Value']],
             body: decisionData,
             theme: 'striped',
             headStyles: { fillColor: [16, 185, 129] },
@@ -95,7 +96,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     // Transport Stats Section
     doc.setFontSize(14);
-    doc.text('Detalhe por Transportadora', 14, finalY + 15);
+    doc.text('Breakdown by Carrier', 14, finalY + 15);
 
     const transportData = data.transportStats.map(stat => [
         stat.companyName,
@@ -107,12 +108,43 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     autoTable(doc, {
         startY: finalY + 20,
-        head: [['Transportadora', 'T. Descarga', 'T. Espera', 'Operações', 'SLA']],
+        head: [['Carrier', 'Unload Time', 'Wait Time', 'Operations', 'SLA']],
         body: transportData,
         theme: 'striped',
         headStyles: { fillColor: [59, 130, 246] },
         margin: { left: 14, right: 14 },
     });
+
+    // Sustainability Section
+    finalY = (doc as any).lastAutoTable.finalY || finalY + 60;
+    if (data.sustainability) {
+        const s = data.sustainability;
+        doc.setFontSize(14);
+        doc.text('Sustainability', 14, finalY + 15);
+
+        const co2Display = s.total_co2_kg_estimate >= 1000
+            ? `${(s.total_co2_kg_estimate / 1000).toFixed(2)} t`
+            : `${Math.round(s.total_co2_kg_estimate)} kg`;
+
+        const sustData = [
+            ['Period', `${s.from_date} → ${s.to_date}`],
+            ['Total CO₂ estimate (idling)', co2Display],
+            ['Avg CO₂ / truck', `${s.avg_co2_per_truck_kg.toFixed(2)} kg`],
+            ['Trucks processed', s.trucks_processed.toString()],
+            ['Trucks delayed', `${s.trucks_delayed} (${s.trucks_processed > 0 ? ((s.trucks_delayed / s.trucks_processed) * 100).toFixed(1) : '—'}%)`],
+            ['Avg. wait time', `${Math.round(s.avg_waiting_minutes)} min`],
+            ['Total waiting time', `${Math.round(s.total_waiting_minutes)} min`],
+        ];
+
+        autoTable(doc, {
+            startY: finalY + 20,
+            head: [['Metric', 'Value']],
+            body: sustData,
+            theme: 'striped',
+            headStyles: { fillColor: [34, 197, 94] },
+            margin: { left: 14, right: 14 },
+        });
+    }
 
     // Footer
     const pageCount = doc.getNumberOfPages();
@@ -121,7 +153,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
         doc.setFontSize(8);
         doc.setTextColor(150);
         doc.text(
-            `Intelligent Logistics - Página ${i} de ${pageCount}`,
+            `Intelligent Logistics - Page ${i} of ${pageCount}`,
             pageWidth / 2,
             doc.internal.pageSize.getHeight() - 10,
             { align: 'center' }
@@ -129,7 +161,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     }
 
     // Save
-    doc.save(`relatorio-logistica-${formatDateForFilename(data.generatedAt)}.pdf`);
+    doc.save(`logistics-report-${formatDateForFilename(data.generatedAt)}.pdf`);
 }
 
 /**
@@ -139,48 +171,48 @@ export function exportToCSV(data: ExportData): void {
     const rows: string[][] = [];
 
     // Header row
-    rows.push(['Relatório de Operações Logísticas']);
-    rows.push([`Período: ${getTimeRangeLabel(data.timeRange)}`]);
-    rows.push([`Gerado em: ${data.generatedAt.toLocaleString('pt-PT')}`]);
+    rows.push(['Logistics Operations Report']);
+    rows.push([`Period: ${getTimeRangeLabel(data.timeRange)}`]);
+    rows.push([`Generated at: ${data.generatedAt.toLocaleString('en-GB')}`]);
     rows.push([]);
 
     // Summary section
-    rows.push(['RESUMO']);
-    rows.push(['Métrica', 'Valor']);
-    rows.push(['Camiões no Porto', data.summary.trucksInPort.toString()]);
-    rows.push(['Em Trânsito', data.summary.trucksInTransit.toString()]);
-    rows.push(['Em Descarga', data.summary.unloadingCount.toString()]);
-    rows.push(['Agendados', data.summary.scheduledCount.toString()]);
-    rows.push(['Entradas', data.summary.entriesCount.toString()]);
-    rows.push(['Saídas', data.summary.exitsCount.toString()]);
-    rows.push(['Concluídos', data.summary.completedCount.toString()]);
-    rows.push(['Tempo Médio Permanência (min)', data.summary.avgPermanenceMinutes.toString()]);
-    rows.push(['Tempo Médio Espera (min)', data.summary.avgWaitingMinutes.toString()]);
-    rows.push(['Taxa de Atraso (%)', data.summary.delayRate.toFixed(1)]);
-    rows.push(['SLA Cumprido (%)', data.summary.slaCompliance.toFixed(1)]);
-    rows.push(['Infrações', data.summary.infractionCount.toString()]);
-    rows.push(['Hora de Pico', data.summary.peakHour ? `${data.summary.peakHour.hour}h (${data.summary.peakHour.count})` : 'N/A']);
-    rows.push(['Taxa de Congestionamento (%)', data.summary.congestionRate.toString()]);
-    rows.push(['Capacidade do Porto', data.summary.portCapacity.toString()]);
-    rows.push(['Veículos / Hora', data.summary.vehiclesPerHour.toString()]);
+    rows.push(['SUMMARY']);
+    rows.push(['Metric', 'Value']);
+    rows.push(['Trucks in Port', data.summary.trucksInPort.toString()]);
+    rows.push(['In Transit', data.summary.trucksInTransit.toString()]);
+    rows.push(['Unloading', data.summary.unloadingCount.toString()]);
+    rows.push(['Scheduled', data.summary.scheduledCount.toString()]);
+    rows.push(['Entries', data.summary.entriesCount.toString()]);
+    rows.push(['Exits', data.summary.exitsCount.toString()]);
+    rows.push(['Completed', data.summary.completedCount.toString()]);
+    rows.push(['Avg. Stay Time (min)', data.summary.avgPermanenceMinutes.toString()]);
+    rows.push(['Avg. Wait Time (min)', data.summary.avgWaitingMinutes.toString()]);
+    rows.push(['Delay Rate (%)', data.summary.delayRate.toFixed(1)]);
+    rows.push(['SLA Compliance (%)', data.summary.slaCompliance.toFixed(1)]);
+    rows.push(['Infractions', data.summary.infractionCount.toString()]);
+    rows.push(['Peak Hour', data.summary.peakHour ? `${data.summary.peakHour.hour}h (${data.summary.peakHour.count})` : 'N/A']);
+    rows.push(['Congestion Rate (%)', data.summary.congestionRate.toString()]);
+    rows.push(['Port Capacity', data.summary.portCapacity.toString()]);
+    rows.push(['Vehicles / Hour', data.summary.vehiclesPerHour.toString()]);
     rows.push([]);
 
     // Decision analytics section
     if (data.decisions && data.decisions.totalDecisions > 0) {
-        rows.push(['ANÁLISE DE DECISÕES (IA)']);
-        rows.push(['Métrica', 'Valor']);
-        rows.push(['Total de Decisões', data.decisions.totalDecisions.toString()]);
-        rows.push(['Aceites', data.decisions.accepted.toString()]);
-        rows.push(['Rejeitados', data.decisions.rejected.toString()]);
-        rows.push(['Revisão Manual', data.decisions.manualReview.toString()]);
-        rows.push(['Taxa de Aceitação (%)', data.decisions.acceptanceRate.toFixed(1)]);
-        rows.push(['Tempo Médio Pipeline (ms)', data.decisions.avgPipelineMs.toString()]);
+        rows.push(['DECISION ANALYSIS (AI)']);
+        rows.push(['Metric', 'Value']);
+        rows.push(['Total Decisions', data.decisions.totalDecisions.toString()]);
+        rows.push(['Accepted', data.decisions.accepted.toString()]);
+        rows.push(['Rejected', data.decisions.rejected.toString()]);
+        rows.push(['Manual Review', data.decisions.manualReview.toString()]);
+        rows.push(['Acceptance Rate (%)', data.decisions.acceptanceRate.toFixed(1)]);
+        rows.push(['Avg. Pipeline Time (ms)', data.decisions.avgPipelineMs.toString()]);
         rows.push([]);
     }
 
     // Transport stats section
-    rows.push(['DETALHE POR TRANSPORTADORA']);
-    rows.push(['Transportadora', 'T. Descarga (min)', 'T. Espera (min)', 'Operações', 'SLA (%)']);
+    rows.push(['BREAKDOWN BY CARRIER']);
+    rows.push(['Carrier', 'Unload Time (min)', 'Wait Time (min)', 'Operations', 'SLA (%)']);
     data.transportStats.forEach(stat => {
         rows.push([
             stat.companyName,
@@ -191,26 +223,45 @@ export function exportToCSV(data: ExportData): void {
         ]);
     });
 
+    // Sustainability section
+    if (data.sustainability) {
+        const s = data.sustainability;
+        const co2Display = s.total_co2_kg_estimate >= 1000
+            ? `${(s.total_co2_kg_estimate / 1000).toFixed(2)} t`
+            : `${Math.round(s.total_co2_kg_estimate)} kg`;
+        rows.push(['SUSTAINABILITY']);
+        rows.push(['Metric', 'Value']);
+        rows.push(['Period', `${s.from_date} → ${s.to_date}`]);
+        rows.push(['Total CO2 estimate (idling)', co2Display]);
+        rows.push(['Avg CO2 per truck (kg)', s.avg_co2_per_truck_kg.toFixed(2)]);
+        rows.push(['Trucks processed', s.trucks_processed.toString()]);
+        rows.push(['Trucks delayed', s.trucks_delayed.toString()]);
+        rows.push(['Delay rate (%)', s.trucks_processed > 0 ? ((s.trucks_delayed / s.trucks_processed) * 100).toFixed(1) : '—']);
+        rows.push(['Avg wait time (min)', Math.round(s.avg_waiting_minutes).toString()]);
+        rows.push(['Total waiting time (min)', Math.round(s.total_waiting_minutes).toString()]);
+        rows.push([]);
+    }
+
     // Convert to CSV string
     const csvContent = rows
         .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
         .join('\n');
 
     // Create and download file
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `relatorio-logistica-${formatDateForFilename(data.generatedAt)}.csv`;
+    link.download = `logistics-report-${formatDateForFilename(data.generatedAt)}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
 }
 
 function getTimeRangeLabel(range: string): string {
     switch (range) {
-        case 'today': return 'Hoje';
-        case 'week': return 'Última Semana';
-        case 'month': return 'Último Mês';
-        case 'year': return 'Último Ano';
+        case 'today': return 'Today';
+        case 'week': return 'Last Week';
+        case 'month': return 'Last Month';
+        case 'year': return 'Last Year';
         default: return range;
     }
 }

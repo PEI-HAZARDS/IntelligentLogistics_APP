@@ -5,6 +5,7 @@
 import api from '@/lib/api';
 import type {
     Appointment,
+    AppointmentDetail,
     AppointmentStatusUpdate,
     ArrivalsQueryParams,
     PaginatedResponse,
@@ -74,6 +75,15 @@ export async function getArrival(appointmentId: number): Promise<Appointment> {
 }
 
 /**
+ * Get enriched appointment detail including visit state, driver, booking, gates.
+ * Uses the /detail endpoint which is not cached at Redis level (always fresh).
+ */
+export async function getArrivalDetail(appointmentId: number): Promise<AppointmentDetail> {
+    const response = await api.get<AppointmentDetail>(`${BASE_PATH}/detail/${appointmentId}`);
+    return response.data;
+}
+
+/**
  * Get arrival by PIN/arrival_id (used by drivers)
  */
 export async function getArrivalByPin(arrivalId: string): Promise<Appointment> {
@@ -120,6 +130,44 @@ export async function createVisit(
         `${BASE_PATH}/${appointmentId}/visit`,
         visitData
     );
+    return response.data;
+}
+
+export interface InfractionReviewPayload {
+    reviewed_by: string;
+    note?: string;
+}
+
+export interface InfractionReviewResult {
+    id: number;
+    reviewed_at: string;
+    reviewed_by: string;
+    review_note: string | null;
+}
+
+export async function reviewInfraction(
+    appointmentId: number,
+    payload: InfractionReviewPayload,
+): Promise<InfractionReviewResult> {
+    const response = await api.patch<InfractionReviewResult>(
+        `${BASE_PATH}/${appointmentId}/review`,
+        payload,
+    );
+    return response.data;
+}
+
+export interface BulkArrivalsResult {
+    created: number;
+    skipped: number;
+    errors: { row: number; reason: string }[];
+}
+
+export async function importArrivalsCSV(file: File): Promise<BulkArrivalsResult> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const response = await api.post<BulkArrivalsResult>(`${BASE_PATH}/bulk`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
 }
 
