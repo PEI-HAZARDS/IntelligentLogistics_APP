@@ -11,11 +11,13 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     AlertCircle,
+    Grid3x3,
+    Activity,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    PieChart, Pie, Cell, AreaChart, Area,
+    PieChart, Pie, Cell, AreaChart, Area, ComposedChart, ReferenceLine,
 } from "recharts";
 import { useVolumeData, useAlertsBreakdown, useTransportStats, useSummaryStats, useDecisionAnalytics } from "@/hooks/useStatistics";
 import KPICard from "@/components/logistics-manager/KPICard";
@@ -55,6 +57,26 @@ const rangeLabels: Record<AnalyticsRange, string> = {
     year: "Year",
 };
 
+const HEATMAP_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Green → amber → red interpolation for a 0..1 congestion ratio (empty = surface tint). */
+function heatColor(ratio: number): string {
+    const stops = [
+        { r: 30, g: 41, b: 59 },     // empty
+        { r: 34, g: 197, b: 94 },    // low
+        { r: 245, g: 158, b: 11 },   // medium
+        { r: 239, g: 68, b: 68 },    // high
+    ];
+    if (ratio <= 0) return `rgb(${stops[0].r}, ${stops[0].g}, ${stops[0].b})`;
+    const t = Math.min(1, ratio) * (stops.length - 1);
+    const i = Math.floor(t);
+    const f = t - i;
+    const a = stops[i];
+    const b = stops[Math.min(i + 1, stops.length - 1)];
+    const mix = (x: number, y: number) => Math.round(x + (y - x) * f);
+    return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`;
+}
+
 export default function AnalyticsPage() {
     const [timeRange, setTimeRange] = useState<AnalyticsRange>("month");
     const queryClient = useQueryClient();
@@ -64,8 +86,18 @@ export default function AnalyticsPage() {
     const { data: volumeData = [], isLoading: volLoading, isError: volError } = useVolumeData(from, to, volInterval);
     const { data: alertsBreakdown = [], isLoading: alertsLoading, isError: alertsError } = useAlertsBreakdown(from, to);
     const { data: transportStats = [], isLoading: transportLoading, isError: transportError } = useTransportStats(from, to);
-    const { data: summary, isLoading: summaryLoading } = useSummaryStats();
+    // Period-scoped KPIs: pass the selected range so the cards reflect
+    // week/month/quarter/year (not just today).
+    const { data: summary, isLoading: summaryLoading } = useSummaryStats(undefined, from, to);
+    // Live (today) summary — for "current" anchors like in-port occupancy/capacity.
+    const { data: liveSummary } = useSummaryStats();
     const { data: decisions, isLoading: decisionsLoading } = useDecisionAnalytics();
+
+    // Weekly hourly volume — feeds the congestion heatmap and the occupancy-vs-capacity
+    // curve. Independent of the page range: both views are about the recurring weekly
+    // pattern, so we always pull the last 7 days at hourly granularity.
+    const { from: weekFromHour } = getDateRange("week");
+    const { data: hourlyVolume = [] } = useVolumeData(weekFromHour, to, "hour");
 
     const isLoading = volLoading || alertsLoading || transportLoading;
 
@@ -122,6 +154,39 @@ export default function AnalyticsPage() {
 
     const totalAlerts = alertsBreakdown.reduce((sum, item) => sum + item.count, 0);
     const maxAlertCount = Math.max(...alertsBreakdown.map(a => a.count), 1);
+
+    // ── Congestion heatmap: weekday (rows) × hour-of-day (cols); value = total movements.
+    const heatmap = useMemo(() => {
+        const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+        for (const p of hourlyVolume) {
+            const d = new Date(p.timestamp);
+            const wd = (d.getDay() + 6) % 7;       // shift to Monday-first index
+            grid[wd][d.getHours()] += p.entries + p.exits;
+        }
+        const max = Math.max(1, ...grid.flat());
+        return { grid, max };
+    }, [hourlyVolume]);
+
+    // ── Estimated in-port occupancy vs capacity.
+    // The series only carries flow (entries/exits), not an absolute count — but we DO know
+    // the current in-port count (summary.trucksInPort). Anchor the curve to that value and
+    // walk the hourly net flow backwards to reconstruct occupancy over the week.
+    const occupancyData = useMemo(() => {
+        if (!hourlyVolume.length || !liveSummary) return [];
+        const occ = new Array(hourlyVolume.length).fill(0);
+        let running = liveSummary.trucksInPort;
+        for (let i = hourlyVolume.length - 1; i >= 0; i--) {
+            occ[i] = Math.max(0, Math.round(running));
+            running -= hourlyVolume[i].entries - hourlyVolume[i].exits;
+        }
+        return hourlyVolume.map((p, i) => ({
+            label: new Date(p.timestamp).toLocaleString("en-GB", { weekday: "short", hour: "2-digit" }),
+            occupancy: occ[i],
+        }));
+    }, [hourlyVolume, liveSummary]);
+
+    const capacity = liveSummary?.portCapacity ?? 0;
+    const peakOccupancy = occupancyData.reduce((m, d) => Math.max(m, d.occupancy), 0);
 
     return (
         <div className="analytics-page">
@@ -424,6 +489,92 @@ export default function AnalyticsPage() {
                                                 name="Total Movements"
                                             />
                                         </AreaChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Weekly Congestion Heatmap — weekday × hour-of-day */}
+                    <div className="charts-grid charts-grid-full">
+                        <div className="chart-card">
+                            <div className="chart-header">
+                                <h3 className="chart-title"><Grid3x3 size={16} /> Weekly Congestion Heatmap</h3>
+                                <span className="chart-subtitle">total movements (entries + exits) · last 7 days</span>
+                            </div>
+                            {hourlyVolume.length === 0 ? (
+                                <div className="chart-empty"><span>No hourly volume for this week</span></div>
+                            ) : (
+                                <div className="heatmap">
+                                    <div className="heatmap-hours">
+                                        <span className="heatmap-corner" />
+                                        {Array.from({ length: 24 }, (_, h) => (
+                                            <span key={h} className="heatmap-hour-label">{h % 3 === 0 ? `${h}h` : ""}</span>
+                                        ))}
+                                    </div>
+                                    {heatmap.grid.map((row, wd) => (
+                                        <div key={wd} className="heatmap-row">
+                                            <span className="heatmap-day-label">{HEATMAP_WEEKDAYS[wd]}</span>
+                                            {row.map((v, h) => (
+                                                <div
+                                                    key={h}
+                                                    className="heatmap-cell"
+                                                    style={{ background: heatColor(v / heatmap.max) }}
+                                                    title={`${HEATMAP_WEEKDAYS[wd]} ${String(h).padStart(2, "0")}:00 — ${v} movements`}
+                                                />
+                                            ))}
+                                        </div>
+                                    ))}
+                                    <div className="heatmap-legend">
+                                        <span>Quieter</span>
+                                        <span className="heatmap-legend-bar" />
+                                        <span>Busier</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Estimated Occupancy vs Capacity */}
+                    <div className="charts-grid charts-grid-full">
+                        <div className="chart-card">
+                            <div className="chart-header">
+                                <h3 className="chart-title"><Activity size={16} /> Estimated Occupancy vs Capacity</h3>
+                                <span className="chart-subtitle">
+                                    anchored to current in-port count ({liveSummary?.trucksInPort ?? "--"}) · peak {peakOccupancy}{capacity ? ` / ${capacity}` : ""}
+                                </span>
+                            </div>
+                            <div className="chart-container" style={{ height: 300 }}>
+                                {occupancyData.length === 0 ? (
+                                    <div className="chart-empty"><span>No occupancy data available</span></div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={occupancyData} margin={{ top: 5, right: 24, left: 0, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{ fontSize: 10 }}
+                                                interval={Math.max(0, Math.floor(occupancyData.length / 8))}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, capacity * 1.1))]}
+                                            />
+                                            <Tooltip
+                                                formatter={(value) => [
+                                                    `${value} trucks${capacity ? ` (${Math.round((Number(value) / capacity) * 100)}% cap.)` : ""}`,
+                                                    "In port",
+                                                ]}
+                                            />
+                                            <Area type="monotone" dataKey="occupancy" stroke="#0277BD" fill="rgba(2,119,189,0.18)" strokeWidth={2} name="In port" />
+                                            {capacity > 0 && (
+                                                <ReferenceLine y={capacity} stroke="#ef4444" strokeDasharray="6 4"
+                                                    label={{ value: `Capacity ${capacity}`, fill: "#ef4444", fontSize: 11, position: "insideTopRight" }} />
+                                            )}
+                                            {capacity > 0 && (
+                                                <ReferenceLine y={capacity * 0.8} stroke="#f59e0b" strokeDasharray="3 3"
+                                                    label={{ value: "80%", fill: "#f59e0b", fontSize: 10, position: "insideBottomRight" }} />
+                                            )}
+                                        </ComposedChart>
                                     </ResponsiveContainer>
                                 )}
                             </div>

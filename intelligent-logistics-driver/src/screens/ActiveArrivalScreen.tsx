@@ -5,7 +5,7 @@
  * - in_transit: Route map to port
  * - in_process: Port map with dock destination
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -29,14 +29,16 @@ import Animated, {
     useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useAuthStore } from '../stores/authStore';
-import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeUnloading, completeAppointment } from '../services/drivers';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { getMyActiveArrival, getMyTodayArrivals, claimArrival, updateArrivalStatus, startTrip, startUnloading, completeUnloading, completeAppointment, reportProblem, type ProblemCategory } from '../services/drivers';
+import { spacing, borderRadius, fontSize, fontWeight, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import RouteMap from '../components/RouteMap';
 import PortMap from '../components/PortMap';
 import type { Appointment, ClaimAppointmentResponse } from '../types/types';
-import { API_CONFIG } from '../config/config';
+import { API_CONFIG, APP_CONFIG } from '../config/config';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -105,6 +107,25 @@ const MOCK_ASSIGNED_DELIVERIES: Appointment[] = [
 ];
 // ===== END MOCK MODE =====
 
+// Port of Aveiro — same destination the RouteMap routes to. Used to show the
+// live straight-line (great-circle) distance from the driver to the port.
+const PORT_DESTINATION = { latitude: 40.6335912, longitude: -8.73065429999997 };
+const AVG_APPROACH_SPEED_KMH = 40; // for a rough ETA from the remaining distance
+
+function haversineKm(
+    a: { latitude: number; longitude: number },
+    b: { latitude: number; longitude: number },
+): number {
+    const R = 6371; // Earth radius in km
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(b.latitude - a.latitude);
+    const dLng = toRad(b.longitude - a.longitude);
+    const lat1 = toRad(a.latitude);
+    const lat2 = toRad(b.latitude);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 // Delivery states - TRIGGER: Driver action buttons
 // Aligned with backend state machine:
 //   in_transit → (gate) → in_port → unloading → leaving_port → completed
@@ -119,6 +140,22 @@ const DELIVERY_STEPS: { id: DeliveryPhase; label: string; icon: string }[] = [
     { id: 'unloading', label: 'Unloading', icon: 'cube-outline' },
     { id: 'leaving_port', label: 'Leaving', icon: 'exit-outline' },
     { id: 'completed', label: 'Departed', icon: 'checkmark-circle-outline' },
+];
+
+// Problem types a driver can report from the road. `suggestsLocation` triggers
+// an automatic GPS capture so the manager sees "near <place>".
+const PROBLEM_CATEGORIES: {
+    id: ProblemCategory;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    suggestsLocation?: boolean;
+}[] = [
+    { id: 'breakdown', label: 'Breakdown', icon: 'construct-outline' },
+    { id: 'lost', label: 'Lost near location', icon: 'navigate-circle-outline', suggestsLocation: true },
+    { id: 'delay', label: 'Traffic delay', icon: 'time-outline' },
+    { id: 'accident', label: 'Accident', icon: 'alert-circle-outline', suggestsLocation: true },
+    { id: 'cargo', label: 'Cargo / container', icon: 'cube-outline' },
+    { id: 'other', label: 'Other', icon: 'ellipsis-horizontal-circle-outline' },
 ];
 
 function getDeliveryPhaseIndex(phase: DeliveryPhase): number {
@@ -162,6 +199,8 @@ function getStatusColors(phase: DeliveryPhase): { bg: string; text: string; acce
 }
 
 export default function ActiveArrivalScreen() {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { user, token } = useAuthStore();
     const driversLicense = user?.drivers_license || '';
     const driverName = user?.name || 'Driver';
@@ -182,6 +221,18 @@ export default function ActiveArrivalScreen() {
     const [deliveryPhase, setDeliveryPhase] = useState<DeliveryPhase>('idle');
     const [showGatePopup, setShowGatePopup] = useState(false);
     const [showInfractionPopup, setShowInfractionPopup] = useState(false);
+
+    // Report-a-problem modal
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportCategory, setReportCategory] = useState<ProblemCategory | null>(null);
+    const [reportNote, setReportNote] = useState('');
+    const [reportLocation, setReportLocation] = useState<{ label: string; latitude: number; longitude: number } | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
+    // Live straight-line distance (km) from the driver to the port while in transit.
+    const [distanceKm, setDistanceKm] = useState<number | null>(null);
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+    const [reportError, setReportError] = useState<string | null>(null);
+    const [reportSuccess, setReportSuccess] = useState(false);
     const infractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const infractionFlash = useSharedValue(1);
 
@@ -265,6 +316,43 @@ export default function ActiveArrivalScreen() {
     const deliveryPhaseRef = useRef(deliveryPhase);
     useEffect(() => {
         deliveryPhaseRef.current = deliveryPhase;
+    }, [deliveryPhase]);
+
+    // Live distance to the port — watch GPS while in transit and compute the
+    // great-circle distance to the port (replaces the old hard-coded value).
+    useEffect(() => {
+        if (deliveryPhase !== 'in_transit') {
+            setDistanceKm(null);
+            return;
+        }
+        let cancelled = false;
+        let sub: Location.LocationSubscription | null = null;
+        (async () => {
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted' || cancelled) return;
+                // Seed once immediately so the value isn't blank until the first move.
+                const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                if (!cancelled) {
+                    setDistanceKm(haversineKm(
+                        { latitude: first.coords.latitude, longitude: first.coords.longitude },
+                        PORT_DESTINATION,
+                    ));
+                }
+                sub = await Location.watchPositionAsync(
+                    { accuracy: Location.Accuracy.Balanced, distanceInterval: 50, timeInterval: 15000 },
+                    (pos) => {
+                        setDistanceKm(haversineKm(
+                            { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+                            PORT_DESTINATION,
+                        ));
+                    },
+                );
+            } catch {
+                // Location unavailable — leave distance as null ("—").
+            }
+        })();
+        return () => { cancelled = true; sub?.remove(); };
     }, [deliveryPhase]);
 
     // Keep a ref to activeArrival so WS handlers always read fresh state
@@ -585,6 +673,222 @@ export default function ActiveArrivalScreen() {
     const statusColors = getStatusColors(deliveryPhase);
 
     // Gate Accepted Popup
+    // ===== Report a problem =====
+    const openReportModal = () => {
+        haptics.medium();
+        setReportCategory(null);
+        setReportNote('');
+        setReportLocation(null);
+        setReportError(null);
+        setReportSuccess(false);
+        setShowReportModal(true);
+    };
+
+    const closeReportModal = () => {
+        if (isSubmittingReport) return;
+        Keyboard.dismiss();
+        setShowReportModal(false);
+    };
+
+    const captureReportLocation = useCallback(async () => {
+        setReportError(null);
+        setIsLocating(true);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                setReportError('Location permission denied — you can still send the report without it.');
+                return;
+            }
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const { latitude, longitude } = pos.coords;
+            let label = '';
+            try {
+                const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+                const p = places[0];
+                if (p) {
+                    label = [p.street || p.name, p.city || p.subregion || p.region].filter(Boolean).join(', ');
+                }
+            } catch {
+                // reverse geocoding is best-effort; fall back to raw coordinates
+            }
+            if (!label) label = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            setReportLocation({ label, latitude, longitude });
+            haptics.light();
+        } catch {
+            setReportError('Could not get your location. Try again or send without it.');
+        } finally {
+            setIsLocating(false);
+        }
+    }, []);
+
+    const handleSelectReportCategory = (cat: typeof PROBLEM_CATEGORIES[number]) => {
+        haptics.medium();
+        setReportCategory(cat.id);
+        setReportError(null);
+        if (cat.suggestsLocation && !reportLocation && !isLocating) {
+            captureReportLocation();
+        }
+    };
+
+    const handleSubmitReport = async () => {
+        if (!reportCategory) {
+            setReportError('Please choose a problem type.');
+            return;
+        }
+        Keyboard.dismiss();
+        setReportError(null);
+        setIsSubmittingReport(true);
+        try {
+            await reportProblem({
+                category: reportCategory,
+                note: reportNote.trim() || undefined,
+                location_label: reportLocation?.label,
+                latitude: reportLocation?.latitude,
+                longitude: reportLocation?.longitude,
+                arrival_id: activeArrival?.arrival_id,
+                appointment_id: activeArrival?.id,
+                license_plate: activeArrival?.truck_license_plate,
+            });
+            haptics.success();
+            setReportSuccess(true);
+            setTimeout(() => {
+                setShowReportModal(false);
+                setReportSuccess(false);
+            }, 1400);
+        } catch {
+            haptics.error();
+            setReportError('Could not send the report. Check your connection and try again.');
+        } finally {
+            setIsSubmittingReport(false);
+        }
+    };
+
+    const renderReportModal = () => (
+        <Modal
+            visible={showReportModal}
+            transparent
+            animationType="fade"
+            onRequestClose={closeReportModal}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.gatePopupOverlay}>
+                    <TouchableWithoutFeedback onPress={() => {}}>
+                        <Animated.View entering={ZoomIn.duration(300)} style={styles.reportModalContent}>
+                            <TouchableOpacity style={styles.modalCloseIcon} onPress={closeReportModal}>
+                                <Ionicons name="close" size={24} color={colors.text.muted} />
+                            </TouchableOpacity>
+
+                            <View style={styles.reportModalHeader}>
+                                <Ionicons name="warning" size={28} color="#ef4444" />
+                                <Text style={styles.reportModalTitle}>Report a Problem</Text>
+                            </View>
+                            <Text style={styles.reportModalSubtitle}>
+                                What's happening? The logistics manager will be notified.
+                            </Text>
+
+                            {reportSuccess ? (
+                                <Animated.View entering={FadeIn.duration(250)} style={styles.reportSentBox}>
+                                    <Ionicons name="checkmark-circle" size={44} color="#22c55e" />
+                                    <Text style={styles.reportSentText}>Report sent to the manager</Text>
+                                </Animated.View>
+                            ) : (
+                                <>
+                                    {/* Category grid */}
+                                    <View style={styles.reportCategoryGrid}>
+                                        {PROBLEM_CATEGORIES.map((cat) => {
+                                            const selected = reportCategory === cat.id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={cat.id}
+                                                    style={[styles.reportCategoryChip, selected && styles.reportCategoryChipActive]}
+                                                    onPress={() => handleSelectReportCategory(cat)}
+                                                    disabled={isSubmittingReport}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons
+                                                        name={cat.icon}
+                                                        size={22}
+                                                        color={selected ? colors.primary : colors.text.secondary}
+                                                    />
+                                                    <Text style={[styles.reportCategoryText, selected && styles.reportCategoryTextActive]}>
+                                                        {cat.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+
+                                    {/* Location row */}
+                                    <TouchableOpacity
+                                        style={styles.reportLocationRow}
+                                        onPress={captureReportLocation}
+                                        disabled={isLocating || isSubmittingReport}
+                                        activeOpacity={0.8}
+                                    >
+                                        {isLocating ? (
+                                            <ActivityIndicator size="small" color={colors.primary} />
+                                        ) : (
+                                            <Ionicons
+                                                name={reportLocation ? 'location' : 'location-outline'}
+                                                size={20}
+                                                color={reportLocation ? colors.primary : colors.text.secondary}
+                                            />
+                                        )}
+                                        <Text style={styles.reportLocationText} numberOfLines={1}>
+                                            {isLocating
+                                                ? 'Getting your location…'
+                                                : reportLocation
+                                                    ? `Near ${reportLocation.label}`
+                                                    : 'Attach my current location'}
+                                        </Text>
+                                        {reportLocation && !isLocating && (
+                                            <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                                        )}
+                                    </TouchableOpacity>
+
+                                    {/* Optional note */}
+                                    <TextInput
+                                        style={styles.reportNoteInput}
+                                        placeholder="Add a note (optional)…"
+                                        placeholderTextColor={colors.text.muted}
+                                        value={reportNote}
+                                        onChangeText={setReportNote}
+                                        multiline
+                                        maxLength={300}
+                                        editable={!isSubmittingReport}
+                                    />
+
+                                    {reportError && (
+                                        <View style={[styles.errorBanner, { width: '100%', marginBottom: 0, marginTop: spacing.sm }]}>
+                                            <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                                            <Text style={styles.errorText}>{reportError}</Text>
+                                        </View>
+                                    )}
+
+                                    <TouchableOpacity
+                                        style={[styles.reportSubmitButton, (isSubmittingReport || !reportCategory) && styles.buttonDisabled]}
+                                        onPress={handleSubmitReport}
+                                        disabled={isSubmittingReport || !reportCategory}
+                                        activeOpacity={0.85}
+                                    >
+                                        {isSubmittingReport ? (
+                                            <ActivityIndicator size="small" color={colors.white} />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="send" size={18} color={colors.white} />
+                                                <Text style={styles.reportSubmitText}>Send to Manager</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </Animated.View>
+                    </TouchableWithoutFeedback>
+                </View>
+            </TouchableWithoutFeedback>
+        </Modal>
+    );
+
     const renderGatePopup = () => (
         <Modal
             visible={showGatePopup}
@@ -881,12 +1185,18 @@ export default function ActiveArrivalScreen() {
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>DISTANCE</Text>
-                                <Text style={styles.statValue}>4.2 km</Text>
+                                <Text style={styles.statValue}>
+                                    {distanceKm != null ? `${distanceKm.toFixed(1)} km` : '—'}
+                                </Text>
                             </View>
                             <View style={styles.statVerticalDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>ETA</Text>
-                                <Text style={styles.statValue}>{formatTime(new Date(Date.now() + 8 * 60 * 1000).toISOString())}</Text>
+                                <Text style={styles.statValue}>
+                                    {distanceKm != null
+                                        ? formatTime(new Date(Date.now() + (distanceKm / AVG_APPROACH_SPEED_KMH) * 3600 * 1000).toISOString())
+                                        : '—'}
+                                </Text>
                             </View>
                             <View style={styles.statVerticalDivider} />
                             <View style={styles.statItem}>
@@ -1146,7 +1456,7 @@ export default function ActiveArrivalScreen() {
                 </View>
 
                 {/* Report Problem Button */}
-                <TouchableOpacity style={styles.reportButton} onPress={() => {}}>
+                <TouchableOpacity style={styles.reportButton} onPress={openReportModal}>
                     <Ionicons name="warning-outline" size={20} color="#ef4444" />
                     <Text style={styles.reportButtonText}>Report Problem</Text>
                 </TouchableOpacity>
@@ -1247,13 +1557,16 @@ export default function ActiveArrivalScreen() {
             {/* Infraction warning popup */}
             {renderInfractionPopup()}
 
-            {/* WebSocket Debug Panel */}
-            {renderDebugPanel()}
+            {/* Report a problem to the manager */}
+            {renderReportModal()}
+
+            {/* WebSocket Debug Panel (only when EXPO_PUBLIC_DEBUG_MODE=true) */}
+            {APP_CONFIG.debugMode && renderDebugPanel()}
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background.dark,
@@ -1368,14 +1681,14 @@ const styles = StyleSheet.create({
         top: spacing.md,
         left: spacing.md,
         right: spacing.md,
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        backgroundColor: colors.background.medium,
         borderRadius: borderRadius.lg,
         padding: spacing.md,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: colors.border.light,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.18,
         shadowRadius: 12,
         elevation: 8,
     },
@@ -1896,7 +2209,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     pinInput: {
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+        backgroundColor: colors.background.light,
         borderWidth: 2,
         borderColor: colors.border.medium,
         borderRadius: borderRadius.lg,
@@ -1936,7 +2249,7 @@ const styles = StyleSheet.create({
     gatePopupTitle: {
         fontSize: 32,
         fontWeight: '900',
-        color: '#22c55e',
+        color: colors.success,
         letterSpacing: 2,
     },
     gatePopupSubtitle: {
@@ -2079,6 +2392,126 @@ const styles = StyleSheet.create({
         fontSize: fontSize.md,
         fontWeight: '600',
         color: '#ef4444',
+    },
+
+    // Report Problem modal
+    reportModalContent: {
+        backgroundColor: colors.background.medium,
+        borderRadius: borderRadius.xl,
+        padding: spacing.xl,
+        width: '100%',
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 15,
+        elevation: 10,
+    },
+    reportModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginTop: spacing.xs,
+    },
+    reportModalTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '800',
+        color: colors.text.primary,
+    },
+    reportModalSubtitle: {
+        fontSize: fontSize.sm,
+        color: colors.text.secondary,
+        marginTop: spacing.xs,
+        marginBottom: spacing.lg,
+    },
+    reportSentBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.xl,
+        gap: spacing.md,
+    },
+    reportSentText: {
+        fontSize: fontSize.md,
+        fontWeight: '600',
+        color: colors.text.primary,
+    },
+    reportCategoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginBottom: spacing.lg,
+    },
+    reportCategoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        backgroundColor: colors.background.light,
+        flexGrow: 1,
+        flexBasis: '46%',
+    },
+    reportCategoryChipActive: {
+        borderColor: colors.primary,
+        backgroundColor: 'rgba(2, 119, 189, 0.12)',
+    },
+    reportCategoryText: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: colors.text.secondary,
+        flexShrink: 1,
+    },
+    reportCategoryTextActive: {
+        color: colors.text.primary,
+    },
+    reportLocationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        backgroundColor: colors.background.light,
+        marginBottom: spacing.md,
+    },
+    reportLocationText: {
+        flex: 1,
+        fontSize: fontSize.sm,
+        fontWeight: '500',
+        color: colors.text.secondary,
+    },
+    reportNoteInput: {
+        minHeight: 72,
+        maxHeight: 120,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+        backgroundColor: colors.background.light,
+        padding: spacing.md,
+        fontSize: fontSize.md,
+        color: colors.text.primary,
+        textAlignVertical: 'top',
+    },
+    reportSubmitButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        marginTop: spacing.lg,
+    },
+    reportSubmitText: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.white,
     },
 
     // WebSocket Debug Panel

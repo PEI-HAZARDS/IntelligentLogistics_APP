@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        backgroundColor: colors.background.medium,
         borderBottomWidth: 1,
         borderBottomColor: colors.border.light,
     },
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
     },
     iconButton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(15, 23, 42, 0.06)',
         borderRadius: borderRadius.md,
         padding: spacing.sm,
     },
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     },
     pinInput: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+        backgroundColor: colors.background.light,
         borderWidth: 1,
         borderColor: colors.border.medium,
         borderRadius: borderRadius.md,
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     },
     activeSection: {},
     arrivalCard: {
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+        backgroundColor: colors.background.light,
         borderRadius: borderRadius.md,
         padding: spacing.md,
         position: 'relative',

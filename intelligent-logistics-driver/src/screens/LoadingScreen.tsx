@@ -1,11 +1,15 @@
 /**
  * Loading Screen - Shown while checking authentication
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { colors, fontSize } from '../theme/colors';
+import { fontSize, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function LoadingScreen() {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+
     return (
         <View style={styles.container}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -14,7 +18,7 @@ export default function LoadingScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',

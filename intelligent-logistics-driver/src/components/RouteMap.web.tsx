@@ -2,9 +2,10 @@
  * Route Map Component — web stub
  * react-native-maps is native-only; this placeholder is used when bundling for web.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing, borderRadius, fontSize } from '../theme/colors';
+import { spacing, borderRadius, fontSize, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface RouteMapProps {
     destinationLat?: number;
@@ -13,6 +14,8 @@ interface RouteMapProps {
 }
 
 export default function RouteMap({ destinationName = 'Port of Aveiro' }: RouteMapProps) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     return (
         <View style={styles.container}>
             <Text style={styles.label}>Map unavailable on web</Text>
@@ -21,11 +24,11 @@ export default function RouteMap({ destinationName = 'Port of Aveiro' }: RouteMa
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         borderRadius: borderRadius.lg,
-        backgroundColor: colors.background?.card ?? '#1e293b',
+        backgroundColor: colors.background?.card ?? '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.md,

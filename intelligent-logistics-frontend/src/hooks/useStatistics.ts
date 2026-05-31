@@ -22,10 +22,10 @@ import {
 import { getActiveAlerts } from '@/services/alerts';
 import type { Alert } from '@/types/types';
 
-export function useSummaryStats(date?: string) {
+export function useSummaryStats(date?: string, from?: string, to?: string) {
     return useQuery<DashboardSummary>({
-        queryKey: ['statistics', 'summary', date],
-        queryFn: () => getDashboardSummary(date),
+        queryKey: ['statistics', 'summary', date, from, to],
+        queryFn: () => getDashboardSummary(date, from, to),
         refetchInterval: 30_000,
         staleTime: 15_000,
     });

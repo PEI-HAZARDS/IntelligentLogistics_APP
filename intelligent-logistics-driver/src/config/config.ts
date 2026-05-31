@@ -22,6 +22,9 @@ export const APP_CONFIG = {
     name: 'Intelligent Logistics Driver',
     version: '1.0.0',
 
+    // Show the on-screen WebSocket debug panel (set EXPO_PUBLIC_DEBUG_MODE=true).
+    debugMode: process.env.EXPO_PUBLIC_DEBUG_MODE === 'true',
+
     // Feature flags
     features: {
         gpsNavigation: true,

@@ -37,6 +37,30 @@ export async function login(credentials: DriverLoginRequest): Promise<AuthDriver
     return response.data;
 }
 
+/** Problem categories a driver can report from the road. */
+export type ProblemCategory = 'breakdown' | 'lost' | 'delay' | 'accident' | 'cargo' | 'other';
+
+/** Payload for {@link reportProblem}. Driver identity is taken from the JWT server-side. */
+export interface DriverProblemReport {
+    category: ProblemCategory;
+    note?: string;
+    /** Reverse-geocoded place name, e.g. "Rua do Porto, Aveiro" → shown as "near …". */
+    location_label?: string;
+    latitude?: number;
+    longitude?: number;
+    arrival_id?: string;
+    appointment_id?: number;
+    license_plate?: string;
+}
+
+/**
+ * Report a problem to the logistics manager. The server turns this into a
+ * `problem` alert that appears in the manager's alerts widget.
+ */
+export async function reportProblem(report: DriverProblemReport): Promise<void> {
+    await api.post(`${BASE_PATH}/report-problem`, report);
+}
+
 /**
  * Claim an arrival using PIN.
  * Driver identity is extracted from the JWT token on the server.

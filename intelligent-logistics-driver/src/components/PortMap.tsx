@@ -3,11 +3,12 @@
  * Shows port interior with route to dock
  * Used when status is in_process
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { borderRadius, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface PortMapProps {
     terminalId?: number;
@@ -47,6 +48,8 @@ const PORT_BOUNDARY = [
 ];
 
 export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMapProps) {
+    const { colors, mode } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const terminal = TERMINALS[terminalId] || TERMINALS[1];
 
     return (
@@ -61,7 +64,7 @@ export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMap
                 showsUserLocation={true}
                 showsMyLocationButton={true}
                 showsCompass={true}
-                userInterfaceStyle="dark"
+                userInterfaceStyle={mode}
             >
                 {/* Port boundary */}
                 <Polygon
@@ -105,7 +108,7 @@ export default function PortMap({ terminalId = 1, dockNumber = 'A-01' }: PortMap
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         borderRadius: borderRadius.lg,

@@ -70,7 +70,9 @@ export async function getUpcomingArrivals(
  * Get a single arrival by appointment ID
  */
 export async function getArrival(appointmentId: number): Promise<Appointment> {
-    const response = await api.get<Appointment>(`${BASE_PATH}/${appointmentId}`);
+    // NOTE: /arrivals/{id} on the gateway is a gate-scoped list (catch-all /arrivals/{gate_id}).
+    // The single-appointment lookup lives at /arrivals/by-id/{id}.
+    const response = await api.get<Appointment>(`${BASE_PATH}/by-id/${appointmentId}`);
     return response.data;
 }
 

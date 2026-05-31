@@ -1,6 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { getGateWebSocket, DecisionUpdatePayload } from '@/lib/websocket';
+import api from '@/lib/api';
+
+interface EnergySpike {
+    gate_id: number;
+    value: number;
+    mode: string;
+    timestamp: string;
+}
 
 interface DataPoint {
     time: string;
@@ -16,17 +24,41 @@ export default function SimulatedEnergyGraph({ isDarkMode }: SimulatedEnergyGrap
     const isHighPowerRef = useRef(false);
 
     useEffect(() => {
-        // Initialize with some base data
-        const initialData: DataPoint[] = [];
+        let cancelled = false;
+
+        // Build the rolling base window, then overlay persisted spikes from the
+        // backend so spikes survive a page refresh (the read side of the
+        // WebSocket → Mongo flow: scale_up events are stored by the gateway).
         const now = new Date();
-        for (let i = 60; i >= 0; i--) {
-            const time = new Date(now.getTime() - i * 10000);
-            initialData.push({
-                time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                value: 1.26 + Math.random() * 0.02, // ~1.26-1.28 kW
-            });
-        }
-        setData(initialData);
+        const fmt = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const points = Array.from({ length: 61 }, (_, idx) => {
+            const i = 60 - idx;
+            return { t: new Date(now.getTime() - i * 10000), value: 1.26 + Math.random() * 0.02 };
+        });
+
+        (async () => {
+            try {
+                const res = await api.get<EnergySpike[]>('/energy/spikes', { params: { gate_id: 1, limit: 200 } });
+                if (Array.isArray(res.data)) {
+                    for (const spike of res.data) {
+                        const st = new Date(spike.timestamp).getTime();
+                        // snap each spike to the nearest window point (within 6 s)
+                        let best = -1;
+                        let bestDiff = 6000;
+                        points.forEach((p, j) => {
+                            const d = Math.abs(p.t.getTime() - st);
+                            if (d < bestDiff) { bestDiff = d; best = j; }
+                        });
+                        if (best >= 0) points[best].value = Math.max(points[best].value, spike.value || 1.83);
+                    }
+                }
+            } catch {
+                // ignore — fall back to the plain base window
+            }
+            if (!cancelled) {
+                setData(points.map(p => ({ time: fmt(p.t), value: Number(p.value.toFixed(2)) })));
+            }
+        })();
 
         // Connect to WebSocket to listen for scale messages
         const ws = getGateWebSocket(1); // Default to gate 1
@@ -75,6 +107,7 @@ export default function SimulatedEnergyGraph({ isDarkMode }: SimulatedEnergyGrap
         }, 10000);
 
         return () => {
+            cancelled = true;
             unsubscribe();
             clearInterval(interval);
         };
