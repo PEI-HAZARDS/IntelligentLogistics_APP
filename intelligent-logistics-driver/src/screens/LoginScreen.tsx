@@ -1,9 +1,15 @@
 /**
  * Login Screen for Driver App
  * Adapted from web version Login.tsx
- * Enhanced with animations and haptic feedback
+ * Enhanced with animations and haptic feedback.
+ *
+ * The login card sits on the same animated blue background used by the web
+ * gate-operator / manager apps (Login.css): a diagonal blue gradient with a
+ * dark overlay and slowly drifting orbs. The card itself is a white card with
+ * light inputs (matching the web login), fixed regardless of the in-app
+ * light/dark theme (there is no theme toggle pre-login).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -15,14 +21,96 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    ViewStyle,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
+import Animated, {
+    FadeIn,
+    FadeInDown,
+    FadeInUp,
+    ZoomIn,
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withTiming,
+    Easing,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { login } from '../services/drivers';
 import { useAuthStore } from '../stores/authStore';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { haptics } from '../components/AnimatedComponents';
 import type { UserInfo } from '../types/types';
+
+/* -------------------------------------------------------------------------- */
+/* Animated blue background (mirrors web Login.css)                            */
+/* -------------------------------------------------------------------------- */
+
+interface OrbProps {
+    size: number;
+    color: string;
+    duration: number;
+    reverse?: boolean;
+    style: ViewStyle;
+}
+
+/** A large, faint circle that drifts slowly — ambient motion behind the card. */
+function FloatingOrb({ size, color, duration, reverse, style }: OrbProps) {
+    const t = useSharedValue(0);
+
+    useEffect(() => {
+        t.value = withRepeat(
+            withTiming(1, { duration, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            true,
+        );
+    }, [duration, t]);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        const p = reverse ? 1 - t.value : t.value;
+        // Approximates the web orb-float keyframes (drift + gentle scale).
+        return {
+            transform: [
+                { translateX: -10 + p * 40 },
+                { translateY: 20 - p * 60 },
+                { scale: 1 + p * 0.05 },
+            ],
+        };
+    });
+
+    return (
+        <Animated.View
+            pointerEvents="none"
+            style={[
+                styles.orb,
+                { width: size, height: size, borderRadius: size / 2, backgroundColor: color },
+                style,
+                animatedStyle,
+            ]}
+        />
+    );
+}
+
+function LoginBackground() {
+    return (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <LinearGradient
+                colors={['#0c4a6e', '#0369a1', '#0284c7', '#0ea5e9', '#38bdf8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.bgOverlay} />
+            <FloatingOrb size={500} color="#38bdf8" duration={20000} style={{ top: -120, left: -100 }} />
+            <FloatingOrb size={400} color="#0ea5e9" duration={28000} reverse style={{ bottom: -80, right: -80 }} />
+            <FloatingOrb size={300} color="#7dd3fc" duration={22000} style={{ top: '45%', left: '55%' }} />
+        </View>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Login screen                                                                */
+/* -------------------------------------------------------------------------- */
 
 export default function LoginScreen() {
     const [driversLicense, setDriversLicense] = useState('');
@@ -88,147 +176,180 @@ export default function LoginScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
+        <View style={styles.container}>
+            <LoginBackground />
+
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                <Animated.View style={styles.card} entering={FadeIn.duration(500)}>
-                    {/* Logo - Animated Zoom In */}
-                    <Animated.View style={styles.logoContainer} entering={ZoomIn.delay(200).duration(600).springify()}>
-                        <Image
-                            source={require('../../assets/logo.png')}
-                            style={styles.logo}
-                            resizeMode="contain"
-                        />
-                    </Animated.View>
-
-                    {/* Title - Fade In */}
-                    <Animated.Text style={styles.title} entering={FadeInDown.delay(400).duration(400)}>
-                        INTELLIGENT LOGISTICS
-                    </Animated.Text>
-                    <Animated.Text style={styles.subtitle} entering={FadeInDown.delay(500).duration(400)}>
-                        Driver Area
-                    </Animated.Text>
-
-                    {/* Success Message */}
-                    {success && (
-                        <Animated.View style={styles.successContainer} entering={FadeInDown.duration(300).springify()}>
-                            <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
-                            <Text style={styles.successText}>Login successful! Redirecting…</Text>
-                        </Animated.View>
-                    )}
-
-                    {/* Error Message - Animated */}
-                    {error && !success && (
-                        <Animated.View style={styles.errorContainer} entering={FadeInDown.duration(300).springify()}>
-                            <Ionicons name="alert-circle" size={18} color={colors.error} />
-                            <Text style={styles.errorText}>{error}</Text>
-                        </Animated.View>
-                    )}
-
-                    {/* Form - Animated */}
-                    <Animated.View style={styles.form} entering={FadeInUp.delay(600).duration(500)}>
-                        {/* Driver's License Input */}
-                        <View style={styles.inputGroup}>
-                            <View style={styles.inputIcon}>
-                                <Ionicons name="card-outline" size={20} color={colors.text.muted} />
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Driver's License"
-                                placeholderTextColor={colors.text.muted}
-                                value={driversLicense}
-                                onChangeText={setDriversLicense}
-                                autoCapitalize="characters"
-                                autoCorrect={false}
-                                editable={!isLoading && !success}
+                <ScrollView
+                    style={styles.flex}
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <Animated.View style={styles.card} entering={FadeIn.duration(500)}>
+                        {/* Logo - Animated Zoom In */}
+                        <Animated.View style={styles.logoContainer} entering={ZoomIn.delay(200).duration(600).springify()}>
+                            <Image
+                                source={require('../../assets/logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
                             />
-                        </View>
+                        </Animated.View>
 
-                        {/* Password Input */}
-                        <View style={styles.inputGroup}>
-                            <View style={styles.inputIcon}>
-                                <Ionicons name="lock-closed-outline" size={20} color={colors.text.muted} />
-                            </View>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor={colors.text.muted}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                editable={!isLoading && !success}
-                            />
-                            <TouchableOpacity
-                                style={styles.togglePassword}
-                                onPress={() => setShowPassword(!showPassword)}
-                                disabled={isLoading}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye' : 'eye-off'}
-                                    size={20}
-                                    color={colors.text.muted}
+                        {/* Title - Fade In */}
+                        <Animated.Text style={styles.title} entering={FadeInDown.delay(400).duration(400)}>
+                            INTELLIGENT LOGISTICS
+                        </Animated.Text>
+                        <Animated.Text style={styles.subtitle} entering={FadeInDown.delay(500).duration(400)}>
+                            Driver Area
+                        </Animated.Text>
+
+                        {/* Success Message */}
+                        {success && (
+                            <Animated.View style={styles.successContainer} entering={FadeInDown.duration(300).springify()}>
+                                <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                                <Text style={styles.successText}>Login successful! Redirecting…</Text>
+                            </Animated.View>
+                        )}
+
+                        {/* Error Message - Animated */}
+                        {error && !success && (
+                            <Animated.View style={styles.errorContainer} entering={FadeInDown.duration(300).springify()}>
+                                <Ionicons name="alert-circle" size={18} color="#ef4444" />
+                                <Text style={styles.errorText}>{error}</Text>
+                            </Animated.View>
+                        )}
+
+                        {/* Form - Animated */}
+                        <Animated.View style={styles.form} entering={FadeInUp.delay(600).duration(500)}>
+                            {/* Driver's License Input */}
+                            <View style={styles.inputGroup}>
+                                <View style={styles.inputIcon}>
+                                    <Ionicons name="card-outline" size={20} color="#64748b" />
+                                </View>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Driver's License"
+                                    placeholderTextColor="#64748b"
+                                    value={driversLicense}
+                                    onChangeText={setDriversLicense}
+                                    autoCapitalize="characters"
+                                    autoCorrect={false}
+                                    editable={!isLoading && !success}
                                 />
+                            </View>
+
+                            {/* Password Input */}
+                            <View style={styles.inputGroup}>
+                                <View style={styles.inputIcon}>
+                                    <Ionicons name="lock-closed-outline" size={20} color="#64748b" />
+                                </View>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor="#64748b"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    editable={!isLoading && !success}
+                                />
+                                <TouchableOpacity
+                                    style={styles.togglePassword}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    disabled={isLoading}
+                                >
+                                    <Ionicons
+                                        name={showPassword ? 'eye' : 'eye-off'}
+                                        size={20}
+                                        color="#64748b"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={handleLoginPress}
+                                disabled={isLoading || success}
+                                activeOpacity={0.85}
+                            >
+                                <LinearGradient
+                                    colors={success ? ['#15803d', '#166534'] : ['#0277BD', '#01579B']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={[
+                                        styles.loginButton,
+                                        (isLoading || success) && !success && styles.loginButtonDisabled,
+                                    ]}
+                                >
+                                    {success ? (
+                                        <View style={styles.loadingContainer}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+                                            <Text style={styles.loginButtonText}>Redirecting…</Text>
+                                        </View>
+                                    ) : isLoading ? (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                            <Text style={styles.loginButtonText}>Logging in...</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>LOGIN</Text>
+                                    )}
+                                </LinearGradient>
                             </TouchableOpacity>
-                        </View>
 
-                        <TouchableOpacity
-                            style={[
-                                styles.loginButton,
-                                (isLoading || success) && styles.loginButtonDisabled,
-                                success && styles.loginButtonSuccess,
-                            ]}
-                            onPress={handleLoginPress}
-                            disabled={isLoading || success}
-                            activeOpacity={0.8}
-                        >
-                            {success ? (
-                                <View style={styles.loadingContainer}>
-                                    <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-                                    <Text style={styles.loginButtonText}>Redirecting…</Text>
-                                </View>
-                            ) : isLoading ? (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="small" color={colors.white} />
-                                    <Text style={styles.loginButtonText}>Logging in...</Text>
-                                </View>
-                            ) : (
-                                <Text style={styles.loginButtonText}>LOGIN</Text>
-                            )}
-                        </TouchableOpacity>
+                        </Animated.View>
 
+                        {/* Footer */}
+                        <Text style={styles.footer}>© 2025 Port Logistics Management System</Text>
                     </Animated.View>
-
-                    {/* Footer */}
-                    <Text style={styles.footer}>© 2025 Port Logistics Management System</Text>
-                </Animated.View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
+/**
+ * Fixed dark-glass-on-blue styling, matching the web login (Login.css). These
+ * colors are intentionally not theme-reactive so the entry screen looks the
+ * same across the driver, gate-operator and manager apps.
+ */
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background.dark,
+        backgroundColor: '#0c4a6e', // gradient fallback
     },
+    flex: {
+        flex: 1,
+    },
+    // --- animated background ---
+    bgOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    },
+    orb: {
+        position: 'absolute',
+        opacity: 0.12,
+    },
+    // --- card ---
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
         padding: spacing.lg,
     },
     card: {
-        backgroundColor: colors.background.medium,
+        backgroundColor: '#ffffff',
         borderRadius: borderRadius.xl,
         padding: spacing.xxl,
         borderWidth: 1,
-        borderColor: colors.border.light,
+        borderColor: 'rgba(15, 23, 42, 0.06)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 25 },
+        shadowOpacity: 0.25,
+        shadowRadius: 50,
+        elevation: 12,
     },
     logoContainer: {
         alignItems: 'center',
@@ -241,13 +362,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: fontSize.xxl,
         fontWeight: fontWeight.bold,
-        color: colors.text.primary,
+        color: '#0f172a',
         textAlign: 'center',
         marginBottom: spacing.xs,
     },
     subtitle: {
         fontSize: fontSize.md,
-        color: colors.text.secondary,
+        color: '#64748b',
         textAlign: 'center',
         marginBottom: spacing.xl,
     },
@@ -264,17 +385,14 @@ const styles = StyleSheet.create({
     },
     successText: {
         flex: 1,
-        color: '#86efac',
+        color: '#16a34a',
         fontSize: fontSize.sm,
         fontWeight: fontWeight.medium,
-    },
-    loginButtonSuccess: {
-        backgroundColor: '#15803d',
     },
     errorContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.errorBg,
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
         borderWidth: 1,
         borderColor: 'rgba(239, 68, 68, 0.3)',
         borderRadius: borderRadius.md,
@@ -284,7 +402,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         flex: 1,
-        color: '#fca5a5',
+        color: '#dc2626',
         fontSize: fontSize.sm,
     },
     form: {
@@ -293,10 +411,10 @@ const styles = StyleSheet.create({
     inputGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
-        borderWidth: 1,
-        borderColor: colors.border.medium,
-        borderRadius: borderRadius.md,
+        backgroundColor: '#f1f5f9',
+        borderWidth: 2,
+        borderColor: 'rgba(148, 163, 184, 0.4)',
+        borderRadius: 50,
     },
     inputIcon: {
         paddingHorizontal: spacing.md,
@@ -304,14 +422,13 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: 50,
-        color: colors.text.primary,
+        color: '#0f172a',
         fontSize: fontSize.lg,
     },
     togglePassword: {
         paddingHorizontal: spacing.md,
     },
     loginButton: {
-        backgroundColor: colors.primary,
         borderRadius: borderRadius.md,
         height: 50,
         justifyContent: 'center',
@@ -319,10 +436,10 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
     },
     loginButtonDisabled: {
-        opacity: 0.6,
+        opacity: 0.7,
     },
     loginButtonText: {
-        color: colors.white,
+        color: '#ffffff',
         fontSize: fontSize.lg,
         fontWeight: fontWeight.semibold,
     },
@@ -334,7 +451,7 @@ const styles = StyleSheet.create({
     footer: {
         marginTop: spacing.xxl,
         textAlign: 'center',
-        color: colors.text.muted,
+        color: '#94a3b8',
         fontSize: fontSize.xs,
     },
 });

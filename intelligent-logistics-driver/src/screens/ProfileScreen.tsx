@@ -2,21 +2,30 @@
  * Profile Screen
  * Shows driver info and logout option
  */
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { spacing, borderRadius, fontSize, fontWeight, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { haptics } from '../components/AnimatedComponents';
 
 export default function ProfileScreen() {
     const { user, logout } = useAuthStore();
+    const { colors, mode, toggle } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    const isDark = mode === 'dark';
 
     const handleLogout = () => {
         haptics.medium();
         logout();
+    };
+
+    const handleThemeToggle = () => {
+        haptics.light();
+        toggle();
     };
 
     return (
@@ -70,6 +79,31 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
+                {/* Appearance / Theme toggle */}
+                <View style={styles.settingsCard}>
+                    <TouchableOpacity
+                        style={styles.settingRow}
+                        onPress={handleThemeToggle}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name={isDark ? 'moon' : 'sunny'}
+                            size={20}
+                            color={colors.text.muted}
+                        />
+                        <View style={styles.infoContent}>
+                            <Text style={styles.infoLabel}>Appearance</Text>
+                            <Text style={styles.infoValue}>{isDark ? 'Dark' : 'Light'}</Text>
+                        </View>
+                        <Switch
+                            value={isDark}
+                            onValueChange={handleThemeToggle}
+                            trackColor={{ false: colors.border.medium, true: colors.primary }}
+                            thumbColor={colors.white}
+                        />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                     <Ionicons name="log-out-outline" size={20} color={colors.error} />
@@ -80,7 +114,7 @@ export default function ProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background.dark,
@@ -143,6 +177,19 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: colors.border.light,
         marginVertical: spacing.xs,
+    },
+    settingsCard: {
+        backgroundColor: colors.background.card,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginTop: spacing.lg,
+        borderWidth: 1,
+        borderColor: colors.border.light,
+    },
+    settingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
     },
     logoutButton: {
         flexDirection: 'row',
