@@ -108,6 +108,7 @@ export default function Co2TrendChart({ data, isLoading, isError }: Props) {
                                 x={x} y={y} width={barW} height={barH}
                                 fill="url(#co2-bar-grad)" rx="2"
                                 className="co2chart-bar"
+                                style={{ animationDelay: `${i * 0.045}s` }}
                             />
                             <text
                                 x={x + barW / 2} y={PAD_TOP + PLOT_H + 18}

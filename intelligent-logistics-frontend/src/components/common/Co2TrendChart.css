@@ -23,10 +23,22 @@
 
 .co2chart-bar {
     transition: fill 0.15s ease;
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: co2-bar-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes co2-bar-rise {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
 }
 
 .co2chart-bar-group:hover .co2chart-bar {
     fill: url(#co2-bar-grad-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .co2chart-bar { animation: none; }
 }
 
 .co2chart-yaxis-label {
