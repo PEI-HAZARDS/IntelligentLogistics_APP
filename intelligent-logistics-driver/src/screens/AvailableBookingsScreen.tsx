@@ -3,7 +3,7 @@
  * Shows unclaimed scheduled appointments for the driver's company.
  * Driver selects one and claims it via PIN entry.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
     ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
@@ -12,7 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getAvailableBookings, claimArrival } from '../services/drivers';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { spacing, borderRadius, fontSize, fontWeight, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { haptics } from '../components/AnimatedComponents';
 import type { Appointment } from '../types/types';
 
@@ -32,6 +33,8 @@ interface ClaimModalProps {
 }
 
 function ClaimModal({ appointment, onClose, onClaimed }: ClaimModalProps) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [pin, setPin] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -129,6 +132,8 @@ function ClaimModal({ appointment, onClose, onClaimed }: ClaimModalProps) {
 }
 
 export default function AvailableBookingsScreen() {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { user } = useAuthStore();
 
     const [bookings, setBookings] = useState<Appointment[]>([]);
@@ -303,7 +308,7 @@ export default function AvailableBookingsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background.dark },
     scrollContent: { padding: spacing.md, paddingBottom: spacing.xl },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },

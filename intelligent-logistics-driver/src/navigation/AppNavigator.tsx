@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../stores/authStore';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -24,6 +24,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
     const { isAuthenticated, isLoading } = useAuthStore();
+    const { colors } = useTheme();
     const [consentChecked, setConsentChecked] = useState(false);
     const [hasConsent, setHasConsent] = useState<boolean | null>(null);
 

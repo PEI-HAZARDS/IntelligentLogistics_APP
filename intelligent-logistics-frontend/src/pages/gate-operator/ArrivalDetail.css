@@ -72,7 +72,7 @@
 
 /* ── Section card ── */
 .ad-section {
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   border-radius: 12px;
   overflow: hidden;
@@ -88,7 +88,7 @@
 }
 
 .ad-section-header svg {
-  color: var(--accent, #60a5fa);
+  color: var(--accent-color, #60a5fa);
   flex-shrink: 0;
 }
 
@@ -151,4 +151,24 @@
 }
 .spin {
   animation: spin 0.9s linear infinite;
+}
+
+/* ── Light-mode refinements ─────────────────────────────────────────────────
+   The infraction banner used light-red foregrounds (built for a dark panel)
+   and the section header used a near-invisible white tint. Re-tint for a
+   light surface: stronger red fill + dark-red text, and a subtle dark wash. */
+.light-mode .ad-infraction-banner {
+  background: #FEE2E2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+.light-mode .ad-infraction-banner svg,
+.light-mode .ad-infraction-banner strong {
+  color: #b91c1c;
+}
+.light-mode .ad-infraction-notes {
+  color: #991b1b;
+}
+.light-mode .ad-section-header {
+  background: rgba(15, 23, 42, 0.03);
 }

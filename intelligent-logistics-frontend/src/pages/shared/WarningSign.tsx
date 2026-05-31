@@ -191,28 +191,21 @@ export default function WarningSign() {
         </div>
 
         {/* Luminous Sign Section */}
-        {/* Sign physical frame */}
-        <div className={`p-6 rounded-2xl border-4 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-full max-w-sm aspect-2/3 relative ${isDarkMode
-          ? 'bg-[#0a0a0a] border-neutral-800'
-          : 'bg-slate-700 border-slate-600'
-          }`}>
+        {/* Sign physical frame — intentionally always dark, regardless of the app theme */}
+        <div className="p-6 rounded-2xl border-4 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center w-full max-w-sm aspect-2/3 relative bg-[#0a0a0a] border-neutral-800">
           {/* LED flashing corner lights (often seen on these signs) */}
           <div
-            className={`absolute top-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
+            className={`absolute top-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 border-[#1a1a1a] ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping" : "bg-amber-900/40"} `}
           ></div>
           <div
-            className={`absolute top-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
+            className={`absolute top-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 border-[#1a1a1a] ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-150" : "bg-amber-900/40"} `}
           ></div>
 
           <div
-            className={`absolute bottom-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
+            className={`absolute bottom-6 left-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 border-[#1a1a1a] ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-75" : "bg-amber-900/40"} `}
           ></div>
           <div
-            className={`absolute bottom-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 ${isDarkMode ? 'border-[#1a1a1a]' : 'border-slate-500'
-              } ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : isDarkMode ? "bg-amber-900/40" : "bg-amber-600/70 shadow-[0_0_8px_rgba(217,119,6,0.4)]"} `}
+            className={`absolute bottom-6 right-6 w-12 h-12 rounded-full border-4 transition-colors duration-300 z-20 border-[#1a1a1a] ${isActive ? "bg-amber-500 shadow-[0_0_30px_#f59e0b] animate-ping delay-225" : "bg-amber-900/40"} `}
           ></div>
 
           {/* The actual display area */}
