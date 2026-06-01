@@ -56,10 +56,14 @@ export interface AlertsBreakdown {
 }
 
 /**
- * Get dashboard summary metrics for a given date
+ * Get dashboard summary metrics. Pass `from`/`to` for period-scoped KPIs
+ * (week/month/quarter/year), or `date` (default today) for a single day.
  */
-export async function getDashboardSummary(date?: string): Promise<DashboardSummary> {
-    const params = date ? { date } : {};
+export async function getDashboardSummary(date?: string, from?: string, to?: string): Promise<DashboardSummary> {
+    const params: Record<string, string> = {};
+    if (date) params.date = date;
+    if (from) params.from = from;
+    if (to) params.to = to;
     const response = await api.get('/statistics/summary', { params });
     return response.data;
 }

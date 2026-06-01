@@ -26,6 +26,25 @@ function getToday(): string {
     return new Date().toISOString().split("T")[0];
 }
 
+/** "2026-05-25" → "25 May" (human-readable, no timezone shift). */
+function fmtDay(iso: string): string {
+    return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+// ── CO₂ "avoidable" model ───────────────────────────────────────────────────
+// Same emission factor the backend uses (ICCT HDV 2023 + EU JRC, Euro VI idling).
+// "Avoidable" = idle minutes beyond a 5-min operational grace window, estimated from
+// the wait-distribution buckets via their representative midpoints. It is an estimate
+// (we only have bucket counts on the client, not per-truck minutes) — labelled as such.
+const IDLE_CO2_KG_PER_MIN = 0.84 / 60;
+const GRACE_MIN = 5;                 // first 5 min considered unavoidable scheduling slack
+const CAR_CO2_KG_PER_KM = 0.12;      // EEA average passenger car, for the tangible equivalence
+const AVOIDABLE_MIN_PER_TRUCK: Record<"5_15" | "15_30" | "over_30", number> = {
+    "5_15": 10 - GRACE_MIN,          // midpoint 10 min
+    "15_30": 22.5 - GRACE_MIN,       // midpoint 22.5 min
+    over_30: 45 - GRACE_MIN,         // conservative representative for the open-ended bucket
+};
+
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -96,6 +115,17 @@ function WaitingHistogram({ distribution, isLoading, isError }: {
 
     const maxCount = Math.max(...buckets.map(b => b.count), 1);
 
+    const avoidable = useMemo(() => {
+        if (!distribution) return null;
+        const minutes =
+            distribution["5_15"] * AVOIDABLE_MIN_PER_TRUCK["5_15"] +
+            distribution["15_30"] * AVOIDABLE_MIN_PER_TRUCK["15_30"] +
+            distribution.over_30 * AVOIDABLE_MIN_PER_TRUCK.over_30;
+        const co2 = minutes * IDLE_CO2_KG_PER_MIN;
+        const delayed = distribution["5_15"] + distribution["15_30"] + distribution.over_30;
+        return { co2, km: co2 / CAR_CO2_KG_PER_KM, delayed };
+    }, [distribution]);
+
     if (isLoading) return (
         <div className="sus-histo-wrap sus-chart-loading">
             <RefreshCw size={20} className="sus-spin" />
@@ -131,6 +161,19 @@ function WaitingHistogram({ distribution, isLoading, isError }: {
                     </div>
                 );
             })}
+
+            {avoidable && (
+                <div className="sus-avoidable">
+                    <div className="sus-avoidable-main">
+                        <span className="sus-avoidable-value">{avoidable.co2.toFixed(1)}</span>
+                        <span className="sus-avoidable-unit">kg CO₂ avoidable</span>
+                    </div>
+                    <p className="sus-avoidable-sub">
+                        Idle beyond the {GRACE_MIN}-min grace window across {avoidable.delayed} trucks
+                        {avoidable.km >= 1 && <> · ≈ {Math.round(avoidable.km)} km driven by a car</>}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
@@ -219,7 +262,7 @@ export default function SustainabilityPage() {
                     <div>
                         <h1 className="sus-title">Sustainability</h1>
                         <p className="sus-subtitle">
-                            Week of <span>{weekFrom}</span> to <span>{today}</span>
+                            Week of <span>{fmtDay(weekFrom)}</span> – <span>{fmtDay(today)} {new Date().getFullYear()}</span>
                         </p>
                     </div>
                 </div>

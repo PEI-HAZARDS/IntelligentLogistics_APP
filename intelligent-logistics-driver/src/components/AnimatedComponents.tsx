@@ -121,7 +121,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
                     width,
                     height,
                     borderRadius,
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(15, 23, 42, 0.08)',
                 },
                 animatedStyle,
                 style,
@@ -145,7 +145,7 @@ export function SkeletonCard({ style }: { style?: ViewStyle }) {
 
 const skeletonStyles = StyleSheet.create({
     card: {
-        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+        backgroundColor: '#E3E8EF',
         borderRadius: 12,
         padding: 16,
         gap: 8,

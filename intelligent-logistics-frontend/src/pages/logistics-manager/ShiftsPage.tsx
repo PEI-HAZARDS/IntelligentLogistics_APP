@@ -2,9 +2,11 @@
  * Shifts Management Page
  * Allows managers to view, filter, and manage operator shifts
  */
-import { useState, useEffect, useCallback } from "react";
-import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2, Upload } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Search, Filter, RefreshCw, Plus, Clock, User, Trash2, Upload, CalendarClock } from "lucide-react";
 import { getShifts, deleteShift, type ShiftListItem } from "@/services/workers";
+import ShiftCalendar from "@/components/logistics-manager/ShiftCalendar";
+import ShiftTemplatesModal from "@/components/logistics-manager/ShiftTemplatesModal";
 import AddShiftModal from "@/components/logistics-manager/AddShiftModal";
 import ImportShiftsModal from "@/components/logistics-manager/ImportShiftsModal";
 import ImportAppointmentsModal from "@/components/logistics-manager/ImportAppointmentsModal";
@@ -30,12 +32,20 @@ const STATUS_LABELS: Record<ShiftStatus, string> = {
     'inactive': 'No Operator',
 };
 
+const toISO = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export default function ShiftsPage() {
     const queryClient = useQueryClient();
     const { toasts, addToast, dismissToast } = useToasts();
-    const [shifts, setShifts] = useState<Shift[]>([]);
+    // `monthShifts` holds the whole visible month (feeds the calendar); the
+    // table shows the shifts of the selected day.
+    const [monthShifts, setMonthShifts] = useState<Shift[]>([]);
+    const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+    const [selectedDate, setSelectedDate] = useState<string>(() => toISO(new Date()));
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showTemplatesModal, setShowTemplatesModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showImportAppointmentsModal, setShowImportAppointmentsModal] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -45,39 +55,58 @@ export default function ShiftsPage() {
         shiftType: '' as 'MORNING' | 'AFTERNOON' | 'NIGHT' | '',
     });
 
-    // Fetch shifts data from API
+    const monthRange = useMemo(() => {
+        const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+        const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
+        return { from: toISO(start), to: toISO(end) };
+    }, [calendarMonth]);
+
+    // Fetch the whole visible month (one call powers both calendar and table).
     const fetchShifts = useCallback(async () => {
         setIsLoading(true);
         try {
             const data = await getShifts({
+                dateFrom: monthRange.from,
+                dateTo: monthRange.to,
                 shiftType: filters.shiftType || undefined,
-                gateId: undefined,
             });
-
-            // Apply client-side filters for text search and status
-            let filtered = data;
-            if (filters.workerId) {
-                filtered = filtered.filter(s =>
-                    s.operatorName.toLowerCase().includes(filters.workerId.toLowerCase()) ||
-                    s.operatorId.toLowerCase().includes(filters.workerId.toLowerCase())
-                );
-            }
-            if (filters.status) {
-                filtered = filtered.filter(s => s.status === filters.status);
-            }
-
-            setShifts(filtered);
+            setMonthShifts(data);
         } catch (error) {
             console.error("Failed to fetch shifts:", error);
-            setShifts([]);
+            setMonthShifts([]);
         } finally {
             setIsLoading(false);
         }
-    }, [filters]);
+    }, [monthRange, filters.shiftType]);
 
     useEffect(() => {
         fetchShifts();
     }, [fetchShifts]);
+
+    // Table rows = selected day's shifts, with the text/status filters applied.
+    const shifts = useMemo(() => {
+        let filtered = monthShifts.filter(s => s.date === selectedDate);
+        if (filters.workerId) {
+            const q = filters.workerId.toLowerCase();
+            filtered = filtered.filter(s =>
+                s.operatorName.toLowerCase().includes(q) || s.operatorId.toLowerCase().includes(q));
+        }
+        if (filters.status) {
+            filtered = filtered.filter(s => s.status === filters.status);
+        }
+        return filtered;
+    }, [monthShifts, selectedDate, filters.workerId, filters.status]);
+
+    const handleMonthChange = (delta: number) => {
+        const next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1);
+        setCalendarMonth(next);
+        // Keep the selection meaningful: today if it falls in the new month, else day 1.
+        const now = new Date();
+        setSelectedDate(
+            now.getMonth() === next.getMonth() && now.getFullYear() === next.getFullYear()
+                ? toISO(now) : toISO(next),
+        );
+    };
 
     const clearFilters = () => {
         setFilters({ workerId: '', status: '', shiftType: '' });
@@ -107,6 +136,15 @@ export default function ShiftsPage() {
                         setShowAddModal(false);
                         fetchShifts();
                         addToast({ type: 'success', title: 'Shift Created', message: 'The shift was created successfully.' });
+                    }}
+                />
+            )}
+            {showTemplatesModal && (
+                <ShiftTemplatesModal
+                    onClose={() => setShowTemplatesModal(false)}
+                    onChanged={(msg) => {
+                        fetchShifts();
+                        if (msg) addToast({ type: 'success', title: 'Templates', message: msg });
                     }}
                 />
             )}
@@ -158,12 +196,25 @@ export default function ShiftsPage() {
                         <Upload size={16} />
                         Import Shifts
                     </button>
+                    <button className="action-btn" onClick={() => setShowTemplatesModal(true)}>
+                        <CalendarClock size={16} />
+                        Recurring Templates
+                    </button>
                     <button className="action-btn primary" onClick={() => setShowAddModal(true)}>
                         <Plus size={16} />
                         New Shift
                     </button>
                 </div>
             </div>
+
+            {/* Calendar — monthly shift distribution */}
+            <ShiftCalendar
+                month={calendarMonth}
+                shifts={monthShifts}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onMonthChange={handleMonthChange}
+            />
 
             {/* Filters Panel */}
             <div className="shifts-filters">
@@ -228,7 +279,9 @@ export default function ShiftsPage() {
             {/* Shifts Table */}
             <div className="data-table">
                 <div className="data-table-header">
-                    <h3 className="data-table-title">Shifts List</h3>
+                    <h3 className="data-table-title">
+                        Shifts · {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                    </h3>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                         {shifts.length} result{shifts.length !== 1 ? 's' : ''}
                     </span>

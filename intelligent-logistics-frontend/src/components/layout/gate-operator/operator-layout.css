@@ -4107,3 +4107,81 @@ VISIBLE FOCUS FLOW - ACTIVE SECTION HIGHLIGHT
   border-color: rgba(59, 130, 246, 0.3);
   transition: border-color 0.2s;
 }
+
+/* =============================================================================
+   LIGHT-MODE REFINEMENTS — Gate Operator
+   Light mode is the default theme. The rules below replace pastel foregrounds
+   (designed for a dark canvas) with darker, WCAG-AA-legible tones, and re-skin
+   the few surfaces that were hardcoded dark so they read correctly on light.
+   ============================================================================= */
+
+/* --- Inline status text (entry queue / cards) --- */
+.light-mode .status-em-descarga { color: #1d4ed8; }
+.light-mode .status-concluído  { color: #15803d; }
+.light-mode .status-atrasado   { color: #b91c1c; }
+
+/* --- Primary delayed badge (was #FDE047 on a tint) --- */
+.light-mode .status-badge.status-delayed {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: rgba(180, 83, 9, 0.5);
+}
+
+/* --- Alert card severity rails — darken so the accent reads on white --- */
+.light-mode .alert-card.severity-info    { border-left-color: #1d4ed8; }
+.light-mode .alert-card.severity-warning { border-left-color: #b45309; }
+.light-mode .alert-card.severity-danger  { border-left-color: #b91c1c; }
+
+/* --- Shift-handover modal: flips to a light surface via --bg-dropdown,
+       so its pastel stat icons / notices must darken to keep contrast --- */
+.light-mode .handover-stats .stat-item.completed svg { color: #15803d; }
+.light-mode .handover-stats .stat-item.delayed svg   { color: #b91c1c; }
+.light-mode .handover-stats .stat-item.transit svg   { color: #1d4ed8; }
+.light-mode .pending-section .section-title svg      { color: #b45309; }
+
+.light-mode .handover-notice {
+  background: #FEF3C7;
+  border-color: rgba(180, 83, 9, 0.35);
+  color: #92400E;
+}
+.light-mode .handover-modal .empty-state { color: #15803d; }
+
+/* --- Manual-review modal (light surface via --bg-surface-glass) --- */
+.light-mode .manual-review-modal .modal-header {
+  background: #FEF3C7;
+}
+.light-mode .manual-review-modal .modal-title .warning-icon { color: #b45309; }
+
+/* --- Detection-details modal: was hardcoded dark (rgba(15,23,42,.98)),
+       which left its var(--text-primary) body text invisible in light mode.
+       Re-skin every surface to a light, consistent panel. --- */
+.light-mode .detection-details-modal {
+  background: var(--bg-surface-glass);
+  border-color: var(--border-color);
+}
+.light-mode .detection-details-modal .modal-header,
+.light-mode .detection-details-modal .modal-footer {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+.light-mode .detection-details-modal .detail-row {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+.light-mode .detection-details-modal .detail-label,
+.light-mode .detection-details-modal .field-label {
+  color: var(--text-secondary);
+}
+.light-mode .detection-details-modal .hazmat-section {
+  background: #FEF3C7;
+  border-color: rgba(180, 83, 9, 0.35);
+}
+
+/* --- Modal close button sits on a flipping --bg-surface; its white-tint
+       hover becomes invisible on light, so swap to a neutral dark tint.
+       (.retry-button and .crop-thumb::after live on dark camera/image
+       overlays that stay dark in both modes — intentionally left alone.) --- */
+.light-mode .modal-close-btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-primary);
+}

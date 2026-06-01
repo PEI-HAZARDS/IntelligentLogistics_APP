@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAuthStore } from './src/stores/authStore';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -21,6 +22,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
+  const { mode } = useTheme();
 
   // Check authentication on app start
   useEffect(() => {
@@ -29,7 +31,8 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar style="light" />
+      {/* Status-bar glyphs follow the active theme (dark glyphs on light, light on dark) */}
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <AppNavigator />
     </>
   );
@@ -38,9 +41,11 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AppContent />
+        </QueryClientProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

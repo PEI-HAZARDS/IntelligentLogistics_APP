@@ -117,9 +117,27 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     position: relative;
     overflow: hidden;
+    animation: sus-rise 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.sus-kpi:hover { transform: translateY(-2px); }
+
+.sus-kpi-row .sus-kpi:nth-child(1) { animation-delay: 0.04s; }
+.sus-kpi-row .sus-kpi:nth-child(2) { animation-delay: 0.10s; }
+.sus-kpi-row .sus-kpi:nth-child(3) { animation-delay: 0.16s; }
+.sus-kpi-row .sus-kpi:nth-child(4) { animation-delay: 0.22s; }
+
+@keyframes sus-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sus-bar-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
 }
 
 .sus-kpi::before {
@@ -211,7 +229,18 @@
     border: 1px solid var(--border-color);
     border-radius: 10px;
     overflow: hidden;
+    animation: sus-rise 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation-delay: 0.18s;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
+
+.sus-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-hover, rgba(148, 163, 184, 0.22));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.sus-charts-row .sus-card:nth-child(2) { animation-delay: 0.26s; }
 
 .sus-card-header {
     display: flex;
@@ -329,6 +358,17 @@
     border-radius: 5px;
     transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     min-width: 4px;
+    transform-origin: left center;
+    animation: sus-bar-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sus-histo-row:nth-child(1) .sus-histo-bar { animation-delay: 0.22s; }
+.sus-histo-row:nth-child(2) .sus-histo-bar { animation-delay: 0.31s; }
+.sus-histo-row:nth-child(3) .sus-histo-bar { animation-delay: 0.40s; }
+.sus-histo-row:nth-child(4) .sus-histo-bar { animation-delay: 0.49s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .sus-kpi, .sus-card, .sus-histo-bar { animation: none; }
 }
 
 .sus-histo-count {
@@ -473,4 +513,46 @@
     .sus-kpi-row {
         grid-template-columns: 1fr;
     }
+}
+
+/* ── Avoidable CO₂ (wait-distribution card) ───────────────────────────────── */
+.sus-avoidable {
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.sus-avoidable-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+.sus-avoidable-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #ef5350;
+}
+
+.sus-avoidable-unit {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.sus-avoidable-sub {
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+/* ── Light-mode refinements ─────────────────────────────────────────────────
+   The histogram track used a near-invisible white tint and the avoidable-CO₂
+   figure used a light red — both darkened for contrast on a light surface. */
+.light-mode .sus-histo-track {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.light-mode .sus-avoidable-value {
+    color: #c62828;
 }

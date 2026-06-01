@@ -3,17 +3,21 @@
  * Audit table of appointments flagged with highway_infraction=true.
  * Allows the manager to review hazmat infractions and log contact with the carrier.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
     RefreshCw, Search, ShieldAlert, AlertCircle,
     ChevronLeft, ChevronRight, Truck, Activity, CheckCircle, ClipboardCheck,
+    Download,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSummaryStats } from "@/hooks/useStatistics";
 import { useInfractionArrivals } from "@/hooks/useArrivals";
+import { getArrivals } from "@/services/arrivals";
 import type { Appointment, AppointmentStatusEnum } from "@/types/types";
 import { labelForStatus } from "@/lib/statusLabel";
 import InfractionReviewModal from "@/components/logistics-manager/InfractionReviewModal";
+import ExportInfractionsModal from "@/components/logistics-manager/ExportInfractionsModal";
+import { onlyReviewed, type ReviewedInfraction } from "@/lib/infractionExport";
 
 const PAGE_SIZE = 15;
 
@@ -80,6 +84,26 @@ export default function InfractionsPage() {
         queryClient.invalidateQueries({ queryKey: ["arrivals", "infractions"] });
     };
 
+    const [exportOpen, setExportOpen] = useState(false);
+
+    // Fetch every infraction (across pages) and keep only the reviewed ones,
+    // so the export/email covers all carriers, not just the current page.
+    // The arrivals endpoint caps `limit` at 100, so we page through instead of
+    // requesting a single oversized page (which would 422 and fail the export).
+    const fetchAllReviewed = useCallback(async (): Promise<ReviewedInfraction[]> => {
+        const PAGE_LIMIT = 100;
+        const collected: ReviewedInfraction[] = [];
+        let page = 1;
+        for (let guard = 0; guard < 50; guard++) {
+            const res = await getArrivals({ highway_infraction: true, page, limit: PAGE_LIMIT });
+            const items = (res.items ?? []) as ReviewedInfraction[];
+            collected.push(...items);
+            if (items.length === 0 || page >= (res.pages ?? 1)) break;
+            page++;
+        }
+        return onlyReviewed(collected);
+    }, []);
+
     return (
         <div className="infractions-page">
             {reviewTarget && (
@@ -87,6 +111,13 @@ export default function InfractionsPage() {
                     appointment={reviewTarget}
                     onClose={() => setReviewTarget(null)}
                     onReviewed={handleReviewed}
+                />
+            )}
+
+            {exportOpen && (
+                <ExportInfractionsModal
+                    fetchReviewed={fetchAllReviewed}
+                    onClose={() => setExportOpen(false)}
                 />
             )}
 
@@ -100,6 +131,15 @@ export default function InfractionsPage() {
                     </span>
                 </div>
                 <div className="dashboard-filters">
+                    <button
+                        className="filter-btn"
+                        onClick={() => setExportOpen(true)}
+                        disabled={tableLoading}
+                        title="Export or email reviewed infractions by carrier"
+                    >
+                        <Download size={16} />
+                        <span>Export / Email</span>
+                    </button>
                     <button className="filter-btn" onClick={handleRefresh} disabled={tableLoading} title="Refresh">
                         <RefreshCw size={16} className={tableLoading ? "spinning" : ""} />
                     </button>

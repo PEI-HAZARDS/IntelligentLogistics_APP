@@ -45,5 +45,6 @@ RUN npm run build:${VITE_MODE}
 # --- Serve stage ---
 FROM nginx:1.27-alpine
 COPY --from=build /workspace/intelligent-logistics-frontend/dist /usr/share/nginx/html
-COPY --from=build /workspace/intelligent-logistics-frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Template: the entrypoint runs envsubst (${API_UPSTREAM}) → /etc/nginx/conf.d/default.conf
+COPY --from=build /workspace/intelligent-logistics-frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80

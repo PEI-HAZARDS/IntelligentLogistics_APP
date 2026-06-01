@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,10 @@ import {
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { spacing, borderRadius, fontSize, fontWeight, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+
+type Styles = ReturnType<typeof createStyles>;
 
 export const LOCATION_CONSENT_KEY = 'location_consent_given';
 
@@ -20,6 +23,8 @@ interface Props {
 }
 
 export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [saving, setSaving] = useState(false);
 
     const handleAccept = async () => {
@@ -49,36 +54,36 @@ export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
                 </Animated.Text>
 
                 <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.card}>
-                    <Section icon="navigate-outline" title="Purpose">
+                    <Section icon="navigate-outline" title="Purpose" styles={styles} colors={colors}>
                         Your GPS position is used to calculate the route to the port terminal
                         and estimate your arrival time in real time.
                     </Section>
 
-                    <Divider />
+                    <Divider styles={styles} />
 
-                    <Section icon="server-outline" title="How it's processed">
+                    <Section icon="server-outline" title="How it's processed" styles={styles} colors={colors}>
                         Location data is processed locally on your device for route calculation.
                         It is not stored on servers or shared with third parties.
                     </Section>
 
-                    <Divider />
+                    <Divider styles={styles} />
 
-                    <Section icon="time-outline" title="How long">
+                    <Section icon="time-outline" title="How long" styles={styles} colors={colors}>
                         Only while the delivery is active (status <Text style={styles.mono}>in_transit</Text>).
                         When the delivery is completed or cancelled, access is stopped.
                     </Section>
 
-                    <Divider />
+                    <Divider styles={styles} />
 
-                    <Section icon="person-outline" title="Your rights">
+                    <Section icon="person-outline" title="Your rights" styles={styles} colors={colors}>
                         You can withdraw this consent at any time in your device settings
                         (Settings → Privacy → Location). This does not affect deliveries
                         already completed.
                     </Section>
 
-                    <Divider />
+                    <Divider styles={styles} />
 
-                    <Section icon="business-outline" title="Data Controller">
+                    <Section icon="business-outline" title="Data Controller" styles={styles} colors={colors}>
                         Port of Aveiro — Intelligent Logistics System.{'\n'}
                         DPO Contact: dpo@porto-aveiro.pt
                     </Section>
@@ -115,7 +120,7 @@ export default function LocationConsentScreen({ onConsent, onDecline }: Props) {
     );
 }
 
-function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+function Section({ icon, title, children, styles, colors }: { icon: string; title: string; children: React.ReactNode; styles: Styles; colors: ThemeColors }) {
     return (
         <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -127,11 +132,11 @@ function Section({ icon, title, children }: { icon: string; title: string; child
     );
 }
 
-function Divider() {
+function Divider({ styles }: { styles: Styles }) {
     return <View style={styles.divider} />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background.dark,

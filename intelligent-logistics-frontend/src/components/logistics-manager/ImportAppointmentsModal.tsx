@@ -8,10 +8,10 @@ interface Props {
 }
 
 const CSV_TEMPLATE = [
-    "truck_license_plate,terminal_name,scheduled_start_time,expected_duration,direction,cargo_description,cargo_type,cargo_quantity,notes",
-    "AA-00-BB,Terminal Norte - Porto de Aveiro,2026-06-01T08:00:00,60,inbound,Steel coils,solid,24.5,",
-    "CC-11-DD,Terminal de Granéis Líquidos - Porto de Aveiro,2026-06-01T10:00:00,90,inbound,Chemical drums,liquid,12,Fragile cargo",
-    "EE-22-FF,Terminal de Granéis Sólidos - Porto de Aveiro,2026-06-01T14:00:00,,inbound,,,",
+    "truck_license_plate,terminal_name,gate_label,scheduled_start_time,expected_duration,direction,cargo_description,cargo_type,cargo_quantity,notes",
+    "AA-00-BB,Terminal Norte - Porto de Aveiro,Portaria 1,2026-06-01T08:00:00,60,inbound,Steel coils,solid,24.5,",
+    "CC-11-DD,Terminal de Granéis Líquidos - Porto de Aveiro,Portaria 1,2026-06-01T10:00:00,90,inbound,Chemical drums,liquid,12,Fragile cargo",
+    "EE-22-FF,Terminal de Granéis Sólidos - Porto de Aveiro,Portaria 2,2026-06-01T14:00:00,,inbound,,,",
 ].join("\n");
 
 function downloadTemplate() {
@@ -90,6 +90,9 @@ export default function ImportAppointmentsModal({ onClose, onImported }: Props) 
                             </p>
                             <p className="import-hint-sub" style={{ marginTop: "0.2rem" }}>
                                 Optional: <code>scheduled_start_time</code> (ISO-8601), <code>expected_duration</code> (min), <code>direction</code> (inbound/outbound, default: inbound)
+                            </p>
+                            <p className="import-hint-sub" style={{ marginTop: "0.2rem" }}>
+                                <code>gate_label</code> (e.g. "Portaria 1") — recommended; matches a gate by name prefix, so the short name is enough. Without it the appointment won't appear on a gate operator's dashboard until detected at the gate.
                             </p>
                             <p className="import-hint-sub" style={{ marginTop: "0.2rem" }}>
                                 Cargo: <code>cargo_description</code>, <code>cargo_type</code> (liquid/solid/gaseous/hybrid), <code>cargo_quantity</code>, <code>notes</code>

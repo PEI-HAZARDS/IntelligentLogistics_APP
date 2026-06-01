@@ -1,3 +1,5 @@
+name: intelligentlogistics_app
+
 services:
   gate-ui:
     build:
@@ -15,8 +17,18 @@ services:
         VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
       - "8080:80"
+    environment:
+      # Injected into the nginx template (envsubst) at container start.
+      - API_UPSTREAM=${API_UPSTREAM}
     networks:
       - logistics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   manager-ui:
     build:
@@ -34,8 +46,17 @@ services:
         VITE_USE_SIMULATED_GRAPH: ${VITE_USE_SIMULATED_GRAPH}
     ports:
       - "8081:80"
+    environment:
+      - API_UPSTREAM=${API_UPSTREAM}
     networks:
       - logistics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   api-proxy:
     build:
@@ -44,8 +65,18 @@ services:
     ports:
       - "8000:80"
       - "8189:8189/udp"
+    environment:
+      - API_UPSTREAM=${API_UPSTREAM}
+      - MEDIA_UPSTREAM=${MEDIA_UPSTREAM}
     networks:
       - logistics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   driver-app:
     build:
@@ -74,6 +105,13 @@ services:
           target: /packages/shared
     stdin_open: true
     tty: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8082 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
 
 networks:
   logistics-network:

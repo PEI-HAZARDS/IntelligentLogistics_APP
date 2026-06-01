@@ -7,7 +7,8 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors, spacing, borderRadius, fontSize } from '../theme/colors';
+import { spacing } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 // Screens
 import ActiveArrivalScreen from '../screens/ActiveArrivalScreen';
@@ -27,6 +28,7 @@ const Drawer = createDrawerNavigator<MainDrawerParamList>();
 // Custom Header Right component (Profile icon)
 const HeaderRight = () => {
     const navigation = useNavigation<any>();
+    const { colors } = useTheme();
     return (
         <TouchableOpacity 
             style={styles.profileButton}
@@ -38,6 +40,7 @@ const HeaderRight = () => {
 };
 
 export default function MainDrawerNavigator() {
+    const { colors } = useTheme();
     return (
         <Drawer.Navigator
             screenOptions={{

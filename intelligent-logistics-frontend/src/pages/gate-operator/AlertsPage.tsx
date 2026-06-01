@@ -95,27 +95,9 @@ export default function AlertsPage() {
                         };
                     }
 
-                    // ── status_changed ───────────────────────────────────────
-                    if (msgType === "status_changed") {
-                        const newStatus: string = d.new_status || d.status || "–";
-                        const apptId: string | undefined = d.appointment_id != null
-                            ? String(d.appointment_id)
-                            : undefined;
-
-                        return {
-                            id: msg.id,
-                            type: "info",
-                            title: `Status update${plate ? ` — ${plate}` : apptId ? ` — #${apptId}` : ""}`,
-                            message: `Appointment moved to: ${newStatus.replace(/_/g, " ")}`,
-                            timestamp: new Date(msg.timestamp).toLocaleString("en-GB"),
-                            read: false,
-                            licensePlate: plate,
-                            messageType: msgType,
-                        };
-                    }
-
                     // ── fallback: skip internal/infra messages ───────────────
-                    if (["scale_network", "ping", "heartbeat"].includes(msgType)) return null;
+                    // status_changed is intentionally not surfaced as a notification.
+                    if (["status_changed", "scale_network", "ping", "heartbeat"].includes(msgType)) return null;
 
                     // ── generic fallback for any other message type ───────────
                     const alertMessages: string[] = Array.isArray(d.alerts) ? d.alerts : [];

@@ -2,14 +2,15 @@
  * Arrivals Screen
  * Shows list of today's arrivals
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, SlideInRight, Layout } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getMyTodayArrivals } from '../services/drivers';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
+import { spacing, borderRadius, fontSize, fontWeight, ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { haptics, SkeletonCard } from '../components/AnimatedComponents';
 import type { Appointment } from '../types/types';
 
@@ -86,6 +87,8 @@ function getStatusLabel(status: string): string {
 }
 
 export default function ArrivalsScreen() {
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { user } = useAuthStore();
     const driversLicense = user?.drivers_license || '';
 
@@ -198,7 +201,7 @@ export default function ArrivalsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background.dark,
