@@ -6,9 +6,10 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl,
-    ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
+    ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { getAvailableBookings, claimArrival } from '../services/drivers';
@@ -135,6 +136,7 @@ export default function AvailableBookingsScreen() {
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const { user } = useAuthStore();
+    const navigation = useNavigation<any>();
 
     const [bookings, setBookings] = useState<Appointment[]>([]);
     const [total, setTotal] = useState(0);
@@ -171,7 +173,17 @@ export default function AvailableBookingsScreen() {
         setClaimedId(selected?.id ?? null);
         setSelected(null);
         fetchBookings(page);
-    }, [selected, page, fetchBookings]);
+        // Confirm the claim and send the driver to the Delivery tab, where the
+        // claimed booking now appears as a card with a Start Trip action.
+        Alert.alert(
+            'Booking claimed',
+            'The booking is now assigned to you. Start the trip from the Delivery tab.',
+            [
+                { text: 'Stay here', style: 'cancel' },
+                { text: 'Go to Delivery', onPress: () => navigation.navigate('Home') },
+            ],
+        );
+    }, [selected, page, fetchBookings, navigation]);
 
     if (isLoading) {
         return (

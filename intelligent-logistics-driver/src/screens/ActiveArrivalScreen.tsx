@@ -513,6 +513,44 @@ export default function ActiveArrivalScreen() {
         }
     };
 
+    // Start a delivery the driver already owns (claimed earlier in Available Bookings).
+    // No PIN is required — the backend allows an owned re-claim by booking_reference,
+    // which returns the dock/navigation details we need before going in_transit.
+    const handleStartOwnedDelivery = async (delivery: Appointment) => {
+        if (isClaiming) return;
+        setIsClaiming(true);
+        setError(null);
+        try {
+            if (DEV_MOCK_MODE) {
+                await new Promise(resolve => setTimeout(resolve, 800));
+                setClaimResult(MOCK_CLAIM_RESULT);
+                setActiveArrival(MOCK_ACTIVE);
+                setDeliveryPhase('in_transit');
+                setSuccessMessage('Trip started! Ready to drive.');
+                haptics.success();
+                return;
+            }
+            const result = await claimArrival({ arrival_id: '', booking_reference: delivery.booking_reference });
+            if (result.appointment_id) {
+                try {
+                    await startTrip(result.appointment_id);
+                } catch (err) {
+                    console.warn('Failed to update status to in_transit:', err);
+                }
+            }
+            haptics.success();
+            setClaimResult(result);
+            setSuccessMessage('Trip started!');
+            setActiveArrival(delivery);
+            setDeliveryPhase('in_transit');
+        } catch (err) {
+            setError('Could not start the trip. Please try again.');
+            haptics.error();
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+
     // Expand map modal
     const handleExpandMap = () => {
         haptics.light();
@@ -1333,8 +1371,8 @@ export default function ActiveArrivalScreen() {
                 {/* Priority Hero Card */}
                 <Text style={styles.sectionTitle}>PRIORITY TASK</Text>
                 {nextDelivery ? (
-                    <TouchableOpacity 
-                        onPress={() => { haptics.light(); setSelectedForPin(nextDelivery); }}
+                    <TouchableOpacity
+                        onPress={() => { haptics.light(); handleStartOwnedDelivery(nextDelivery); }}
                         activeOpacity={0.9}
                     >
                         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.heroCard}>
@@ -1378,9 +1416,9 @@ export default function ActiveArrivalScreen() {
                                 key={delivery.id} 
                                 entering={FadeInDown.delay(300 + (idx * 100)).duration(400)}
                             >
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.deliveryListItem}
-                                    onPress={() => { haptics.light(); setSelectedForPin(delivery); }}
+                                    onPress={() => { haptics.light(); handleStartOwnedDelivery(delivery); }}
                                 >
                                     <View style={styles.deliveryListInfo}>
                                         <View style={styles.deliveryListHeader}>
